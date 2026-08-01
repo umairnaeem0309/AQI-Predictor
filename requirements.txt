@@ -1,0 +1,58 @@
+# =============================================================================
+# AQI Predictor — Python Dependencies
+# =============================================================================
+# Version ranges: lower bound ensures features, upper bound prevents breakage
+# Python version: 3.11 (required for Hopsworks compatibility)
+# =============================================================================
+
+# --- Core ML ---
+scikit-learn>=1.3.0,<1.5.0
+xgboost>=1.7.0,<2.1.0
+tensorflow-cpu>=2.13.0,<2.17.0
+
+# --- Data Processing ---
+pandas>=2.0.0,<2.2.0
+numpy>=1.24.0,<2.0.0
+
+# --- Feature Store ---
+# Hopsworks: install separately if needed (may have platform issues on Windows)
+# pip install hopsworks>=3.7.0,<4.0.0
+# If installation fails, the local fallback (DuckDB + Parquet) is fully functional
+hopsworks>=3.7.0,<4.0.0
+
+# --- Experiment Tracking & Model Registry ---
+mlflow>=2.8.0,<3.0.0
+
+# --- Backend API ---
+fastapi>=0.104.0,<0.112.0
+uvicorn>=0.24.0,<0.31.0
+
+# --- Frontend Dashboard ---
+streamlit>=1.28.0,<1.40.0
+
+# --- Monitoring ---
+evidently>=0.4.0,<0.5.0
+
+# --- Explainability ---
+shap>=0.43.0,<0.46.0
+
+# --- Local Feature Store ---
+duckdb>=0.9.0,<1.1.0
+pyarrow>=14.0.0,<18.0.0
+
+# --- Validation ---
+pydantic>=2.5.0,<2.10.0
+
+# --- Testing ---
+pytest>=7.4.0,<8.0.0
+pytest-cov>=4.1.0,<6.0.0
+
+# --- Code Quality ---
+black>=23.12.0,<24.0.0
+isort>=5.12.0,<6.0.0
+flake8>=7.0.0,<8.0.0
+
+# --- Utilities ---
+python-dotenv>=1.0.0,<2.0.0
+pyyaml>=6.0.0,<7.0.0
+requests>=2.31.0,<2.33.0

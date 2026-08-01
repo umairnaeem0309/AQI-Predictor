@@ -1,0 +1,48 @@
+# =============================================================================
+# AQI Predictor — Docker Compose
+# =============================================================================
+# Services:
+#   backend  — FastAPI prediction API (port 8000)
+#   frontend — Streamlit dashboard (port 8501)
+# =============================================================================
+
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aqi-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    image: python:3.11-slim
+    container_name: aqi-frontend
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./app/frontend:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir streamlit requests &&
+             streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

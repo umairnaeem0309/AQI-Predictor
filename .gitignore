@@ -1,0 +1,77 @@
+# =============================================================================
+# AQI Predictor — Git Ignore Rules
+# =============================================================================
+
+# --- Secrets ---
+.env
+*.key
+*.secret
+credentials.json
+service-account*.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Virtual Environment ---
+venv/
+env/
+.venv/
+ENV/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints/
+
+# --- Data (large files) ---
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# --- Models (large files) ---
+models/*
+!models/.gitkeep
+
+# --- MLflow ---
+mlruns/
+mlartifacts/
+
+# --- Docker ---
+docker/*.log
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Coverage ---
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# --- Pytest ---
+.pytest_cache/
+
+# --- MyPy ---
+.mypy_cache/
+
+# --- Logs ---
+*.log
+logs/
