@@ -62,4 +62,58 @@
 
 ## Entry 002
 
-*(To be created during Phase 1)*
+**Date:** 1 August 2026  
+**Phase:** Phase 1 — Repository and Development Environment Setup  
+
+### Work Completed
+- Created complete repository directory structure with __init__.py and .gitkeep files
+- Created requirements.txt with pinned dependencies (tensorflow-cpu preferred)
+- Created .env.example with HOPSWORKS_HOST environment variable (not in config.yaml)
+- Created config.yaml with city definitions, model parameters, API settings (no hardcoded Hopsworks host)
+- Created .gitignore with comprehensive rules for secrets, Python, data, models, IDE files
+- Created Dockerfile (Python 3.11-slim) and docker-compose.yml (backend + frontend services)
+- Created .pre-commit-config.yaml (black, isort, flake8)
+- Created src/config/__init__.py with setup_logging() and load_config()
+- Created tests/conftest.py and tests/unit/test_environment.py with 5 test classes
+- Created placeholder source files for all modules with docstrings
+- Updated CURRENT_STATE.md and PROJECT_JOURNAL.md
+
+### Files Added
+```
+requirements.txt
+.env.example
+config.yaml
+.gitignore
+Dockerfile
+docker-compose.yml
+.pre-commit-config.yaml
+src/config/__init__.py
+tests/conftest.py
+tests/unit/test_environment.py
++ placeholder source files (12 files)
++ directory skeleton (30+ directories with __init__.py/.gitkeep)
+```
+
+### Problems
+- Hopsworks host moved to env var per owner request (no code impact)
+- tensorflow-cpu preferred over full tensorflow to reduce install size
+
+### Solutions
+- HOPSWORKS_HOST in .env.example; config.yaml references env var
+- requirements.txt specifies tensorflow-cpu
+
+### Decisions Made
+- DEC-009: Use tensorflow-cpu by default
+- DEC-010: Hopsworks host from env var, not config file
+- DEC-011: Pre-commit hooks: black, isort, flake8
+
+### Next Step
+- Run environment verification tests
+- Create Phase 1 git commit
+- Wait for Phase 1 approval
+
+---
+
+## Entry 003
+
+*(To be created during Phase 2)*

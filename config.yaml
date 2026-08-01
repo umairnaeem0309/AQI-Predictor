@@ -1,0 +1,82 @@
+# =============================================================================
+# AQI Predictor — Project Configuration
+# =============================================================================
+# Non-secret configuration only.
+# Secrets (API keys, hosts) are loaded from environment variables (.env).
+# =============================================================================
+
+project:
+  name: "AQI Predictor"
+  version: "1.0"
+
+cities:
+  - id: "karachi"
+    name: "Karachi"
+    latitude: 24.8607
+    longitude: 67.0011
+  - id: "lahore"
+    name: "Lahore"
+    latitude: 31.5204
+    longitude: 74.3587
+  - id: "islamabad"
+    name: "Islamabad"
+    latitude: 33.6844
+    longitude: 73.0479
+
+forecast_horizons:
+  - hours: 24
+    label: "24-hour"
+  - hours: 48
+    label: "48-hour"
+  - hours: 72
+    label: "72-hour"
+
+feature_store:
+  primary: "hopsworks"
+  fallback: "local"
+  # Hopsworks host is loaded from HOPSWORKS_HOST environment variable
+  # Default: eu-west.cloud.hopsworks.ai
+  time_travel_format: "HUDI"
+
+api:
+  openweather:
+    base_url: "https://api.openweathermap.org/data/2.5"
+    timeout_seconds: 30
+    max_retries: 3
+  aqicn:
+    base_url: "https://api.waqi.info"
+    timeout_seconds: 30
+    max_retries: 3
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+testing:
+  mock_data_days: 90
+  test_train_split_ratio: 0.8
+
+models:
+  random_forest:
+    n_estimators: 100
+    max_depth: 20
+    random_state: 42
+  xgboost:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.1
+    random_state: 42
+  ridge:
+    alpha: 1.0
+  lstm:
+    epochs: 50
+    batch_size: 32
+    sequence_length: 24
+    random_state: 42
+
+data:
+  raw_path: "data/raw"
+  processed_path: "data/processed"
+  mock_path: "data/mock"
+  models_path: "models"

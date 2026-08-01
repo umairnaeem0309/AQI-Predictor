@@ -74,6 +74,17 @@
 - Consider using environment variable toggle (`HOPSWORKS_ENABLED=true/false`)
 - GitHub Codespaces can serve as alternative Hopsworks development environment
 
+### Development Environment (Phase 1)
+- Repository structure created with 30+ directories
+- Python 3.11 virtual environment with pinned dependencies
+- Docker: Python 3.11-slim base image
+- Code quality: black, isort, flake8 via pre-commit
+- Testing: pytest with conftest.py and environment verification tests
+- Configuration: config.yaml + .env for secrets
+- Hopsworks host loaded from HOPSWORKS_HOST env var (not config.yaml)
+- MLflow: local file-based tracking by default (no server required)
+- TensorFlow: tensorflow-cpu preferred (lighter install)
+
 ---
 
 ## 5. Important References

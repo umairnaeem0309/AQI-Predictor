@@ -237,3 +237,87 @@ How much synthetic data to generate for development and testing, and how to prev
 
 **Impact:**  
 `data/mock/` contains 90 days of synthetic data. Documentation explicitly states mock data usage boundaries.
+
+---
+
+### DEC-009
+
+**Date:** 1 August 2026  
+**Topic:** TensorFlow Package Variant  
+**Phase:** 1  
+
+**Problem:**  
+Full TensorFlow package includes GPU support and is significantly larger than needed for CPU-only development.
+
+**Options Considered:**
+
+- **Option A:** `tensorflow` — Full package with GPU support, large install size
+- **Option B:** `tensorflow-cpu` — CPU-only variant, smaller install, faster setup
+
+**Chosen Approach:** `tensorflow-cpu`
+
+**Reason:**  
+GPU support is not required for initial development and experimentation. CPU-only variant reduces install time and disk usage. Can be upgraded to full TensorFlow later if GPU training is needed.
+
+**Trade-offs:**  
+- No GPU acceleration during development (acceptable for model comparison phase)
+- Significantly smaller installation footprint
+
+**Impact:**  
+`requirements.txt` specifies `tensorflow-cpu`. LSTM training will be slower on CPU but sufficient for experimentation.
+
+---
+
+### DEC-010
+
+**Date:** 1 August 2026  
+**Topic:** Hopsworks Host Configuration  
+**Phase:** 1  
+
+**Problem:**  
+Hopsworks host URL should not be hardcoded in configuration files for security and flexibility.
+
+**Options Considered:**
+
+- **Option A:** Hardcode in config.yaml — Simple but inflexible
+- **Option B:** Load from environment variable — Secure, flexible, follows 12-factor app principles
+
+**Chosen Approach:** Environment variable `HOPSWORKS_HOST`
+
+**Reason:**  
+Environment variables are the standard for secret/sensitive configuration. Allows different hosts for development, staging, and production without code changes.
+
+**Trade-offs:**  
+- Requires .env file or system environment setup (standard practice)
+
+**Impact:**  
+`.env.example` includes `HOPSWORKS_HOST=eu-west.cloud.hopsworks.ai`. `config.yaml` does not contain host. All feature store code reads host from `os.environ`.
+
+---
+
+### DEC-011
+
+**Date:** 1 August 2026  
+**Topic:** Code Quality Pre-commit Hooks  
+**Phase:** 1  
+
+**Problem:**  
+Need consistent code formatting and linting across the project.
+
+**Options Considered:**
+
+- **Option A:** No code quality tools — Inconsistent formatting
+- **Option B:** Manual formatting — Error-prone, time-consuming
+- **Option C:** Pre-commit hooks (black, isort, flake8) — Automated, consistent
+
+**Chosen Approach:** Pre-commit hooks with black, isort, flake8
+
+**Reason:**  
+Industry-standard Python code quality tools. Black handles formatting, isort handles import sorting, flake8 handles linting. Pre-commit ensures checks run automatically.
+
+**Trade-offs:**  
+- Initial setup overhead (minimal)
+- Developers must run `pre-commit install` once
+
+**Impact:**  
+`.pre-commit-config.yaml` created. All Python files should pass black, isort, and flake8 checks.
