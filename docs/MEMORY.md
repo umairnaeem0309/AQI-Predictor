@@ -3,8 +3,8 @@
 ## AQI Predictor — Long-Term Project Knowledge
 
 **Version:** 1.0  
-**Date:** 31 July 2026  
-**Status:** Phase 0 — Foundation  
+**Date:** 2 August 2026  
+**Status:** Phase 2 — Data Collection Architecture  
 
 ---
 
@@ -29,11 +29,25 @@
 - Python 3.10 is acceptable as fallback
 - Python 3.12+ must not be used in this project
 
+### Data Collection Architecture
+- OpenWeather API provides both weather and air pollution data
+- AQICN/WAQI API provides AQI on US EPA scale (0-500)
+- OpenWeather AQI is 1-5 scale (different from US EPA) — not used as primary AQI
+- AQICN ground stations update infrequently (staleness detection critical)
+- All timestamps normalized to UTC for consistency
+- API clients support initialization without credentials for testing
+- Retry only on transient errors: network, timeout, 429, 5xx
+- No retry on: 401, 403, 4xx (permanent failures)
+
 ---
 
 ## 2. Lessons Learned
 
-*(To be populated as development progresses)*
+### Phase 2 — Data Collection
+- Pydantic v2 models provide strong type validation for API responses
+- responses library is effective for HTTP mocking in tests
+- Mock data should be API-shaped JSON responses only (never fake training data)
+- Data ownership rules prevent conflicting values from multiple sources
 
 ---
 

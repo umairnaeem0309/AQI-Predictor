@@ -116,4 +116,44 @@ tests/unit/test_environment.py
 
 ## Entry 003
 
-*(To be created during Phase 2)*
+**Date:** 2 August 2026  
+**Phase:** Phase 2 — Data Collection Architecture  
+
+### Work Completed
+- Created src/data/exceptions.py with custom exception hierarchy (12 exception classes)
+- Created src/data/base_client.py with abstract base, retry logic, caching readiness
+- Created src/data/schemas.py with 15 Pydantic models for API responses and standard schema
+- Created src/data/validators.py with full validation pipeline (schema, staleness, duplicates, missing)
+- Created src/data/openweather_client.py with weather + pollution merging and timezone normalization
+- Created src/data/aqicn_client.py with staleness detection and AQICN-OpenWeather merge
+- Created 7 mock API response JSON files (API-shaped responses only)
+- Created 5 test files: test_schemas, test_openweather_client, test_aqicn_client, test_validators, test_retry_logic
+- Created docs/DATA_DICTIONARY.md with comprehensive field documentation
+- Added responses library to requirements.txt
+- Updated CURRENT_STATE.md and MEMORY.md
+
+### Key Design Decisions
+- Data ownership: OpenWeather authoritative for weather, AQICN authoritative for AQI/pollution
+- API clients support initialization without credentials (dependency injection)
+- Retry only on: network failures, timeouts, HTTP 429, HTTP 5xx
+- No retry on: authentication failures, invalid requests
+- Timezone normalization: all timestamps converted to UTC
+- Mock data: API-shaped responses only, never fake training datasets
+
+### Problems
+- None significant during implementation
+
+### Decisions Made
+- DEC-012: API clients support initialization without credentials
+- DEC-013: Retry only on retryable errors (network, timeout, 429, 5xx)
+- DEC-014: OpenWeather authoritative for weather; AQICN authoritative for AQI/pollution
+
+### Next Step
+- Create Phase 2 git commit
+- Wait for Phase 2 approval
+
+---
+
+## Entry 004
+
+*(To be created during Phase 3)*

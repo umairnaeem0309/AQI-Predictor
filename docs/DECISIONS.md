@@ -321,3 +321,87 @@ Industry-standard Python code quality tools. Black handles formatting, isort han
 
 **Impact:**  
 `.pre-commit-config.yaml` created. All Python files should pass black, isort, and flake8 checks.
+
+---
+
+### DEC-012
+
+**Date:** 2 August 2026  
+**Topic:** API Client Credential Handling  
+**Phase:** 2  
+
+**Problem:**  
+API clients should support both authenticated and unauthenticated modes for development and testing.
+
+**Options Considered:**
+
+- **Option A:** Require API key at initialization — Breaks test/mock mode
+- **Option B:** Support optional API key with dependency injection — Flexible for all use cases
+
+**Chosen Approach:** Optional API key with dependency injection
+
+**Reason:**  
+Allows clients to be instantiated without credentials for unit testing and mock data scenarios. API key is injected when available from environment variables.
+
+**Trade-offs:**  
+- Client must handle None API key gracefully (logged as warning)
+- Tests can create clients without mocking credentials
+
+**Impact:**  
+All API clients accept `api_key=None`. Warning logged if initialized without key.
+
+---
+
+### DEC-013
+
+**Date:** 2 August 2026  
+**Topic:** API Retry Strategy  
+**Phase:** 2  
+
+**Problem:**  
+Need to define which errors trigger retries and which fail immediately.
+
+**Options Considered:**
+
+- **Option A:** Retry all errors — Wastes time on permanent failures
+- **Option B:** Retry only transient errors — Efficient and correct
+
+**Chosen Approach:** Retry only transient errors
+
+**Reason:**  
+Authentication failures (401/403) and invalid requests (4xx) are permanent and will not succeed on retry. Network failures, timeouts, rate limits (429), and server errors (5xx) are transient.
+
+**Trade-offs:**  
+- More complex error classification (justified by correctness)
+- No wasted retry attempts on permanent failures
+
+**Impact:**  
+`BaseAPIClient._retry_request()` classifies errors and retries only: `APINetworkError`, `APITimeoutError`, `APIRateLimitError`, `APIServerError`.
+
+---
+
+### DEC-014
+
+**Date:** 2 August 2026  
+**Topic:** Data Source Ownership  
+**Phase:** 2  
+
+**Problem:**  
+Both OpenWeather and AQICN provide overlapping data. Need clear ownership rules.
+
+**Options Considered:**
+
+- **Option A:** Use whichever source is available — Unpredictable data quality
+- **Option B:** Define authoritative source per field category — Consistent, predictable
+
+**Chosen Approach:** Define authoritative source per field category
+
+**Reason:**  
+Weather fields are more accurate from OpenWeather (specialized weather API). AQI/pollution values from AQICN use the US EPA scale and are more reliable for air quality assessment.
+
+**Trade-offs:**  
+- Requires merge logic between sources (implemented in AQICNClient.merge_with_openweather)
+- Clear, documented data provenance
+
+**Impact:**  
+OpenWeather is authoritative for temperature, humidity, wind, pressure, weather_condition. AQICN is authoritative for AQI, PM2.5, PM10, CO, NO2, SO2, O3.
