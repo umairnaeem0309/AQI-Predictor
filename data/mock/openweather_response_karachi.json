@@ -1,0 +1,27 @@
+{
+  "coord": {"lon": 67.0011, "lat": 24.8607},
+  "weather": [
+    {
+      "id": 801,
+      "main": "Clouds",
+      "description": "few clouds",
+      "icon": "02d"
+    }
+  ],
+  "main": {
+    "temp": 34.5,
+    "feels_like": 38.2,
+    "temp_min": 33.0,
+    "temp_max": 36.1,
+    "pressure": 1005,
+    "humidity": 72
+  },
+  "wind": {
+    "speed": 4.6,
+    "deg": 220
+  },
+  "name": "Karachi",
+  "dt": 1751400000,
+  "timezone": 18000,
+  "cod": 200
+}
