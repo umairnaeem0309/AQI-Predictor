@@ -39,10 +39,12 @@ ENV/
 .ipynb_checkpoints/
 
 # --- Data (large files) ---
-data/raw/*
+data/raw/**
 data/processed/*
-!data/raw/.gitkeep
+data/mock/!*.json
 !data/processed/.gitkeep
+# API audit trail (real API responses)
+data/raw/api_audit/
 
 # --- Models (large files) ---
 models/*
