@@ -182,3 +182,86 @@ Mock data files in `data/mock/` contain API-shaped JSON responses for testing.
 | `aqicn_response_karachi.json` | Sample AQICN response for Karachi |
 | `aqicn_response_lahore.json` | Sample AQICN response for Lahore |
 | `aqicn_response_islamabad.json` | Sample AQICN response for Islamabad |
+
+---
+
+## 9. Engineered Features
+
+**Feature Version:** 1.0.0  
+**Schema Version:** 1.0  
+**Pipeline:** `src/features/feature_engineering.py`  
+**Total Features:** 37
+
+### 9.1 Time Features (7 features)
+
+| Feature | Type | Calculation | Availability | Purpose |
+|---|---|---|---|---|
+| `hour` | int | `timestamp.hour` | t (immediate) | Daily pollution cycles |
+| `day_of_week` | int | `timestamp.weekday()` (0=Mon, 6=Sun) | t (immediate) | Weekly patterns |
+| `month` | int | `timestamp.month` | t (immediate) | Seasonal patterns |
+| `season` | int | 0=Winter, 1=Spring, 2=Summer, 3=Fall | t (immediate) | Broad seasonal classification |
+| `is_weekend` | int | 1 if day_of_week >= 5, else 0 | t (immediate) | Weekend activity patterns |
+| `hour_sin` | float | `sin(2π × hour / 24)` | t (immediate) | Cyclical encoding |
+| `hour_cos` | float | `cos(2π × hour / 24)` | t (immediate) | Cyclical encoding |
+
+### 9.2 Lag Features (12 features)
+
+| Feature | Source | Lag | Availability | Purpose |
+|---|---|---|---|---|
+| `aqi_lag_1h` | AQI | 1 hour | t (historical) | Short-term AQI momentum |
+| `aqi_lag_6h` | AQI | 6 hours | t (historical) | Medium-term AQI trend |
+| `aqi_lag_12h` | AQI | 12 hours | t (historical) | Half-day pattern |
+| `aqi_lag_24h` | AQI | 24 hours | t (historical) | Daily pattern (same time yesterday) |
+| `aqi_lag_48h` | AQI | 48 hours | t (historical) | Two-day pattern |
+| `aqi_lag_72h` | AQI | 72 hours | t (historical) | Three-day pattern |
+| `pm25_lag_1h` | PM2.5 | 1 hour | t (historical) | Short-term PM2.5 trend |
+| `pm25_lag_24h` | PM2.5 | 24 hours | t (historical) | Daily PM2.5 pattern |
+| `temperature_lag_1h` | Temperature | 1 hour | t (historical) | Temperature momentum |
+| `temperature_lag_24h` | Temperature | 24 hours | t (historical) | Daily temperature cycle |
+| `humidity_lag_1h` | Humidity | 1 hour | t (historical) | Humidity momentum |
+| `humidity_lag_24h` | Humidity | 24 hours | t (historical) | Daily humidity cycle |
+
+**Note:** All lag features use data from t-N hours ago. They are available at prediction time t.
+
+### 9.3 Rolling Window Features (10 features)
+
+| Feature | Source | Window | Aggregation | Availability | Purpose |
+|---|---|---|---|---|---|
+| `aqi_rolling_mean_6h` | AQI | 6 hours | Mean | t (historical window) | Short-term average |
+| `aqi_rolling_mean_12h` | AQI | 12 hours | Mean | t (historical window) | Half-day average |
+| `aqi_rolling_mean_24h` | AQI | 24 hours | Mean | t (historical window) | Daily average |
+| `aqi_rolling_std_24h` | AQI | 24 hours | Std Dev | t (historical window) | AQI volatility |
+| `aqi_rolling_min_24h` | AQI | 24 hours | Min | t (historical window) | Best AQI in period |
+| `aqi_rolling_max_24h` | AQI | 24 hours | Max | t (historical window) | Worst AQI in period |
+| `pm25_rolling_mean_6h` | PM2.5 | 6 hours | Mean | t (historical window) | Short-term PM2.5 average |
+| `pm25_rolling_mean_24h` | PM2.5 | 24 hours | Mean | t (historical window) | Daily PM2.5 average |
+| `temperature_rolling_mean_24h` | Temperature | 24 hours | Mean | t (historical window) | Daily temperature average |
+| `humidity_rolling_mean_24h` | Humidity | 24 hours | Mean | t (historical window) | Daily humidity average |
+
+**Note:** Rolling windows use `closed='left'` to exclude the current period (no future data leakage).
+
+### 9.4 Derived Features (10 features)
+
+| Feature | Calculation | Availability | Purpose |
+|---|---|---|---|
+| `aqi_change_rate_1h` | `aqi - aqi_lag_1h` | t (historical) | Hourly AQI change speed |
+| `aqi_change_rate_6h` | `(aqi - aqi_lag_6h) / 6` | t (historical) | 6-hour AQI change speed |
+| `aqi_change_rate_24h` | `(aqi - aqi_lag_24h) / 24` | t (historical) | Daily AQI change speed |
+| `aqi_trend_24h` | `aqi_rolling_mean_6h - aqi_rolling_mean_24h` | t (historical) | Short vs long term direction |
+| `pm25_pm10_ratio` | `pm25 / pm10` | t (immediate) | Particle size distribution |
+| `no2_so2_ratio` | `no2 / so2` | t (immediate) | Industrial vs traffic signature |
+| `o3_no2_ratio` | `o3 / no2` | t (immediate) | Photochemical activity |
+| `temp_humidity_interaction` | `temperature × humidity / 100` | t (immediate) | Heat index approximation |
+| `wind_cooling_effect` | `temperature - (wind_speed × 2)` | t (immediate) | Wind-chill approximation |
+| `aqi_deviation_from_24h_avg` | `aqi - aqi_rolling_mean_24h` | t (historical) | Deviation from recent average |
+
+**Note:** Feature usefulness will be experimentally evaluated during model training.
+
+### 9.5 Feature Metadata
+
+Every generated feature dataset includes:
+- `feature_version`: Semantic version of the feature definitions
+- `schema_version`: Schema version for compatibility
+- `generation_timestamp`: UTC timestamp when features were generated
+- `source_row_count`: Number of input observations
+- `feature_count`: Number of features generated |
