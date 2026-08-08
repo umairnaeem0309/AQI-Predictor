@@ -300,6 +300,9 @@ def build_dataset(
         "cities": df["location_id"].unique().tolist() if "location_id" in df.columns else [],
         "leakage_errors": leakage_errors,
         "quality_report": full_validation(df).__dict__,
+        "dataset_type": "synthetic_test_data",
+        "approved_for_training": False,
+        "approved_for_evaluation": False,
     }
 
     if save:

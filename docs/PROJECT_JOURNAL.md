@@ -156,4 +156,24 @@ tests/unit/test_environment.py
 
 ## Entry 004
 
-*(To be created during Phase 3)*
+**Date:** 8 August 2026  
+**Phase:** Phase 5 — Synthetic Data Clarification  
+
+### Work Completed
+- Renamed synthetic data references to "mock historical dataset" throughout codebase
+- Added dataset metadata: `dataset_type: synthetic_test_data`, `approved_for_training: false`, `approved_for_evaluation: false`
+- Updated CURRENT_STATE.md with critical synthetic data restriction notice
+- Added DEC-015: Synthetic Data Usage Restrictions to DECISIONS.md
+
+### Critical Clarification
+- The 4,392 training observations are **synthetic test data**, not real API data
+- No real historical API calls were made (no credentials provided)
+- Synthetic data is approved for pipeline testing ONLY
+- Final model training and evaluation require real API data
+
+### Decisions Made
+- DEC-015: Synthetic data restricted to pipeline testing only
+
+### Next Step
+- Proceed to Phase 6 (Feature Store) with synthetic data for pipeline validation only
+- Real data collection must complete before Phase 7 reported results
