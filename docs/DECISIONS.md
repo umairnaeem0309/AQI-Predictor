@@ -405,3 +405,45 @@ Weather fields are more accurate from OpenWeather (specialized weather API). AQI
 
 **Impact:**  
 OpenWeather is authoritative for temperature, humidity, wind, pressure, weather_condition. AQICN is authoritative for AQI, PM2.5, PM10, CO, NO2, SO2, O3.
+
+---
+
+### DEC-015
+
+**Date:** 8 August 2026  
+**Topic:** Synthetic Data Usage Restrictions  
+**Phase:** 5  
+
+**Problem:**  
+Historical API data is not yet available. Pipeline development requires data for testing, but synthetic data must not contaminate final results.
+
+**Options Considered:**
+
+- **Option A:** Use synthetic data for everything — Fast but invalidates model results
+- **Option B:** Use synthetic data only for pipeline testing; real data for training — Correct but slower
+- **Option C:** Wait for real data before any development — Too slow
+
+**Chosen Approach:** Option B — Synthetic data restricted to pipeline testing only
+
+**Reason:**  
+Synthetic data allows pipeline architecture to be validated without waiting for API credentials. However, model training and evaluation must use only real API data to produce valid, reproducible results.
+
+**Constraints:**  
+Synthetic data CANNOT be used for:
+- Model training
+- Model evaluation
+- Reported metrics
+- Production use
+
+Synthetic data CAN be used for:
+- Pipeline validation
+- Unit testing
+- Integration testing
+- Architecture verification
+
+**Trade-offs:**  
+- Final model results must wait for real data (correct)
+- Pipeline can be developed and tested in parallel (efficient)
+
+**Impact:**  
+All dataset metadata includes `approved_for_training: false` for synthetic datasets. Real data collection must complete before Phase 7 model training produces reported results.

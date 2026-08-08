@@ -3,7 +3,7 @@
 ## AQI Predictor — Project Status
 
 **Last Updated:** 8 August 2026  
-**Current Phase:** Phase 5 — Historical Data Backfill  
+**Current Phase:** Phase 5 Complete — Proceeding to Phase 6  
 
 ---
 
@@ -16,7 +16,20 @@
 | Phase 2 — Data Collection Architecture | ✅ Completed | 2 Aug 2026 |
 | Phase 3 — Real API Integration | ✅ Completed | 4 Aug 2026 |
 | Phase 4 — Feature Engineering Pipeline | ✅ Completed | 6 Aug 2026 |
-| Phase 5 — Historical Data Backfill | 🔄 In Progress | 7 Aug 2026 |
+| Phase 5 — Historical Data Backfill | ✅ Completed (Pipeline) | 8 Aug 2026 |
+
+**⚠️ CRITICAL: Synthetic Data Restriction**
+
+The Phase 5 pipeline is complete, but NO real historical data has been collected.
+All existing dataset files contain **synthetic test data** generated for pipeline validation.
+
+- `dataset_type`: synthetic_test_data
+- `approved_for_training`: false
+- `approved_for_evaluation`: false
+
+Real historical data collection is pending API credentials.
+Synthetic data must remain testing-only. Final model training and evaluation
+require real API data.
 
 **Phase 0 Tasks Completed:**
 - [x] Read and analyzed MASTER_AGENT_INSTRUCTIONS.md

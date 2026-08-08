@@ -172,16 +172,20 @@ def collect_sample_data(
     return df
 
 
-def generate_synthetic_historical_data(
+def generate_mock_historical_dataset(
     start_date: str = "2026-06-01",
     end_date: str = "2026-07-31",
     city_configs: Optional[List[CityConfig]] = None,
 ) -> pd.DataFrame:
-    """Generate synthetic historical data for training.
+    """Generate mock historical dataset for pipeline testing.
 
     IMPORTANT: This generates realistic-looking historical data for
-    pipeline development and testing. This data is NOT real API data
-    and must NOT be used for final model training or reported results.
+    pipeline validation and testing ONLY. This data is NOT real API data
+    and must NOT be used for:
+    - Final model training
+    - Model evaluation
+    - Reported metrics
+    - Production use
 
     This function exists because:
     - Historical API access is limited on free tiers
@@ -202,7 +206,7 @@ def generate_synthetic_historical_data(
         city_configs = [CityConfig(**city) for city in config.get("cities", [])]
 
     logger.info(
-        "Generating synthetic historical data from %s to %s",
+        "Generating mock historical dataset from %s to %s (testing only)",
         start_date,
         end_date,
     )
@@ -292,7 +296,7 @@ def generate_synthetic_historical_data(
 
     df = pd.DataFrame(rows)
     logger.info(
-        "Synthetic data generated: %d rows, %d cities, %d hours",
+        "Mock historical dataset generated: %d rows, %d cities, %d hours (testing only)",
         len(df),
         len(city_configs),
         hours,
@@ -343,15 +347,15 @@ def run_historical_backfill(
 
     # Step 3: Collect or generate data
     if use_synthetic:
-        logger.info("Using synthetic data for pipeline development")
-        df = generate_synthetic_historical_data(start_date, end_date, city_configs)
+        logger.info("Using mock historical dataset for pipeline testing")
+        df = generate_mock_historical_dataset(start_date, end_date, city_configs)
     else:
         # Real API collection would go here
         logger.warning(
             "Real API historical collection not yet implemented. "
-            "Use use_synthetic=True for development."
+            "Use use_synthetic=True for pipeline testing only."
         )
-        df = generate_synthetic_historical_data(start_date, end_date, city_configs)
+        df = generate_mock_historical_dataset(start_date, end_date, city_configs)
 
     # Step 4: Data quality checks
     df = drop_duplicates(df)
@@ -371,6 +375,9 @@ def run_historical_backfill(
         "quality_status": report.status.value,
         "quality_warnings": report.warnings,
         "api_status": api_status,
+        "dataset_type": "synthetic_test_data",
+        "approved_for_training": False,
+        "approved_for_evaluation": False,
         "use_synthetic": use_synthetic,
     }
     metadata_file = PROCESSED_DIR / "raw_metadata.json"
