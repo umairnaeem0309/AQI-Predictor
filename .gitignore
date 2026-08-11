@@ -53,6 +53,11 @@ models/*
 # --- MLflow ---
 mlruns/
 mlartifacts/
+models/experiment_artifacts/
+*.pkl
+*.joblib
+*.h5
+*.hdf5
 
 # --- Docker ---
 docker/*.log
