@@ -380,3 +380,312 @@ class ModelRegistry:
         except Exception as e:
             logger.error("Failed to list models: %s", str(e))
             return []
+
+    # =========================================================================
+    # Artifact Logging
+    # =========================================================================
+
+    def log_artifacts(
+        self,
+        run_id: str,
+        model=None,
+        metrics: Optional[Dict[str, float]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        feature_importance: Optional[Dict[str, float]] = None,
+        feature_columns: Optional[List[str]] = None,
+        evaluation_report: Optional[str] = None,
+    ) -> bool:
+        """Log all model artifacts to MLflow.
+
+        Artifact structure:
+        ├── model/              (sklearn model)
+        ├── metadata.json       (version, date, dataset, features)
+        ├── metrics.json        (evaluation metrics)
+        ├── parameters.json     (hyperparameters)
+        ├── feature_importance.json
+        ├── feature_list.json   (feature columns)
+        └── evaluation_report.txt
+
+        Args:
+            run_id: MLflow run ID.
+            model: Trained model object.
+            metrics: Evaluation metrics.
+            params: Model parameters.
+            feature_importance: Feature importance dict.
+            feature_columns: List of feature names.
+            evaluation_report: Evaluation report text.
+
+        Returns:
+            True if logging succeeded.
+        """
+        try:
+            import mlflow
+            import mlflow.sklearn
+        except ImportError:
+            logger.warning("MLflow not installed")
+            return False
+
+        try:
+            with mlflow.start_run(run_id=run_id):
+                # Model
+                if model is not None:
+                    mlflow.sklearn.log_model(model, "model")
+
+                # Metrics
+                if metrics:
+                    mlflow.log_dict(metrics, "metrics.json")
+                    for k, v in metrics.items():
+                        if not (isinstance(v, float) and (v != v)):
+                            mlflow.log_metric(k, v)
+
+                # Parameters
+                if params:
+                    mlflow.log_dict(params, "parameters.json")
+
+                # Feature importance
+                if feature_importance:
+                    mlflow.log_dict(feature_importance, "feature_importance.json")
+
+                # Feature list
+                if feature_columns:
+                    mlflow.log_dict({"features": feature_columns}, "feature_list.json")
+
+                # Evaluation report
+                if evaluation_report:
+                    report_path = Path("evaluation_report.txt")
+                    report_path.write_text(evaluation_report)
+                    mlflow.log_artifact(str(report_path))
+                    report_path.unlink()
+
+                logger.info("Artifacts logged for run %s", run_id)
+                return True
+
+        except Exception as e:
+            logger.error("Artifact logging failed: %s", str(e))
+            return False
+
+    # =========================================================================
+    # Version Metadata
+    # =========================================================================
+
+    def store_version_metadata(
+        self,
+        run_id: str,
+        model_name: str,
+        version: int,
+        dataset_version: str,
+        feature_version: str,
+        schema_version: str,
+        training_date: str,
+        metrics: Dict[str, float],
+    ) -> bool:
+        """Store complete version metadata for a model.
+
+        Metadata includes:
+        - model name, version
+        - training date
+        - dataset version, feature version, schema version
+        - evaluation metrics
+        """
+        try:
+            import mlflow
+        except ImportError:
+            return False
+
+        metadata = {
+            "model_name": model_name,
+            "version": version,
+            "training_date": training_date,
+            "dataset_version": dataset_version,
+            "feature_version": feature_version,
+            "schema_version": schema_version,
+            "metrics": metrics,
+            "stored_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        try:
+            with mlflow.start_run(run_id=run_id):
+                mlflow.log_dict(metadata, "version_metadata.json")
+                logger.info("Version metadata stored for %s v%d", model_name, version)
+                return True
+        except Exception as e:
+            logger.error("Failed to store metadata: %s", str(e))
+            return False
+
+    # =========================================================================
+    # Model Loading
+    # =========================================================================
+
+    def load_production_model(self):
+        """Load the current production model.
+
+        Validates metadata before loading:
+        - status must be Production
+        - dataset_type must not be synthetic
+        - approved_for_training must be true
+
+        Returns:
+            Loaded model object or None.
+        """
+        try:
+            import mlflow
+            import mlflow.pyfunc
+        except ImportError:
+            logger.warning("MLflow not installed")
+            return None
+
+        try:
+            # Get production model version
+            client = self._get_client()
+            if client is None:
+                return None
+
+            versions = client.get_latest_versions(
+                self.experiment_name, stages=["Production"]
+            )
+
+            if not versions:
+                logger.warning("No production model found")
+                return None
+
+            prod_version = versions[0]
+
+            # Validate metadata
+            run = client.get_run(prod_version.run_id)
+            tags = run.data.tags
+
+            dataset_type = tags.get("dataset_type", "unknown")
+            if dataset_type == "synthetic_test_data":
+                logger.error("Cannot load synthetic test data as production model")
+                return None
+
+            approved = tags.get("approved_for_training", "false")
+            if approved != "true":
+                logger.error("Production model not approved for training")
+                return None
+
+            # Load model
+            model_uri = f"runs:/{prod_version.run_id}/model"
+            model = mlflow.pyfunc.load_model(model_uri)
+            logger.info("Loaded production model: %s v%s", prod_version.name, prod_version.version)
+            return model
+
+        except Exception as e:
+            logger.error("Failed to load production model: %s", str(e))
+            return None
+
+    def load_model_version(self, version: int):
+        """Load a specific model version.
+
+        Args:
+            version: Model version number.
+
+        Returns:
+            Loaded model object or None.
+        """
+        try:
+            import mlflow
+        except ImportError:
+            return None
+
+        try:
+            model_uri = f"models:/{self.experiment_name}/{version}"
+            model = mlflow.pyfunc.load_model(model_uri)
+            logger.info("Loaded model %s v%d", self.experiment_name, version)
+            return model
+        except Exception as e:
+            logger.error("Failed to load model v%d: %s", version, str(e))
+            return None
+
+    # =========================================================================
+    # Drift Baseline
+    # =========================================================================
+
+    def store_drift_baseline(
+        self,
+        run_id: str,
+        feature_data,
+        feature_columns: List[str],
+    ) -> bool:
+        """Store drift baseline statistics for monitoring.
+
+        Drift baseline contains:
+        Numerical: mean, std, min, max, percentiles (25, 50, 75)
+        Categorical: frequency distribution
+
+        Args:
+            run_id: MLflow run ID.
+            feature_data: DataFrame with features.
+            feature_columns: Columns to compute baseline for.
+
+        Returns:
+            True if baseline stored.
+        """
+        try:
+            import mlflow
+            import numpy as np
+        except ImportError:
+            return False
+
+        baseline = {}
+        for col in feature_columns:
+            if col not in feature_data.columns:
+                continue
+
+            series = feature_data[col]
+
+            if series.dtype in ["float64", "int64", "float32", "int32"]:
+                # Numerical baseline
+                baseline[col] = {
+                    "type": "numerical",
+                    "mean": float(series.mean()),
+                    "std": float(series.std()),
+                    "min": float(series.min()),
+                    "max": float(series.max()),
+                    "percentile_25": float(series.quantile(0.25)),
+                    "percentile_50": float(series.quantile(0.50)),
+                    "percentile_75": float(series.quantile(0.75)),
+                }
+            else:
+                # Categorical baseline
+                freq = series.value_counts(normalize=True).to_dict()
+                baseline[col] = {
+                    "type": "categorical",
+                    "frequency_distribution": {str(k): float(v) for k, v in freq.items()},
+                }
+
+        try:
+            with mlflow.start_run(run_id=run_id):
+                mlflow.log_dict(baseline, "drift_baseline.json")
+                logger.info("Drift baseline stored for %d features", len(baseline))
+                return True
+        except Exception as e:
+            logger.error("Drift baseline storage failed: %s", str(e))
+            return False
+
+    def get_drift_baseline(self, run_id: str) -> Optional[Dict]:
+        """Load drift baseline from MLflow.
+
+        Args:
+            run_id: MLflow run ID.
+
+        Returns:
+            Drift baseline dictionary or None.
+        """
+        try:
+            import mlflow
+            import tempfile
+
+            client = self._get_client()
+            if client is None:
+                return None
+
+            artifact_path = "drift_baseline.json"
+            local_path = client.download_artifacts(run_id, artifact_path)
+
+            with open(local_path, "r") as f:
+                return json.load(f)
+
+        except Exception as e:
+            logger.error("Failed to load drift baseline: %s", str(e))
+            return None
