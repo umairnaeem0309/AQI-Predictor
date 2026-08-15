@@ -177,3 +177,43 @@ tests/unit/test_environment.py
 ### Next Step
 - Proceed to Phase 6 (Feature Store) with synthetic data for pipeline validation only
 - Real data collection must complete before Phase 7 reported results
+
+---
+
+## Entry 005
+
+**Date:** 15 August 2026  
+**Phase:** Phase 9 — Model Lifecycle Management  
+
+### Work Completed
+- Created `src/models/lifecycle.py` with lifecycle state machine:
+  - 8 model statuses: UNTRAINED, TRAINING, EVALUATED, CANDIDATE, APPROVED, REGISTERED, PRODUCTION, ARCHIVED, REJECTED
+  - Valid transition graph with enforcement
+  - `validate_lifecycle_transition()` for transition checking
+- Extended `src/models/registry.py` with:
+  - `store_version_metadata()` for comprehensive version tracking
+  - `get_drift_baseline()` for drift detection reference
+  - `load_production_model()` for model loading with validation
+  - `_validate_metadata_for_load()` for metadata completeness checks
+- Created `tests/unit/test_lifecycle.py` with 24 tests
+- Created `tests/integration/test_model_loading.py` with 12 tests
+- Updated CURRENT_STATE.md and PROJECT_JOURNAL.md
+
+### Key Design Decisions
+- Lifecycle transitions are strictly enforced; invalid transitions raise errors
+- Production loading validates: status, approval, dataset_type, feature_version, schema_version
+- Drift baseline includes: mean, std, min, max, percentiles for numerical features
+- Model loading supports: current production, specific version, rollback target
+- Synthetic data blocks lifecycle advancement to REGISTERED/PRODUCTION at approval level
+
+### Problems
+- None significant during implementation
+
+### Decisions Made
+- Model lifecycle transitions must be strictly validated
+- Drift baseline stored as JSON with complete statistical summary
+- Production model loading requires full metadata validation
+
+### Next Step
+- Review Phase 9 commits
+- Approve Phase 10 for CI/CD pipeline implementation
