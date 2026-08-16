@@ -213,15 +213,42 @@ FeatureStoreInterface (abstract)
 | Data Drift | Feature distribution monitoring |
 | Prediction Monitoring | Trend analysis, anomaly detection |
 
-### 3.9 Automation
+### 3.9 CI/CD Pipeline
 
 | Workflow | Technology | Trigger |
 |---|---|---|
-| Testing | GitHub Actions | Push, Pull Request |
+| CI Pipeline | GitHub Actions | Push, Pull Request |
+| ML Validation | GitHub Actions | Weekly, Manual |
+| CD Pipeline | GitHub Actions | Push to main, Manual |
+
+**CI Pipeline Stages:**
+1. **Lint** — black, isort, flake8 formatting checks
+2. **Type Check** — mypy type validation
+3. **Unit Tests** — pytest with coverage
+4. **Docker Build** — Build verification
+5. **CI Validation** — Synthetic data rejection, lifecycle checks
+6. **Security Audit** — pip-audit, safety check
+
+**ML Validation:**
+- Data safety validation (synthetic data rejection)
+- Model artifact validation
+- Feature quality checks
+- Lifecycle transition validation
+
+**CD Pipeline:**
+- Pre-deployment checks (production validation)
+- Docker image build
+- Dry-run deployment (staging/production)
+- Deployment record creation
+
+### 3.10 Feature Pipeline Automation
+
+| Workflow | Technology | Trigger |
+|---|---|---|
 | Feature Pipeline | GitHub Actions | Every 6h (dev), every 1h (prod) |
 | Training Pipeline | GitHub Actions | Daily |
 
-### 3.10 Application Database
+### 3.11 Application Database
 
 | Component | Technology | Purpose |
 |---|---|---|
@@ -336,6 +363,9 @@ AQI-Predictor/
 │   ├── models/
 │   │   ├── training.py
 │   │   ├── evaluation.py
+│   │   ├── selection.py
+│   │   ├── registry.py
+│   │   ├── lifecycle.py
 │   │   └── prediction.py
 │   ├── feature_store/
 │   │   ├── hopsworks_store.py
@@ -365,11 +395,19 @@ AQI-Predictor/
 ├── tests/
 │   ├── unit/
 │   ├── integration/
+│   ├── ci/
 │   └── end_to_end/
+│
+├── scripts/
+│   └── validate_production.py
 │
 ├── docs/
 ├── docker/
-├── .github/workflows/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       ├── ml-validation.yml
+│       └── cd.yml
 │
 ├── requirements.txt
 ├── Dockerfile
