@@ -8,6 +8,7 @@
 *.secret
 credentials.json
 service-account*.json
+.streamlit/secrets.toml
 
 # --- Python ---
 __pycache__/
