@@ -1,0 +1,67 @@
+# =============================================================================
+# AQI Predictor - Backend Dockerfile
+# Multi-stage build for production
+# =============================================================================
+
+# Stage 1: Build dependencies
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Stage 2: Production image
+FROM python:3.11-slim
+
+# Security: Run as non-root user
+RUN groupadd -r aqiuser && useradd -r -g aqiuser aqiuser
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /root/.local /home/aqiuser/.local
+
+# Copy application code
+COPY src/ ./src/
+COPY app/ ./app/
+COPY config.yaml .
+
+# Set ownership
+RUN chown -R aqiuser:aqiuser /app
+
+# Switch to non-root user
+USER aqiuser
+
+# Update PATH
+ENV PATH=/home/aqiuser/.local/bin:$PATH
+
+# Environment variables with defaults
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV MOCK_MODE=false
+
+# Expose port
+EXPOSE 8000
+
+# Healthcheck using Python (no curl dependency)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+# Production command: gunicorn with uvicorn workers
+CMD ["gunicorn", "app.backend.main:app", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--log-level", "info", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]
