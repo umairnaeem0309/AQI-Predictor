@@ -447,3 +447,38 @@ Synthetic data CAN be used for:
 
 **Impact:**  
 All dataset metadata includes `approved_for_training: false` for synthetic datasets. Real data collection must complete before Phase 7 model training produces reported results.
+
+---
+
+### DEC-016
+
+**Date:** 20 August 2026  
+**Topic:** Production Deployment Strategy  
+**Phase:** 14  
+
+**Problem:**  
+Need a production deployment strategy that ensures safety, reliability, and rollback capability.
+
+**Options Considered:**
+
+- **Option A:** Manual deployment — Simple but error-prone
+- **Option B:** Docker Compose production deployment — Containerized, reproducible
+- **Option C:** Kubernetes deployment — Enterprise-grade but overkill for current scale
+
+**Chosen Approach:** Docker Compose production deployment
+
+**Reason:**  
+Docker Compose provides containerized, reproducible deployments without Kubernetes complexity. Sufficient for current scale. Multi-stage builds ensure minimal image size. Python-based healthchecks eliminate curl dependency.
+
+**Constraints:**  
+- MOCK_MODE must be false in production
+- Only approved real-data models may be deployed
+- Pre-deployment safety checks are mandatory
+- Rollback strategy must be automated
+
+**Trade-offs:**  
+- Docker Compose has limited scaling compared to Kubernetes (acceptable for current needs)
+- Requires Docker and Docker Compose on deployment host (standard)
+
+**Impact:**  
+Production deployment uses `docker/docker-compose.prod.yml`. All deployments run `pre_deploy_checks.py` before deployment. gunicorn with uvicorn workers serves the FastAPI backend.
