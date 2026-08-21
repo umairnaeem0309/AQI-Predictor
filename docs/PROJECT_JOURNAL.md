@@ -345,3 +345,107 @@ tests/unit/test_environment.py
 ### Next Step
 - Review Phase 11 commits
 - Approve Phase 12 for FastAPI backend implementation
+
+---
+
+## Entry 008
+
+**Date:** 20 August 2026  
+**Phase:** Phase 14 — Deployment  
+
+### Work Completed
+- Created `docker/Dockerfile.backend` with:
+  - Multi-stage build for optimized image size
+  - Non-root user for security
+  - Python-based healthcheck (no curl dependency)
+  - gunicorn + uvicorn workers (4 workers)
+- Created `docker/Dockerfile.frontend` with:
+  - Multi-stage build
+  - Streamlit configuration
+  - Python-based healthcheck
+- Created `docker/docker-compose.prod.yml` with:
+  - Backend and frontend services
+  - Health checks with start period
+  - Resource limits
+  - Network isolation
+  - Volume persistence
+- Created `scripts/pre_deploy_checks.py`:
+  - MOCK_MODE validation (must be false)
+  - API_KEY validation
+  - HOPSWORKS_HOST validation
+  - API keys validation
+  - Model metadata validation
+- Created `scripts/deploy.py`:
+  - Full deployment automation
+  - Pre-deployment checks
+  - Backup creation
+  - Rollback on failure
+  - Deployment logging
+- Created `tests/deployment/test_deployment_safety.py`:
+  - Mock mode rejection tests
+  - Synthetic model rejection tests
+  - Missing secret rejection tests
+  - Health failure rollback simulation tests
+- Created `docs/DEPLOYMENT.md`:
+  - Complete deployment guide
+  - Environment variables documentation
+  - Deployment steps
+  - Rollback procedures
+  - Troubleshooting guide
+- Updated CURRENT_STATE.md and PROJECT_JOURNAL.md
+
+### Key Design Decisions
+- Production deployment target: Docker Compose
+- Server strategy: gunicorn + uvicorn workers
+- Healthcheck: Python-based (no curl dependency)
+- MOCK_MODE=false enforced in pre-deployment checks
+- Hopsworks local fallback warned, not silently activated
+- Rollback automated on health check failure
+
+### Problems
+- None significant during implementation
+
+### Decisions Made
+- DEC-016: Production Deployment Strategy documented
+- Python-based healthcheck eliminates curl dependency
+- gunicorn + uvicorn chosen for production server
+
+### Next Step
+- Review Phase 14 commits
+- Approve Phase 15 for final documentation
+
+---
+
+## Entry 009
+
+**Date:** 21 August 2026  
+**Phase:** Phase 15 — Final Documentation  
+
+### Work Completed
+- Added DEC-016: Production Deployment Strategy to DECISIONS.md
+- Created `docs/PRODUCTION_READINESS.md`:
+  - Pre-deployment checklist
+  - Deployment checklist
+  - Health check verification
+  - Rollback procedure
+  - Monitoring checklist
+  - Troubleshooting guide
+  - Sign-off section
+- Updated CURRENT_STATE.md with Phase 15 status
+- Updated PROJECT_JOURNAL.md with Phase 15 entry
+
+### Key Design Decisions
+- Production readiness checklist covers all phases
+- Sign-off section for formal approval
+- Troubleshooting guide for common issues
+
+### Problems
+- None significant during implementation
+
+### Decisions Made
+- Final documentation includes production readiness checklist
+- Sign-off process defined for deployment approval
+
+### Next Step
+- Review Phase 15 commits
+- Approve Phase 16 for demo preparation
