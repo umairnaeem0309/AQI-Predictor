@@ -13,9 +13,9 @@ import pandas as pd
 import pytest
 
 from src.models.lifecycle import (
-    ModelStatus,
-    LifecycleTransition,
-    validate_lifecycle_transition,
+    ModelState,
+    ModelLifecycle,
+    LifecycleTransitionError,
 )
 from src.models.registry import ModelRegistry
 
@@ -132,43 +132,34 @@ class TestDriftBaselineRoundTrip:
 
 
 class TestLifecycleTransitions:
-    """Test lifecycle state transitions."""
+    """Test lifecycle state transitions using ModelLifecycle."""
 
     def test_valid_transitions(self):
-        """Test that all valid transitions are allowed."""
-        valid = [
-            (ModelStatus.UNTRAINED, ModelStatus.TRAINING),
-            (ModelStatus.TRAINING, ModelStatus.EVALUATED),
-            (ModelStatus.EVALUATED, ModelStatus.CANDIDATE),
-            (ModelStatus.CANDIDATE, ModelStatus.APPROVED),
-            (ModelStatus.APPROVED, ModelStatus.REGISTERED),
-            (ModelStatus.REGISTERED, ModelStatus.PRODUCTION),
-            (ModelStatus.PRODUCTION, ModelStatus.ARCHIVED),
-            (ModelStatus.REGISTERED, ModelStatus.REJECTED),
-        ]
+        """Test that valid transitions succeed."""
+        lc = ModelLifecycle(model_name="test")
+        lc.transition(ModelState.EVALUATED)
+        lc.transition(ModelState.REGISTERED)
+        lc.transition(ModelState.STAGING)
+        lc.transition(ModelState.PRODUCTION)
+        assert lc.get_state() == ModelState.PRODUCTION
 
-        for from_status, to_status in valid:
-            assert validate_lifecycle_transition(from_status, to_status)
-
-    def test_invalid_transitions(self):
-        """Test that invalid transitions are blocked."""
-        invalid = [
-            (ModelStatus.UNTRAINED, ModelStatus.PRODUCTION),
-            (ModelStatus.TRAINING, ModelStatus.PRODUCTION),
-            (ModelStatus.ARCHIVED, ModelStatus.PRODUCTION),
-            (ModelStatus.UNTRAINED, ModelStatus.REGISTERED),
-        ]
-
-        for from_status, to_status in invalid:
-            assert not validate_lifecycle_transition(from_status, to_status)
+    def test_invalid_transition(self):
+        """Test that invalid transitions raise error."""
+        lc = ModelLifecycle(model_name="test")
+        with pytest.raises(LifecycleTransitionError):
+            lc.transition(ModelState.PRODUCTION)
 
     def test_synthetic_blocks_production(self):
         """Test that synthetic data blocks production lifecycle."""
-        # Synthetic data should be blocked at the approval level,
-        # not the lifecycle level. The lifecycle allows all valid
-        # transitions; the approval workflow rejects synthetic.
-        # This is tested in selection.py validate_for_production().
-        pass
+        from src.models.lifecycle import LifecycleBlockError
+
+        lc = ModelLifecycle(
+            model_name="test",
+            current_state=ModelState.STAGING,
+            dataset_type="synthetic_test_data",
+        )
+        with pytest.raises(LifecycleBlockError):
+            lc.transition(ModelState.PRODUCTION)
 
 
 class TestRegistryVersioning:

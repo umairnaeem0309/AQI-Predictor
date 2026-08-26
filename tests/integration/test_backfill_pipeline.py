@@ -11,7 +11,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 
 from src.data.historical_backfill import (
-    generate_synthetic_historical_data,
+    generate_mock_historical_dataset,
     verify_api_access,
     collect_sample_data,
 )
@@ -48,7 +48,7 @@ class TestBackfillPipelineEndToEnd:
 
     def test_synthetic_data_generation(self, city_configs):
         """Synthetic data is generated for all cities."""
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-03",  # 3 days for fast test
             city_configs=city_configs,
@@ -60,7 +60,7 @@ class TestBackfillPipelineEndToEnd:
 
     def test_synthetic_data_quality(self, city_configs):
         """Synthetic data passes quality checks."""
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-03",
             city_configs=city_configs,
@@ -72,7 +72,7 @@ class TestBackfillPipelineEndToEnd:
     def test_full_pipeline_synthetic(self, city_configs):
         """Complete pipeline works with synthetic data."""
         # Generate synthetic data
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-07",  # 7 days
             city_configs=city_configs,
@@ -90,7 +90,7 @@ class TestBackfillPipelineEndToEnd:
 
     def test_source_quality_metadata(self, city_configs):
         """Source quality metadata is correctly generated."""
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-03",
             city_configs=city_configs,
@@ -102,7 +102,7 @@ class TestBackfillPipelineEndToEnd:
 
     def test_target_generation_end_to_end(self, city_configs):
         """Target generation works end-to-end."""
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-07",
             city_configs=city_configs,
@@ -114,7 +114,7 @@ class TestBackfillPipelineEndToEnd:
 
     def test_chronological_split_preserved(self, city_configs):
         """Chronological ordering preserved in splits."""
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-07",
             city_configs=city_configs,
@@ -127,7 +127,7 @@ class TestBackfillPipelineEndToEnd:
 
     def test_no_cross_city_leakage(self, city_configs):
         """Feature engineering is independent per city."""
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-07",
             city_configs=city_configs,
@@ -153,7 +153,7 @@ class TestBackfillPipelineEndToEnd:
 
     def test_dataset_metadata_complete(self, city_configs):
         """Dataset metadata contains all required fields."""
-        df = generate_synthetic_historical_data(
+        df = generate_mock_historical_dataset(
             start_date="2026-08-01",
             end_date="2026-08-03",
             city_configs=city_configs,
