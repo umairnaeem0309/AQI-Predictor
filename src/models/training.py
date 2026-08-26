@@ -33,7 +33,6 @@ from sklearn.preprocessing import StandardScaler
 
 from src.config import PROJECT_ROOT
 from src.feature_store.schemas import DatasetMetadata, DatasetType
-from src.data.dataset_builder import load_features_for_training
 
 logger = logging.getLogger(__name__)
 

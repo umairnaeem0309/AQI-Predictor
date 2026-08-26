@@ -9,7 +9,7 @@ import logging
 from typing import Optional, Tuple, Any, Dict
 from datetime import datetime, timezone
 
-from src.models.lifecycle import ModelStatus, validate_lifecycle_transition
+from src.models.lifecycle import ModelState
 from src.models.registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
@@ -77,10 +77,10 @@ class ModelService:
             model_info = self.registry.get_production_model()
             
             # Validate lifecycle status
-            if model_info.get("status") != ModelStatus.PRODUCTION.value:
+            if model_info.get("status") != ModelState.PRODUCTION.value:
                 raise ModelNotLoadedError(
                     f"Model status is {model_info.get('status')}, "
-                    f"expected {ModelStatus.PRODUCTION.value}"
+                    f"expected {ModelState.PRODUCTION.value}"
                 )
             
             # Validate approval status
