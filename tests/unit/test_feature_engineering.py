@@ -117,9 +117,11 @@ class TestTimeFeatures:
         """Weekend flag is correctly computed."""
         df = add_time_features(hourly_observation_data)
         assert "is_weekend" in df.columns
-        # Aug 1 (Sat) and Aug 2 (Sun) are weekends
-        assert df["is_weekend"].iloc[0] == 1  # Saturday
-        assert df["is_weekend"].iloc[24] == 0  # Monday
+        # Aug 1 (Sat=5) → is_weekend=1, Aug 2 (Sun=6) → is_weekend=1
+        # Aug 3 (Mon=0) → is_weekend=0
+        assert df["is_weekend"].iloc[0] == 1   # Saturday
+        assert df["is_weekend"].iloc[24] == 1  # Sunday (index 24 = Aug 2 00:00)
+        assert df["is_weekend"].iloc[48] == 0  # Monday (index 48 = Aug 3 00:00)
 
     def test_season_mapping(self, hourly_observation_data):
         """Season is correctly mapped from month."""
@@ -216,9 +218,10 @@ class TestRollingFeatures:
             columns=["aqi"],
             windows={"aqi": [("6h", "mean")]},
         )
-        # At index 5 (after 6 records), rolling mean should be mean of first 6 values
+        # closed='left' excludes current period: at index 5, the 6h window
+        # contains only indices 0-4 (5 values). At index 6, it contains 0-5 (6 values).
         expected_mean = hourly_observation_data["aqi"].iloc[:6].mean()
-        assert abs(df["aqi_rolling_mean_6h"].iloc[5] - expected_mean) < 1e-10
+        assert abs(df["aqi_rolling_mean_6h"].iloc[6] - expected_mean) < 1e-10
 
     def test_rolling_std_non_negative(self, hourly_observation_data):
         """Rolling std is always non-negative."""
@@ -238,8 +241,10 @@ class TestRollingFeatures:
             columns=["aqi"],
             windows={"aqi": [("24h", "mean")]},
         )
-        # First record should still have a value (partial window)
-        assert not pd.isna(df["aqi_rolling_mean_24h"].iloc[0])
+        # closed='left' excludes current period, so index 0 has no data to its left.
+        # Index 1 has only index 0 → valid (min_periods=1).
+        assert pd.isna(df["aqi_rolling_mean_24h"].iloc[0])   # No history left of index 0
+        assert not pd.isna(df["aqi_rolling_mean_24h"].iloc[1])  # Has 1 hour of history
 
 
 # =============================================================================
@@ -276,8 +281,8 @@ class TestDerivedFeatures:
             "o3": [40.0, 40.0],
         })
         df = add_derived_features(df)
-        assert pd.isna(df["pm25_pm10_ratio"].iloc[0])  # Zero division → NaN
-        assert pd.isna(df["no2_so2_ratio"].iloc[1])  # Zero division → NaN
+        assert pd.isna(df["pm25_pm10_ratio"].iloc[0])  # pm10=0 → division by zero → NaN
+        assert df["no2_so2_ratio"].iloc[1] == 0.0  # no2=0, so2=10 → 0/10 = 0.0, NOT NaN
 
     def test_temp_humidity_interaction(self, hourly_observation_data):
         """Temperature-humidity interaction is correctly computed."""

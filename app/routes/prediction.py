@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.backend.dependencies import verify_api_key, check_rate_limit
 from app.schemas.requests import PredictionRequest, validate_city
 from app.schemas.responses import PredictionResponse, ErrorResponse
-from app.services.prediction_service import get_prediction_service, PredictionError
+from app.services.prediction_service import get_prediction_service, PredictionError, PredictionServiceError
+from app.services.model_service import ModelNotLoadedError
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +60,18 @@ async def predict(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except PredictionError as e:
-        if "Model not loaded" in str(e):
+        if "Model not loaded" in str(e) or "not initialized" in str(e):
             raise HTTPException(status_code=503, detail=str(e))
-        elif "Feature store" in str(e):
+        elif "Feature store" in str(e) or "Feature" in str(e):
             raise HTTPException(status_code=503, detail=str(e))
         else:
             raise HTTPException(status_code=500, detail=str(e))
+    except PredictionServiceError as e:
+        logger.warning(f"Prediction service error: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+    except ModelNotLoadedError as e:
+        logger.warning(f"Model not loaded: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         logger.error(f"Prediction error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

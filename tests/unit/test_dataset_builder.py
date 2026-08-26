@@ -223,14 +223,21 @@ class TestDatasetVersion:
     """Tests for dataset version generation."""
 
     def test_version_format(self):
-        """Version string follows expected format."""
+        """Version string follows expected format: vYYYYMMDD_<6-char-hash>."""
         version = generate_dataset_version()
         assert version.startswith("v")
-        assert len(version) == 15  # v20260806_a3f2b1
+        # v + 8-digit date + _ + 6-char hex = 16 chars
+        assert len(version) == 16  # v20260826_159eb2
+        parts = version.split("_")
+        assert len(parts) == 2
+        assert parts[0][1:].isdigit()  # date part after v
+        assert len(parts[1]) == 6  # hash suffix
 
     def test_unique_versions(self):
-        """Each call generates a unique version."""
+        """Versions from different timestamps are unique."""
+        import time
         v1 = generate_dataset_version()
+        time.sleep(1.1)  # Ensure different second for uniqueness
         v2 = generate_dataset_version()
         assert v1 != v2
 

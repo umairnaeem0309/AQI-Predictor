@@ -50,19 +50,19 @@ class TestBackfillPipelineEndToEnd:
         """Synthetic data is generated for all cities."""
         df = generate_mock_historical_dataset(
             start_date="2026-08-01",
-            end_date="2026-08-03",  # 3 days for fast test
+            end_date="2026-08-04",
             city_configs=city_configs,
         )
         assert len(df) > 0
         assert df["location_id"].nunique() == 3
-        # 3 days × 24 hours × 3 cities = 216 rows
-        assert len(df) == 216
+        # (end - start).total_seconds()/3600 + 1 = 73 hours × 3 cities = 219
+        assert len(df) == 219
 
     def test_synthetic_data_quality(self, city_configs):
         """Synthetic data passes quality checks."""
         df = generate_mock_historical_dataset(
             start_date="2026-08-01",
-            end_date="2026-08-03",
+            end_date="2026-08-04",
             city_configs=city_configs,
         )
         from src.data.validators import full_validation
@@ -92,7 +92,7 @@ class TestBackfillPipelineEndToEnd:
         """Source quality metadata is correctly generated."""
         df = generate_mock_historical_dataset(
             start_date="2026-08-01",
-            end_date="2026-08-03",
+            end_date="2026-08-04",
             city_configs=city_configs,
         )
         df = add_source_quality_metadata(df)
@@ -134,15 +134,23 @@ class TestBackfillPipelineEndToEnd:
         )
         result = build_dataset(df, save=False)
 
-        # Check that each city has independent lag features
-        for split_name in ["train", "val", "test"]:
-            split = result[split_name]
-            for city_id in ["karachi", "lahore", "islamabad"]:
-                city_data = split[split["location_id"] == city_id]
-                if len(city_data) > 0 and "aqi_lag_1h" in city_data.columns:
-                    # First record for each city should have NaN lag
-                    first_row = city_data.sort_values("timestamp").iloc[0]
-                    assert pd.isna(first_row["aqi_lag_1h"])
+        # The train split starts at the earliest timestamp, so its first
+        # row per city must have NaN lag (no prior data). Val/test splits
+        # start later and legitimately have valid lag values.
+        train = result["train"]
+        for city_id in ["karachi", "lahore", "islamabad"]:
+            city_data = train[train["location_id"] == city_id].sort_values("timestamp")
+            if len(city_data) > 0 and "aqi_lag_1h" in city_data.columns:
+                first_row = city_data.iloc[0]
+                assert pd.isna(first_row["aqi_lag_1h"])
+
+        # Verify lag values differ between cities (no cross-city copy)
+        for city_id_a, city_id_b in [("karachi", "lahore"), ("lahore", "islamabad")]:
+            ca = train[train["location_id"] == city_id_a].sort_values("timestamp")
+            cb = train[train["location_id"] == city_id_b].sort_values("timestamp")
+            if len(ca) > 1 and len(cb) > 1:
+                # Second row lag values should differ between cities
+                assert ca.iloc[1]["aqi_lag_1h"] != cb.iloc[1]["aqi_lag_1h"]
 
     def test_verify_api_access(self):
         """API access verification completes without error."""
@@ -155,7 +163,7 @@ class TestBackfillPipelineEndToEnd:
         """Dataset metadata contains all required fields."""
         df = generate_mock_historical_dataset(
             start_date="2026-08-01",
-            end_date="2026-08-03",
+            end_date="2026-08-04",
             city_configs=city_configs,
         )
         result = build_dataset(df, save=False)

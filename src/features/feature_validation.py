@@ -61,15 +61,20 @@ def check_no_future_leakage(
                         # First lag_hours records should be NaN (no history)
                         for i in range(min(lag_hours, len(lag_values))):
                             if not pd.isna(lag_values[i]) and not pd.isna(base_values[i]):
-                                # Check if the lag value matches the historical value
-                                expected_idx = i - lag_hours
-                                if expected_idx >= 0:
-                                    expected = base_values[expected_idx]
-                                    if not pd.isna(expected) and lag_values[i] != expected:
-                                        errors.append(
-                                            f"Potential leakage in {col} at index {i} "
-                                            f"for location {loc_id}"
-                                        )
+                                errors.append(
+                                    f"Leakage in {col} at index {i} for location {loc_id}: "
+                                    f"lag value should be NaN but is {lag_values[i]}"
+                                )
+
+                        # Also verify lag values match historical base values
+                        for i in range(lag_hours, len(lag_values)):
+                            if not pd.isna(lag_values[i]) and not pd.isna(base_values[i - lag_hours]):
+                                expected = base_values[i - lag_hours]
+                                if not pd.isna(expected) and lag_values[i] != expected:
+                                    errors.append(
+                                        f"Leakage in {col} at index {i} for location {loc_id}: "
+                                        f"expected {expected} but got {lag_values[i]}"
+                                    )
                 except (ValueError, IndexError):
                     pass
 
@@ -127,6 +132,15 @@ def validate_lag_features(
             group_sorted = group.sort_values(timestamp_column)
             lag_vals = group_sorted[col].values
             base_vals = group_sorted[base_col].values
+
+            # Check: first lag_hours positions should be NaN (no history)
+            for i in range(min(lag_hours, len(lag_vals))):
+                if not pd.isna(lag_vals[i]) and not pd.isna(base_vals[i]):
+                    valid = False
+                    break
+
+            if not valid:
+                break
 
             # Check: lag value at position i should equal base value at position i-lag_hours
             for i in range(lag_hours, len(lag_vals)):
@@ -208,12 +222,12 @@ def get_feature_availability() -> Dict[str, str]:
         availability[feat] = "t (immediately available)"
 
     # Lag features — available at t (using historical data)
-    lag_features = [
-        "aqi_lag_1h", "aqi_lag_6h", "aqi_lag_12h", "aqi_lag_24h",
-        "aqi_lag_48h", "aqi_lag_72h", "pm25_lag_1h", "pm25_lag_24h",
-        "temperature_lag_1h", "temperature_lag_24h",
-        "humidity_lag_1h", "humidity_lag_24h",
-    ]
+    lag_features = []
+    lag_hours = [1, 6, 12, 24, 48, 72]
+    lag_columns = ["aqi", "pm25", "temperature", "humidity"]
+    for col in lag_columns:
+        for h in lag_hours:
+            lag_features.append(f"{col}_lag_{h}h")
     for feat in lag_features:
         availability[feat] = "t (uses data from t-N, available at prediction time)"
 

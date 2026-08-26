@@ -172,6 +172,10 @@ def add_rolling_features(
             "humidity": [("24h", "mean")],
         }
 
+    # Ensure timestamp is datetime for time-based rolling
+    if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+
     for col in columns:
         if col not in df.columns:
             continue
@@ -184,24 +188,29 @@ def add_rolling_features(
 
             # Rolling window within each location group
             # closed='left' excludes current period (no future data leakage)
-            rolling = (
-                df.groupby("location_id")[col]
-                .rolling(window=window, min_periods=1, closed="left")
-            )
+            # Time-based rolling requires a DatetimeIndex; set timestamp
+            # as index within each group, roll, then restore.
+            parts = []
+            for loc_id, group in df.groupby("location_id"):
+                if len(group) == 0:
+                    continue
+                g = group.set_index("timestamp")[[col]].sort_index()
+                rolling = g[col].rolling(window=window, min_periods=1, closed="left")
+                if agg_func == "mean":
+                    result = rolling.mean()
+                elif agg_func == "std":
+                    result = rolling.std()
+                elif agg_func == "min":
+                    result = rolling.min()
+                elif agg_func == "max":
+                    result = rolling.max()
+                else:
+                    continue
+                result.index = group.index
+                parts.append(result)
 
-            if agg_func == "mean":
-                values = rolling.mean()
-            elif agg_func == "std":
-                values = rolling.std()
-            elif agg_func == "min":
-                values = rolling.min()
-            elif agg_func == "max":
-                values = rolling.max()
-            else:
-                continue
-
-            # Reset index to align with original DataFrame
-            df[feature_name] = values.reset_index(level=0, drop=True)
+            if parts:
+                df[feature_name] = pd.concat(parts).sort_index()
 
     logger.debug("Added rolling features for columns: %s", columns)
     return df

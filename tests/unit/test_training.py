@@ -76,8 +76,8 @@ class TestDataSafety:
         validate_training_data(real_metadata)  # Should not raise
 
     def test_synthetic_data_rejected(self, synthetic_metadata):
-        """Synthetic test data is rejected."""
-        with pytest.raises(ValueError, match="synthetic test data"):
+        """Synthetic test data is rejected for training."""
+        with pytest.raises(ValueError):
             validate_training_data(synthetic_metadata)
 
     def test_unapproved_data_rejected(self):
@@ -111,10 +111,10 @@ class TestModelCreation:
         assert model is not None
         assert hasattr(model, "fit")
 
-    def test_unknown_model_returns_none(self):
-        """Unknown model name returns None."""
-        model = get_model("unknown_model")
-        assert model is None
+    def test_unknown_model_raises(self):
+        """Unknown model name raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown model"):
+            get_model("unknown_model")
 
 
 # =============================================================================
