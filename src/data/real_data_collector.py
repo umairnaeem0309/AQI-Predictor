@@ -1,7 +1,8 @@
 """
 Real Data Collector
 
-Collects real data from APIs with usage monitoring and audit trails.
+Collects real data from APIs using the APIManager orchestrator.
+Tracks API usage metrics and audit trails.
 """
 
 import os
@@ -14,345 +15,254 @@ from dataclasses import dataclass, asdict
 
 import pandas as pd
 
-from src.data.openweather_client import OpenWeatherClient
-from src.data.aqicn_client import AQICNClient
+from src.config import load_environment, get_api_key
+from src.data.api_manager import APIManager
+from src.data.schemas import CityConfig
 
 
 @dataclass
-class APICallRecord:
-    """Record of an API call."""
-    api_name: str
-    endpoint: str
+class CollectionRound:
+    """Record of one collection round across all cities."""
+    round_id: str
     timestamp: str
-    status_code: int
-    response_time_ms: float
-    success: bool
-    error_message: Optional[str] = None
-    data_points: int = 0
-
-
-@dataclass
-class APIUsageMetrics:
-    """API usage metrics."""
-    api_name: str
-    total_calls: int
-    successful_calls: int
-    failed_calls: int
-    total_response_time_ms: float
-    avg_response_time_ms: float
-    data_points_collected: int
-    rate_limit_hits: int
-    first_call: str
-    last_call: str
+    cities_attempted: int
+    cities_succeeded: int
+    cities_failed: List[str]
+    observations_count: int
+    collection_duration_ms: float
+    source_summary: Dict[str, int]
 
 
 class RealDataCollector:
     """
     Collects real data from APIs with monitoring.
-    
+
+    Delegates actual API calls to APIManager (which orchestrates
+    OpenWeather and AQICN). This collector adds:
+    - Collection round tracking
+    - Audit trail (saved observations)
+    - Resumable collection support
+
     Features:
-    - API usage tracking
-    - Rate limit monitoring
     - Audit trail
-    - Resumable collection
+    - Resumable collection (appends to master CSV)
     """
-    
-    # Valid cities
+
     CITIES = {
-        "karachi": {"lat": 24.8607, "lon": 67.0011},
-        "lahore": {"lat": 31.5204, "lon": 74.3587},
-        "islamabad": {"lat": 33.6844, "lon": 73.0479},
+        "karachi": CityConfig(id="karachi", name="Karachi", latitude=24.8607, longitude=67.0011),
+        "lahore": CityConfig(id="lahore", name="Lahore", latitude=31.5204, longitude=74.3587),
+        "islamabad": CityConfig(id="islamabad", name="Islamabad", latitude=33.6844, longitude=73.0479),
     }
-    
+
     def __init__(
         self,
-        openweather_key: Optional[str] = None,
-        aqicn_key: Optional[str] = None,
         output_dir: Optional[Path] = None,
     ):
         """
         Initialize real data collector.
-        
+
         Args:
-            openweather_key: OpenWeather API key
-            aqicn_key: AQICN API key
-            output_dir: Output directory for collected data
+            output_dir: Output directory for collected data.
+                       Defaults to data/raw/real
         """
-        self.openweather_key = openweather_key or os.getenv("OPENWEATHER_API_KEY")
-        self.aqicn_key = aqicn_key or os.getenv("AQICN_API_KEY")
-        
         self.output_dir = output_dir or Path("data/raw/real")
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize API clients
-        self.openweather_client = None
-        if self.openweather_key:
-            self.openweather_client = OpenWeatherClient(api_key=self.openweather_key)
-        
-        self.aqicn_client = None
-        if self.aqicn_key:
-            self.aqicn_client = AQICNClient(api_key=self.aqicn_key)
-        
-        # Usage tracking
-        self.call_records: List[APICallRecord] = []
-        self._load_existing_records()
-    
-    def _load_existing_records(self):
-        """Load existing API call records."""
-        records_file = self.output_dir / "api_call_records.json"
-        if records_file.exists():
-            with open(records_file, "r") as f:
+
+        # Initialize APIManager (reads keys from env)
+        self.api_manager = APIManager()
+
+        # Collection rounds tracking
+        self.rounds: List[CollectionRound] = []
+        self._load_existing_rounds()
+
+    def _load_existing_rounds(self):
+        """Load existing collection round records."""
+        rounds_file = self.output_dir / "collection_rounds.json"
+        if rounds_file.exists():
+            with open(rounds_file, "r") as f:
                 records = json.load(f)
-                self.call_records = [APICallRecord(**r) for r in records]
-    
-    def _save_records(self):
-        """Save API call records."""
-        records_file = self.output_dir / "api_call_records.json"
-        with open(records_file, "w") as f:
-            json.dump([asdict(r) for r in self.call_records], f, indent=2)
-    
-    def _record_call(
+                self.rounds = [CollectionRound(**r) for r in records]
+
+    def _save_rounds(self):
+        """Save collection round records."""
+        rounds_file = self.output_dir / "collection_rounds.json"
+        with open(rounds_file, "w") as f:
+            json.dump([asdict(r) for r in self.rounds], f, indent=2)
+
+    def collect_round(
         self,
-        api_name: str,
-        endpoint: str,
-        status_code: int,
-        response_time_ms: float,
-        success: bool,
-        error_message: Optional[str] = None,
-        data_points: int = 0,
-    ):
-        """Record an API call."""
-        record = APICallRecord(
-            api_name=api_name,
-            endpoint=endpoint,
+        cities: Optional[List[str]] = None,
+        save_raw: bool = True,
+    ) -> pd.DataFrame:
+        """
+        Perform one collection round for specified cities.
+
+        Args:
+            cities: List of city IDs to collect. If None, collects all.
+            save_raw: Whether to save raw data to audit directory.
+
+        Returns:
+            DataFrame with collected observations.
+        """
+        start_time = time.time()
+        round_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+        # Determine which cities to collect
+        if cities is None:
+            city_configs = list(self.CITIES.values())
+        else:
+            city_configs = [
+                self.CITIES[c.lower()]
+                for c in cities
+                if c.lower() in self.CITIES
+            ]
+
+        if not city_configs:
+            raise ValueError(f"No valid cities in: {cities}")
+
+        # Collect via APIManager
+        df = self.api_manager.fetch_all_cities(city_configs=city_configs)
+        collection_duration_ms = (time.time() - start_time) * 1000
+
+        # Track which cities succeeded/failed
+        collected_cities = set()
+        failed_cities = []
+        if not df.empty and "location_id" in df.columns:
+            collected_cities = set(df["location_id"].unique())
+        failed_cities = [
+            c.id for c in city_configs
+            if c.id not in collected_cities
+        ]
+
+        # Source summary
+        source_summary = {}
+        if not df.empty:
+            for col in ["weather_source", "pollution_source"]:
+                if col in df.columns:
+                    source_summary[col] = df[col].value_counts().to_dict()
+
+        # Record this collection round
+        collection_round = CollectionRound(
+            round_id=round_id,
             timestamp=datetime.now(timezone.utc).isoformat(),
-            status_code=status_code,
-            response_time_ms=response_time_ms,
-            success=success,
-            error_message=error_message,
-            data_points=data_points,
+            cities_attempted=len(city_configs),
+            cities_succeeded=len(collected_cities),
+            cities_failed=failed_cities,
+            observations_count=len(df),
+            collection_duration_ms=collection_duration_ms,
+            source_summary=source_summary,
         )
-        self.call_records.append(record)
-        self._save_records()
-    
-    def collect_current_data(self, city: str) -> Dict[str, Any]:
-        """
-        Collect current data for a city.
-        
-        Args:
-            city: City name
-            
-        Returns:
-            Collected data
-        """
-        city_lower = city.lower()
-        if city_lower not in self.CITIES:
-            raise ValueError(f"Invalid city: {city}")
-        
-        coords = self.CITIES[city_lower]
-        collected_data = {}
-        
-        # Collect from OpenWeather
-        if self.openweather_client:
-            start_time = time.time()
-            try:
-                weather_data = self.openweather_client.get_current_weather(
-                    lat=coords["lat"],
-                    lon=coords["lon"],
+        self.rounds.append(collection_round)
+        self._save_rounds()
+
+        # Save raw data
+        if save_raw and not df.empty:
+            self._save_round_data(df, round_id)
+
+        return df
+
+    def _save_round_data(self, df: pd.DataFrame, round_id: str):
+        """Save round data to audit directory and append to master CSV."""
+        # Save raw audit JSON for this round
+        audit_dir = self.output_dir / "rounds"
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        round_file = audit_dir / f"round_{round_id}.csv"
+        df.to_csv(round_file, index=False)
+        print(f"Round data saved: {round_file}")
+
+        # Append to master CSV
+        master_file = self.output_dir / "master_observations.csv"
+        if master_file.exists():
+            existing_df = pd.read_csv(master_file)
+            combined = pd.concat([existing_df, df], ignore_index=True)
+            # Remove duplicates by (timestamp, location_id)
+            if "timestamp" in combined.columns and "location_id" in combined.columns:
+                combined = combined.drop_duplicates(
+                    subset=["timestamp", "location_id"], keep="last"
                 )
-                response_time = (time.time() - start_time) * 1000
-                
-                self._record_call(
-                    api_name="openweather",
-                    endpoint="current_weather",
-                    status_code=200,
-                    response_time_ms=response_time,
-                    success=True,
-                    data_points=1,
-                )
-                
-                collected_data["openweather_weather"] = weather_data
-            except Exception as e:
-                response_time = (time.time() - start_time) * 1000
-                self._record_call(
-                    api_name="openweather",
-                    endpoint="current_weather",
-                    status_code=0,
-                    response_time_ms=response_time,
-                    success=False,
-                    error_message=str(e),
-                )
-        
-        # Collect from AQICN
-        if self.aqicn_client:
-            start_time = time.time()
-            try:
-                aqicn_data = self.aqicn_client.get_station_data(city_lower)
-                response_time = (time.time() - start_time) * 1000
-                
-                self._record_call(
-                    api_name="aqicn",
-                    endpoint="station_data",
-                    status_code=200,
-                    response_time_ms=response_time,
-                    success=True,
-                    data_points=1,
-                )
-                
-                collected_data["aqicn_data"] = aqicn_data
-            except Exception as e:
-                response_time = (time.time() - start_time) * 1000
-                self._record_call(
-                    api_name="aqicn",
-                    endpoint="station_data",
-                    status_code=0,
-                    response_time_ms=response_time,
-                    success=False,
-                    error_message=str(e),
-                )
-        
-        return collected_data
-    
-    def collect_all_cities(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Collect data for all cities.
-        
-        Returns:
-            Collected data for all cities
-        """
-        all_data = {}
-        
-        for city in self.CITIES.keys():
-            print(f"Collecting data for {city}...")
-            all_data[city] = self.collect_current_data(city)
-            time.sleep(1)  # Rate limiting
-        
-        return all_data
-    
-    def get_usage_metrics(self) -> Dict[str, APIUsageMetrics]:
-        """
-        Get API usage metrics.
-        
-        Returns:
-            Usage metrics per API
-        """
-        metrics = {}
-        
-        # Group records by API
-        api_records = {}
-        for record in self.call_records:
-            if record.api_name not in api_records:
-                api_records[record.api_name] = []
-            api_records[record.api_name].append(record)
-        
-        # Calculate metrics per API
-        for api_name, records in api_records.items():
-            successful = [r for r in records if r.success]
-            failed = [r for r in records if not r.success]
-            rate_limit_hits = sum(1 for r in records if r.status_code == 429)
-            
-            metrics[api_name] = APIUsageMetrics(
-                api_name=api_name,
-                total_calls=len(records),
-                successful_calls=len(successful),
-                failed_calls=len(failed),
-                total_response_time_ms=sum(r.response_time_ms for r in records),
-                avg_response_time_ms=(
-                    sum(r.response_time_ms for r in records) / len(records)
-                    if records else 0
-                ),
-                data_points_collected=sum(r.data_points for r in records),
-                rate_limit_hits=rate_limit_hits,
-                first_call=records[0].timestamp if records else "",
-                last_call=records[-1].timestamp if records else "",
-            )
-        
-        return metrics
-    
-    def save_collected_data(
-        self,
-        data: Dict[str, Any],
-        city: str,
-    ) -> Path:
-        """
-        Save collected data.
-        
-        Args:
-            data: Collected data
-            city: City name
-            
-        Returns:
-            Path to saved file
-        """
-        city_dir = self.output_dir / city
-        city_dir.mkdir(parents=True, exist_ok=True)
-        
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        output_file = city_dir / f"collection_{timestamp}.json"
-        
-        with open(output_file, "w") as f:
-            json.dump(data, f, indent=2, default=str)
-        
-        return output_file
-    
-    def get_collection_summary(self) -> Dict[str, Any]:
-        """
-        Get collection summary.
-        
-        Returns:
-            Collection summary
-        """
-        metrics = self.get_usage_metrics()
-        
+            combined.to_csv(master_file, index=False)
+        else:
+            df.to_csv(master_file, index=False)
+        print(f"Master CSV updated: {master_file}")
+
+    def get_usage_summary(self) -> Dict[str, Any]:
+        """Get collection usage summary across all rounds."""
+        if not self.rounds:
+            return {"message": "No collection rounds recorded"}
+
+        total_cities = sum(r.cities_attempted for r in self.rounds)
+        total_succeeded = sum(r.cities_succeeded for r in self.rounds)
+        total_observations = sum(r.observations_count for r in self.rounds)
+        total_duration = sum(r.collection_duration_ms for r in self.rounds)
+        failed_cities = []
+        for r in self.rounds:
+            failed_cities.extend(r.cities_failed)
+
+        first_round = self.rounds[0]
+        last_round = self.rounds[-1]
+
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "total_calls": len(self.call_records),
-            "apis": {
-                name: {
-                    "total_calls": m.total_calls,
-                    "successful_calls": m.successful_calls,
-                    "failed_calls": m.failed_calls,
-                    "data_points": m.data_points_collected,
-                    "rate_limit_hits": m.rate_limit_hits,
-                }
-                for name, m in metrics.items()
-            },
+            "total_rounds": len(self.rounds),
+            "total_cities_attempted": total_cities,
+            "total_cities_succeeded": total_succeeded,
+            "total_observations": total_observations,
+            "avg_duration_ms": total_duration / len(self.rounds),
+            "total_duration_ms": total_duration,
+            "unique_failed_cities": list(set(failed_cities)),
+            "first_round": first_round.timestamp,
+            "last_round": last_round.timestamp,
         }
+
+    def get_master_dataframe(self) -> pd.DataFrame:
+        """Load the master observations CSV."""
+        master_file = self.output_dir / "master_observations.csv"
+        if master_file.exists():
+            return pd.read_csv(master_file)
+        return pd.DataFrame()
 
 
 def main():
     """Main collection entry point."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Collect real data from APIs")
     parser.add_argument("--city", help="Specific city to collect (all if not specified)")
-    parser.add_argument("--save", action="store_true", help="Save collected data")
-    
+    parser.add_argument("--no-save", action="store_true", help="Skip saving data")
+    parser.add_argument("--summary", action="store_true", help="Print usage summary")
+
     args = parser.parse_args()
-    
+
+    # Load environment
+    load_environment()
+
     collector = RealDataCollector()
-    
-    if args.city:
-        data = collector.collect_current_data(args.city)
-        print(f"Collected data for {args.city}")
-        if args.save:
-            collector.save_collected_data(data, args.city)
-    else:
-        data = collector.collect_all_cities()
-        print("Collected data for all cities")
-        if args.save:
-            for city, city_data in data.items():
-                collector.save_collected_data(city_data, city)
-    
-    # Print summary
-    summary = collector.get_collection_summary()
+
+    if args.summary:
+        summary = collector.get_usage_summary()
+        print("\n" + "=" * 60)
+        print("Collection Usage Summary")
+        print("=" * 60)
+        for key, value in summary.items():
+            print(f"  {key}: {value}")
+        print("=" * 60)
+        return
+
+    cities = [args.city] if args.city else None
+    df = collector.collect_round(cities=cities, save_raw=not args.no_save)
+
+    # Print results
     print("\n" + "=" * 60)
     print("Collection Summary")
     print("=" * 60)
-    print(f"Total API calls: {summary['total_calls']}")
-    for api_name, api_stats in summary["apis"].items():
-        print(f"{api_name}: {api_stats['successful_calls']} successful, "
-              f"{api_stats['failed_calls']} failed")
+    if df.empty:
+        print("  No observations collected")
+    else:
+        print(f"  Observations: {len(df)}")
+        if "location_id" in df.columns:
+            print(f"  Cities: {df['location_id'].nunique()}")
+            for city in df["location_id"].unique():
+                city_count = len(df[df["location_id"] == city])
+                print(f"    {city}: {city_count} observations")
     print("=" * 60)
 
 
