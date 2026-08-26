@@ -67,6 +67,25 @@ class NowCastHistoryManager:
             json.dump(self.history, f, indent=2)
         logger.debug("NowCast history saved: %d cities", len(self.history))
 
+    @staticmethod
+    def _normalize_to_hour(timestamp: str) -> str:
+        """Normalize a timestamp to its hour boundary.
+
+        Uses the hour of the timestamp as the bucket key.
+        Multiple observations within the same hour are collapsed
+        to a single entry using the latest observation.
+
+        Args:
+            timestamp: ISO-8601 timestamp string
+
+        Returns:
+            Hour-bucket key string (first 13 chars of ISO timestamp)
+        """
+        # "2026-08-26T18:43:51+00:00" -> "2026-08-26T18"
+        # "2026-08-26 18:43:51+00:00" -> "2026-08-26T18"
+        ts = timestamp.replace(" ", "T")
+        return ts[:13]  # YYYY-MM-DDTHH
+
     def add_observation(
         self,
         city_id: str,
@@ -74,7 +93,11 @@ class NowCastHistoryManager:
         pm25: Optional[float],
         pm10: Optional[float],
     ) -> None:
-        """Add a new hourly observation to the history for a city.
+        """Add a new observation to the history for a city.
+
+        Uses hourly time buckets: multiple observations within the same
+        hour are collapsed to a single entry (latest wins). The EPA NowCast
+        algorithm operates on hourly concentrations, not sub-hourly events.
 
         Args:
             city_id: City identifier (e.g. "karachi")
@@ -85,24 +108,29 @@ class NowCastHistoryManager:
         if city_id not in self.history:
             self.history[city_id] = []
 
+        # Normalize to hourly bucket
+        hour_key = self._normalize_to_hour(timestamp)
+
         entry = {
+            "hour_key": hour_key,
             "timestamp": timestamp,
             "pm25": pm25,
             "pm10": pm10,
         }
-        self.history[city_id].append(entry)
 
-        # Sort by timestamp and deduplicate
-        self.history[city_id].sort(key=lambda x: x["timestamp"])
-        seen = set()
-        deduped = []
-        for e in self.history[city_id]:
-            if e["timestamp"] not in seen:
-                seen.add(e["timestamp"])
-                deduped.append(e)
-        self.history[city_id] = deduped
+        # Deduplicate by hour_key: keep latest observation per hour
+        existing_hours = {e["hour_key"]: i for i, e in enumerate(self.history[city_id])}
+        if hour_key in existing_hours:
+            # Update existing entry with latest observation
+            idx = existing_hours[hour_key]
+            self.history[city_id][idx] = entry
+        else:
+            self.history[city_id].append(entry)
 
-        # Keep only the last MAX_HISTORY_HOURS entries
+        # Sort by hour_key chronologically
+        self.history[city_id].sort(key=lambda x: x["hour_key"])
+
+        # Keep only the last MAX_HISTORY_HOURS hourly buckets
         self.history[city_id] = self.history[city_id][-MAX_HISTORY_HOURS:]
 
     def add_warmup_data(
