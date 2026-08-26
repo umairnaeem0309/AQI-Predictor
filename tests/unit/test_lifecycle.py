@@ -190,6 +190,7 @@ class TestArtifactStructure:
             "drift_baseline",
         ]
         # Verify these are mentioned in registry.py log_artifacts
+        pytest.importorskip("duckdb", reason="duckdb required for ModelRegistry import")
         from src.models.registry import ModelRegistry
         # The method exists and accepts these parameters
         registry = ModelRegistry()
