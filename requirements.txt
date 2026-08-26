@@ -6,8 +6,9 @@
 # =============================================================================
 
 # --- Core ML ---
-scikit-learn>=1.3.0,<1.5.0
-xgboost>=1.7.0,<2.1.0
+# Updated ranges to match verified working versions under Python 3.11 (Aug 2026)
+scikit-learn>=1.3.0,<2.0.0
+xgboost>=1.7.0,<3.0.0
 tensorflow-cpu>=2.13.0,<2.17.0
 
 # --- Data Processing ---
@@ -18,7 +19,8 @@ numpy>=1.24.0,<2.0.0
 # Hopsworks: install separately if needed (may have platform issues on Windows)
 # pip install hopsworks>=3.7.0,<4.0.0
 # If installation fails, the local fallback (DuckDB + Parquet) is fully functional
-hopsworks>=3.7.0,<4.0.0
+# Updated to 5.0.x to match Hopsworks backend v5.0.3 (Aug 2026)
+hopsworks>=5.0.0,<5.1.0
 
 # --- Experiment Tracking & Model Registry ---
 mlflow>=2.8.0,<3.0.0
