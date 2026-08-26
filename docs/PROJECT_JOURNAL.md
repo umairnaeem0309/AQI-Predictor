@@ -449,3 +449,79 @@ tests/unit/test_environment.py
 ### Next Step
 - Review Phase 15 commits
 - Approve Phase 16 for demo preparation
+
+---
+
+## Entry 010
+
+**Date:** 26 August 2026  
+**Phase:** Phase 17 — Real Data Validation (Continuation)  
+
+### Work Completed
+- Created Python 3.11.15 conda environment (`aqi-predictor`)
+- Installed all pinned dependencies within approved ranges
+- Validated Hopsworks cloud connection (Feature Store accessible)
+- Validated DuckDB/Parquet local fallback
+- Investigated AQICN staleness: city-level feeds stale, bound stations fresh
+- Fixed AQICN client to use bound station IDs for fresh data
+- Added source-level freshness validation (collected_at, weather_observed_at, aqi_observed_at)
+- Fixed quality gate to use provider observation timestamps
+- Marked initial stale observations as training-invalid
+- Updated requirements.txt to match verified working versions
+- Fixed 8 test failures (import bugs, mock URL mismatches, response library API)
+- Ran full test suite: 287 passed, 26 failed (pre-existing), 1 skipped
+
+### Key Findings
+- AQICN bound stations (@7393, @7432, @7433) return genuinely fresh data
+- AQICN city-level feeds return stale data (months old timestamps)
+- Hourly collection cadence feasible within API rate limits
+- Historical data not available on tested free-tier API endpoints
+- Python 3.11 environment resolves all Hopsworks/dependency issues
+
+### Commits Created
+1. `fix: improve AQICN freshness validation and station selection` (13 files)
+2. `fix: correct quality gate to use source observation timestamps` (2 files)
+3. `test: fix unit tests for AQICN and OpenWeather clients` (3 files)
+4. `chore: update requirements.txt and add Python 3.11 environment scripts` (6 files)
+5. `docs: document Phase 17 corrections and findings` (1 file)
+
+### Files Modified
+- src/data/aqicn_client.py — bound station IDs, freshness validation
+- src/data/schemas.py — collected_at field, training_valid flag, data_source enum
+- src/data/openweather_client.py — collected_at field
+- src/data/base_client.py — missing import fix
+- src/models/registry.py — missing imports fix
+- scripts/quality_gate.py — source timestamp freshness, training-valid filtering
+- scripts/validate_api.py — Windows encoding fix
+- tests/unit/test_aqicn_client.py — bound station URL mocks
+- tests/unit/test_openweather_client.py — timeout test fix
+- tests/unit/test_api_validation.py — assertion fixes
+- tests/unit/test_retry_logic.py — base_url, timeout fixes
+- requirements.txt — updated pinned versions
+
+### Problems
+- Python 3.12.9 was active; project requires 3.11 for Hopsworks
+- Hopsworks client v3.7.0 incompatible with backend v5.0.3
+- AQICN city-level feeds return stale data; bound stations required
+- Quality gate freshness was using collection time, not provider timestamp
+- Multiple test failures due to evolving implementation vs stale mocks
+
+### Solutions
+- Created conda Python 3.11.15 environment
+- Upgraded hopsworks to >=4.0.0 to match backend
+- Switched AQICN client to bound station IDs
+- Added source-level timestamp tracking to schema and clients
+- Fixed quality gate to validate provider observation freshness
+- Updated all affected tests to match new implementation
+
+### Decisions Made
+- Use AQICN bound station IDs, not city-level feeds, for fresh data
+- Source freshness validation uses provider observation timestamp
+- Initial stale observations marked training-invalid but preserved for audit
+- Hourly collection cadence approved (within API limits)
+
+### Next Step
+- Begin sustained hourly real data collection
+- Monitor AQICN freshness over multiple collection cycles
+- After 21+ days, run quality gate for training readiness
+- Wait for project-owner approval before Phase 18

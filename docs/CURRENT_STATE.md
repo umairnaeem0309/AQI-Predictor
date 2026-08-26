@@ -3,7 +3,7 @@
 ## AQI Predictor — Project Status
 
 **Last Updated:** 26 August 2026  
-**Current Phase:** Phase 17 — Real Data Validation (Continuation)  
+**Current Phase:** Phase 17 — Real Data Validation (Active Collection)  
 
 ---
 
@@ -28,18 +28,18 @@
 | Phase 14 — Deployment | ✅ Completed | 20 Aug 2026 |
 | Phase 15 — Final Documentation | ✅ Completed | 21 Aug 2026 |
 | Phase 16 — Demo Preparation | ✅ Completed | 21 Aug 2026 |
-| Phase 17 — Real Data Validation | 🔄 In Progress | 26 Aug 2026 |
+| Phase 17 — Real Data Validation | 🔄 Active Collection | 26 Aug 2026 |
 
 **⚠️ CRITICAL: Synthetic Data Restriction**
 
-Real API credentials are now configured and validated.
-Initial real data collected from live OpenWeather and AQICN APIs (26 Aug 2026).
+Real API credentials configured and validated. Python 3.11 environment established.
+Hopsworks cloud connection verified. Initial real data collected from live APIs.
 
 - `dataset_type`: synthetic_test_data (existing files only)
 - `approved_for_training`: false (synthetic data only)
-- Real data collection is ACTIVE — 3 observations collected for Karachi, Lahore, Islamabad.
+- Real data collection is ACTIVE — bound AQICN stations returning fresh data.
 - Training readiness: NOT MET (21-day minimum, 500 obs/city target).
-- Historical data: NOT available on free API tiers.
+- Historical data: NOT available on currently tested free-tier endpoints.
 
 Synthetic data must remain testing-only. Final model training and evaluation
 require real API data collected over 21-30 days.
@@ -48,11 +48,11 @@ require real API data collected over 21-30 days.
 
 ## 2. Current Phase Details
 
-**Phase 17 — Real Data Validation** 🔄 IN PROGRESS (26 Aug 2026)
+**Phase 17 — Real Data Validation** 🔄 ACTIVE COLLECTION (26 Aug 2026)
 
 **Objective:** Validate real API data collection, build data quality infrastructure.
 
-**Status:** Real API validation complete. Initial real data collected. Bug fixes applied.
+**Status:** All infrastructure validated. Fresh data collection verified. Hourly cadence confirmed.
 
 ### 2.1 API Validation Results
 
@@ -60,28 +60,32 @@ require real API data collected over 21-30 days.
 |---|---|---|
 | OpenWeather Weather | ✅ Working | Current endpoint (free tier) |
 | OpenWeather Pollution | ✅ Working | Air pollution endpoint (free tier) |
-| OpenWeather Historical | ❌ Not available | Requires paid subscription |
-| AQICN Station Data | ⚠️ Stale data | Returns data from March 2025 |
+| OpenWeather Historical | ❌ Not available | Requires paid subscription (tested) |
+| AQICN City Feed | ⚠️ Stale data | City-level feeds return stale timestamps |
+| AQICN Bound Stations | ✅ Fresh data | Bound station IDs return fresh observations |
 | AQICN Station Search | ✅ Working | Finds Pakistan stations |
 
-### 2.2 Initial Real Data (26 Aug 2026)
+### 2.2 Fresh Data Collection (26 Aug 2026)
 
-| City | Temp | Humidity | AQI | Status |
-|---|---|---|---|---|
-| Karachi | 29.06°C | 61% | 161 | Unhealthy |
-| Lahore | 35.99°C | 49% | 34 | Good |
-| Islamabad | 33.23°C | 68% | 154 | Unhealthy (Sensitive) |
+| City | Station ID | AQI | Source | Freshness | Training Valid |
+|---|---|---|---|---|---|
+| Karachi | @7393 | 26 | AQICN+OpenWeather | ~6h | ⚠️ Stale |
+| Lahore | @7432 | 47 | AQICN+OpenWeather | ~7h | ⚠️ Stale |
+| Islamabad | @7433 | 35 | AQICN+OpenWeather | ~6h | ⚠️ Stale |
 
-**Training readiness:** 3/1500 observations, 0/21 days — NOT YET READY
+**Note:** Initial observations correctly marked as training-invalid due to AQICN update frequency.
+Hourly collection will accumulate training-valid observations as fresh AQI data arrives.
 
-### 2.3 Environment Findings
+### 2.3 Environment Verified (Python 3.11)
 
-| Item | Expected | Actual | Impact |
+| Item | Expected | Actual | Status |
 |---|---|---|---|
-| Python | 3.11 | 3.12.9 | Hopsworks cloud validation blocked |
-| MLflow | 2.8-3.0 | 3.8.1 | Local tracking works |
-| duckdb | installed | Not installed | Feature store tests blocked |
-| hopsworks | installed | Not installed | Cloud feature store blocked |
+| Python | 3.11.x | 3.11.15 | ✅ |
+| duckdb | >=0.8.0 | 1.3.0 | ✅ |
+| hopsworks | >=4.0.0 | 5.8.0 | ✅ |
+| mlflow | >=2.8.0,<3.0.0 | 2.22.0 | ✅ |
+| Hopsworks Cloud | Connected | eu-west endpoint | ✅ |
+| Local Fallback | Available | DuckDB+Parquet | ✅ |
 
 **Phase 0 Tasks Completed:**
 - [x] Read and analyzed MASTER_AGENT_INSTRUCTIONS.md

@@ -482,3 +482,38 @@ Docker Compose provides containerized, reproducible deployments without Kubernet
 
 **Impact:**  
 Production deployment uses `docker/docker-compose.prod.yml`. All deployments run `pre_deploy_checks.py` before deployment. gunicorn with uvicorn workers serves the FastAPI backend.
+
+---
+
+### DEC-017
+
+**Date:** 26 August 2026  
+**Topic:** AQICN Station Selection Strategy  
+**Phase:** 17  
+
+**Problem:**  
+AQICN city-level feeds (`/v2/feed/{city}/`) return severely stale data (timestamps from months ago), while bound station IDs (`/v2/@{station_id}/`) return fresh, current observations.
+
+**Options Considered:**
+
+- **Option A:** Continue using city-level feeds — Simple but data is stale and training-invalid
+- **Option B:** Switch to bound station IDs — Requires mapping cities to station IDs but returns fresh data
+- **Option C:** Switch AQI provider entirely — Requires project-owner approval, not within Phase 17 scope
+
+**Chosen Approach:** Option B — Use AQICN bound station IDs
+
+**Reason:**  
+Bound station IDs provide genuinely fresh AQI observations. City-level feeds are fundamentally stale. Station mapping is a one-time configuration task.
+
+**Constraints:**  
+- Bound station IDs: Karachi=@7393, Lahore=@7432, Islamabad=@7433
+- Source freshness must be validated using provider observation timestamp, not collection time
+- Observations with stale AQI values are marked training-invalid
+
+**Trade-offs:**  
+- Requires maintaining station ID mapping (minimal effort)
+- Station IDs may change if AQICN reconfigures (monitor periodically)
+- AQICN ground stations update infrequently (~6-7 hour intervals)
+
+**Impact:**  
+AQICN client uses bound station IDs for fresh data. Quality gate validates source observation freshness. Training dataset excludes stale observations.
