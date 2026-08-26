@@ -19,15 +19,21 @@
 - Regional endpoint `eu-west.cloud.hopsworks.ai` is more reliable than default `c.app.hopsworks.ai`
 
 ### API Data Quality
-- AQICN API returns static values for extended periods (e.g., same AQI reading for 6+ hours)
+- AQICN city-level feeds (`/v2/feed/`) return stale data (timestamps from months ago)
+- AQICN bound station IDs (`/v2/@{station_id}/`) return fresh data (current timestamps)
+- Bound station IDs: Karachi=@7393, Lahore=@7432, Islamabad=@7433
 - OpenWeather API provides more frequent updates and dynamic data
-- Staleness detection is critical when using AQICN as fallback
+- Source freshness validation must use provider observation timestamp, not collection time
 - Deduplication by `(timestamp, location_id)` prevents duplicate feature records
+- AQICN ground stations update infrequently (~6-7 hour intervals typical)
+- Source-level freshness fields: collected_at, weather_observed_at, aqi_observed_at
 
 ### Python Environment
-- Python 3.11 is the safe choice for Hopsworks compatibility
+- Python 3.11 is required for Hopsworks compatibility (verified: 3.11.15)
 - Python 3.10 is acceptable as fallback
-- Python 3.12+ must not be used in this project
+- Python 3.12+ must not be used (removes `imp` module required by Hopsworks)
+- Hopsworks client version must match backend (5.x for current Hopsworks Cloud)
+- Project pins updated: hopsworks>=4.0.0, duckdb>=0.8.0, scikit-learn>=1.3.0
 
 ### Data Collection Architecture
 - OpenWeather API provides both weather and air pollution data
