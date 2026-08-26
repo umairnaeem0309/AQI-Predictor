@@ -34,11 +34,11 @@
 
 ## 2. Current Phase Details
 
-**Phase 17 — AQI Source Resolution** 🔄 ACTIVE
+**Phase 17 — Sustained Collection** 🔄 ACTIVE
 
-**Objective:** Resolve AQI target methodology, integrate PM NowCast AQI, prepare for sustained collection.
+**Objective:** Collect 30 days of real data with PM NowCast AQI targets.
 
-**Status:** AQI methodology validated, pipeline integrated, pilot verified.
+**Status:** Warm-up collected, pipeline integrated, collection activated.
 
 ### 2.1 AQI Methodology
 
@@ -80,7 +80,19 @@
 | mlflow | 2.22.0 ✅ |
 | Hopsworks Cloud | ✅ Connected |
 
-### 2.5 Test Results
+### 2.5 Collection Status
+
+| Item | Status |
+|---|---|
+| Warm-up (7 days) | ✅ 504 rows |
+| Official start | 26 Aug 2026 18:29 UTC |
+| Target end | 25 Sep 2026 |
+| Scheduler | Windows Task Scheduler (hourly) |
+| Collection script | scripts/collect_real_data.py |
+| Lock protection | ✅ Prevents overlapping runs |
+| Audit logs | data/raw/real/logs/ |
+
+### 2.6 Test Results
 
 | Suite | Tests | Passed |
 |---|---|---|
