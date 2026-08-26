@@ -9,18 +9,16 @@ Tests for:
 """
 
 import os
-import tempfile
-from pathlib import Path
-from datetime import datetime, timezone
-
 import pytest
 
 from src.models.lifecycle import (
-    ModelStatus,
-    validate_lifecycle_transition,
+    ModelState,
+    ModelLifecycle,
+    LifecycleTransitionError,
+    LifecycleBlockError,
+    VALID_TRANSITIONS,
 )
-from src.models.registry import ModelRegistry
-from src.models.selection import validate_for_production
+from src.models.registry import validate_for_production
 
 
 class TestSyntheticDataRejection:
@@ -28,37 +26,33 @@ class TestSyntheticDataRejection:
 
     def test_synthetic_dataset_rejected_for_production(self):
         """Test that synthetic_test_data cannot be used for production."""
-        metadata = {
-            "dataset_type": "synthetic_test_data",
-            "approved_for_training": False,
-            "approved_for_evaluation": False,
-        }
-        
-        # Should raise ValueError for synthetic data
-        with pytest.raises(ValueError, match="synthetic"):
-            validate_for_production(metadata)
+        eligible, failures = validate_for_production(
+            dataset_type="synthetic_test_data",
+            approved_for_training=False,
+            approval_status="rejected",
+        )
+        assert eligible is False
+        assert any("synthetic" in f.lower() for f in failures)
 
     def test_real_data_accepted_for_production(self):
         """Test that real_api_data can be used for production."""
-        metadata = {
-            "dataset_type": "real_api_data",
-            "approved_for_training": True,
-            "approved_for_evaluation": True,
-        }
-        
-        # Should not raise for real data
-        validate_for_production(metadata)
+        eligible, failures = validate_for_production(
+            dataset_type="real_api_data",
+            approved_for_training=True,
+            approval_status="approved",
+        )
+        assert eligible is True
+        assert len(failures) == 0
 
     def test_unapproved_data_rejected(self):
         """Test that unapproved data is rejected."""
-        metadata = {
-            "dataset_type": "real_api_data",
-            "approved_for_training": False,
-            "approved_for_evaluation": False,
-        }
-        
-        with pytest.raises(ValueError, match="not approved"):
-            validate_for_production(metadata)
+        eligible, failures = validate_for_production(
+            dataset_type="real_api_data",
+            approved_for_training=False,
+            approval_status="candidate",
+        )
+        assert eligible is False
+        assert len(failures) >= 2  # both approval and status should fail
 
 
 class TestMissingSecretsHandling:
@@ -105,47 +99,38 @@ class TestMissingSecretsHandling:
 class TestInvalidModelStateRejection:
     """Test that invalid model states are rejected."""
 
-    def test_untrained_model_not_production_ready(self):
-        """Test that UNTRAINED status cannot be promoted to PRODUCTION."""
-        assert not validate_lifecycle_transition(
-            ModelStatus.UNTRAINED,
-            ModelStatus.PRODUCTION,
-        )
+    def test_training_cannot_skip_to_production(self):
+        """Test that TRAINING cannot skip directly to PRODUCTION."""
+        lifecycle = ModelLifecycle(dataset_type="real_api_data")
+        with pytest.raises(LifecycleTransitionError):
+            lifecycle.transition(ModelState.PRODUCTION)
 
-    def test_training_model_not_production_ready(self):
-        """Test that TRAINING status cannot be promoted to PRODUCTION."""
-        assert not validate_lifecycle_transition(
-            ModelStatus.TRAINING,
-            ModelStatus.PRODUCTION,
+    def test_evaluated_cannot_skip_to_production(self):
+        """Test that EVALUATED cannot skip directly to PRODUCTION."""
+        lifecycle = ModelLifecycle(
+            current_state=ModelState.EVALUATED,
+            dataset_type="real_api_data",
         )
+        with pytest.raises(LifecycleTransitionError):
+            lifecycle.transition(ModelState.PRODUCTION)
 
-    def test_evaluated_model_not_production_ready(self):
-        """Test that EVALUATED status cannot be promoted to PRODUCTION."""
-        assert not validate_lifecycle_transition(
-            ModelStatus.EVALUATED,
-            ModelStatus.PRODUCTION,
+    def test_registered_can_transition_to_production(self):
+        """Test that REGISTERED can transition to PRODUCTION."""
+        lifecycle = ModelLifecycle(
+            current_state=ModelState.REGISTERED,
+            dataset_type="real_api_data",
         )
+        lifecycle.transition(ModelState.PRODUCTION)
+        assert lifecycle.current_state == ModelState.PRODUCTION
 
-    def test_candidate_model_not_production_ready(self):
-        """Test that CANDIDATE status cannot be promoted to PRODUCTION."""
-        assert not validate_lifecycle_transition(
-            ModelStatus.CANDIDATE,
-            ModelStatus.PRODUCTION,
+    def test_production_can_be_archived(self):
+        """Test that PRODUCTION can be archived."""
+        lifecycle = ModelLifecycle(
+            current_state=ModelState.PRODUCTION,
+            dataset_type="real_api_data",
         )
-
-    def test_registered_model_production_ready(self):
-        """Test that REGISTERED status can be promoted to PRODUCTION."""
-        assert validate_lifecycle_transition(
-            ModelStatus.REGISTERED,
-            ModelStatus.PRODUCTION,
-        )
-
-    def test_production_model_can_be_archived(self):
-        """Test that PRODUCTION status can be archived."""
-        assert validate_lifecycle_transition(
-            ModelStatus.PRODUCTION,
-            ModelStatus.ARCHIVED,
-        )
+        lifecycle.transition(ModelState.ARCHIVED)
+        assert lifecycle.current_state == ModelState.ARCHIVED
 
 
 class TestLifecycleValidation:
@@ -153,77 +138,91 @@ class TestLifecycleValidation:
 
     def test_full_valid_lifecycle(self):
         """Test the complete valid lifecycle path."""
-        transitions = [
-            (ModelStatus.UNTRAINED, ModelStatus.TRAINING),
-            (ModelStatus.TRAINING, ModelStatus.EVALUATED),
-            (ModelStatus.EVALUATED, ModelStatus.CANDIDATE),
-            (ModelStatus.CANDIDATE, ModelStatus.APPROVED),
-            (ModelStatus.APPROVED, ModelStatus.REGISTERED),
-            (ModelStatus.REGISTERED, ModelStatus.PRODUCTION),
-            (ModelStatus.PRODUCTION, ModelStatus.ARCHIVED),
-        ]
-        
-        for from_status, to_status in transitions:
-            assert validate_lifecycle_transition(from_status, to_status), \
-                f"Invalid transition: {from_status.value} -> {to_status.value}"
+        lifecycle = ModelLifecycle(
+            model_name="test_model",
+            dataset_type="real_api_data",
+        )
+        # TRAINING -> EVALUATED -> REGISTERED -> STAGING -> PRODUCTION -> ARCHIVED
+        lifecycle.transition(ModelState.EVALUATED)
+        lifecycle.transition(ModelState.REGISTERED)
+        lifecycle.transition(ModelState.STAGING)
+        lifecycle.transition(ModelState.PRODUCTION)
+        lifecycle.transition(ModelState.ARCHIVED)
+        assert lifecycle.current_state == ModelState.ARCHIVED
 
     def test_invalid_skip_transitions(self):
         """Test that skipping lifecycle stages is blocked."""
-        invalid_transitions = [
-            (ModelStatus.UNTRAINED, ModelStatus.EVALUATED),
-            (ModelStatus.TRAINING, ModelStatus.CANDIDATE),
-            (ModelStatus.EVALUATED, ModelStatus.APPROVED),
-            (ModelStatus.CANDIDATE, ModelStatus.REGISTERED),
-            (ModelStatus.APPROVED, ModelStatus.PRODUCTION),
+        invalid_pairs = [
+            (ModelState.TRAINING, ModelState.REGISTERED),
+            (ModelState.TRAINING, ModelState.PRODUCTION),
+            (ModelState.EVALUATED, ModelState.PRODUCTION),
         ]
-        
-        for from_status, to_status in invalid_transitions:
-            assert not validate_lifecycle_transition(from_status, to_status), \
-                f"Should block transition: {from_status.value} -> {to_status.value}"
+        for from_state, to_state in invalid_pairs:
+            lifecycle = ModelLifecycle(
+                current_state=from_state,
+                dataset_type="real_api_data",
+            )
+            with pytest.raises(LifecycleTransitionError):
+                lifecycle.transition(to_state)
 
-    def test_rejected_status_cannot_progress(self):
-        """Test that REJECTED status cannot progress further."""
-        assert not validate_lifecycle_transition(
-            ModelStatus.REJECTED,
-            ModelStatus.PRODUCTION,
+    def test_rejected_cannot_progress(self):
+        """Test that REJECTED is a terminal state."""
+        lifecycle = ModelLifecycle(
+            current_state=ModelState.REJECTED,
+            dataset_type="real_api_data",
         )
+        with pytest.raises(LifecycleTransitionError):
+            lifecycle.transition(ModelState.PRODUCTION)
 
-    def test_archived_status_cannot_reactivate(self):
-        """Test that ARCHIVED status cannot be reactivated."""
-        assert not validate_lifecycle_transition(
-            ModelStatus.ARCHIVED,
-            ModelStatus.PRODUCTION,
+    def test_archived_cannot_reactivate(self):
+        """Test that ARCHIVED is a terminal state."""
+        lifecycle = ModelLifecycle(
+            current_state=ModelState.ARCHIVED,
+            dataset_type="real_api_data",
         )
+        with pytest.raises(LifecycleTransitionError):
+            lifecycle.transition(ModelState.PRODUCTION)
 
 
 class TestRegistrySafety:
-    """Test registry safety checks."""
+    """Test registry safety checks via validate_for_production."""
 
     def test_registry_rejects_synthetic_for_production(self):
         """Test that registry blocks synthetic data for production."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            registry = ModelRegistry(model_dir=Path(tmpdir))
-            
-            # Try to register synthetic data as production
-            # This should be blocked by validation
-            metadata = {
-                "dataset_type": "synthetic_test_data",
-                "approved_for_training": False,
-            }
-            
-            # The validate_for_production function should catch this
-            with pytest.raises(ValueError):
-                validate_for_production(metadata)
+        eligible, failures = validate_for_production(
+            dataset_type="synthetic_test_data",
+            approved_for_training=False,
+            approval_status="rejected",
+        )
+        assert eligible is False
+        assert any("synthetic" in f.lower() for f in failures)
 
-    def test_registry_requires_approval_status(self):
-        """Test that registry requires approved status for production."""
-        metadata = {
-            "dataset_type": "real_api_data",
-            "approved_for_training": True,
-            "approved_for_evaluation": True,
-            "status": "candidate",  # Not approved
-        }
-        
-        # Should fail because status is not 'approved'
-        with pytest.raises(ValueError):
-            validate_for_production(metadata)
+    def test_registry_rejects_unapproved_data(self):
+        """Test that registry rejects unapproved real data."""
+        eligible, failures = validate_for_production(
+            dataset_type="real_api_data",
+            approved_for_training=False,
+            approval_status="candidate",
+        )
+        assert eligible is False
+        assert len(failures) >= 2
+
+    def test_registry_accepts_approved_real_data(self):
+        """Test that registry accepts approved real data."""
+        eligible, failures = validate_for_production(
+            dataset_type="real_api_data",
+            approved_for_training=True,
+            approval_status="approved",
+        )
+        assert eligible is True
+        assert len(failures) == 0
+
+    def test_registry_rejects_missing_approval(self):
+        """Test that registry rejects data without approval status."""
+        eligible, failures = validate_for_production(
+            dataset_type="real_api_data",
+            approved_for_training=True,
+            approval_status="candidate",
+        )
+        assert eligible is False
+        assert any("not approved" in f.lower() or "status" in f.lower() for f in failures)
