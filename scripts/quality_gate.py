@@ -273,10 +273,19 @@ class DataQualityGate:
         return output_file
 
 
+def _ensure_utf8_stdout():
+    """Ensure stdout supports Unicode symbols on Windows consoles."""
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
 def main():
     """Main quality gate entry point."""
     import argparse
     
+    _ensure_utf8_stdout()
     parser = argparse.ArgumentParser(description="Run data quality gate")
     parser.add_argument("data_file", help="Path to CSV data file")
     parser.add_argument("--save", action="store_true", help="Save results to file")

@@ -26,6 +26,7 @@ from src.data.exceptions import (
     APINetworkError,
     APIAuthenticationError,
     APIRequestError,
+    APIValidationError,
 )
 
 logger = logging.getLogger(__name__)
