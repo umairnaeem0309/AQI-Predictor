@@ -64,24 +64,29 @@ class DataQualityGate:
     
     def check_freshness(self, df: pd.DataFrame) -> dict:
         """
-        Check data freshness.
+        Check data freshness using source observation timestamps.
+
+        Uses raw_response_time (provider observation time) if available,
+        otherwise falls back to timestamp (collection time).
         
         Args:
-            df: DataFrame with timestamp column
+            df: DataFrame with timestamp and optionally raw_response_time columns
             
         Returns:
             Freshness check results
         """
-        if "timestamp" not in df.columns:
+        # Use raw_response_time if available (source observation time)
+        ts_col = "raw_response_time" if "raw_response_time" in df.columns else "timestamp"
+        if ts_col not in df.columns:
             return {
                 "check": "freshness",
                 "passed": False,
-                "error": "No timestamp column",
+                "error": "No timestamp or raw_response_time column",
             }
         
         try:
-            df["timestamp"] = pd.to_datetime(df["timestamp"])
-            latest_timestamp = df["timestamp"].max()
+            timestamps = pd.to_datetime(df[ts_col], format="mixed", utc=True)
+            latest_timestamp = timestamps.max()
             now = pd.Timestamp.now(tz="UTC")
             
             # Ensure timezone aware
@@ -96,7 +101,8 @@ class DataQualityGate:
                 "passed": passed,
                 "age_hours": float(age_hours),
                 "threshold_hours": self.MAX_STALENESS_HOURS,
-                "latest_timestamp": latest_timestamp.isoformat(),
+                "latest_source_timestamp": latest_timestamp.isoformat(),
+                "source_field_used": ts_col,
             }
         except Exception as e:
             return {
@@ -104,6 +110,40 @@ class DataQualityGate:
                 "passed": False,
                 "error": str(e),
             }
+
+    def check_training_validity(self, df: pd.DataFrame) -> dict:
+        """
+        Check how many observations are training-valid.
+
+        Uses the is_training_valid flag to filter stale observations.
+        
+        Args:
+            df: DataFrame with is_training_valid column
+            
+        Returns:
+            Training validity check results
+        """
+        if "is_training_valid" not in df.columns:
+            return {
+                "check": "training_validity",
+                "passed": True,
+                "message": "No is_training_valid column — assuming all valid",
+                "valid_count": len(df),
+                "invalid_count": 0,
+            }
+        
+        valid_count = df["is_training_valid"].sum()
+        invalid_count = len(df) - valid_count
+        valid_ratio = valid_count / len(df) if len(df) > 0 else 0
+        
+        return {
+            "check": "training_validity",
+            "passed": True,  # Informational — doesn't block quality gate
+            "valid_count": int(valid_count),
+            "invalid_count": int(invalid_count),
+            "valid_ratio": float(valid_ratio),
+            "message": f"{int(valid_count)}/{len(df)} observations are training-valid",
+        }
     
     def check_schema(self, df: pd.DataFrame, required_columns: List[str]) -> dict:
         """
@@ -157,6 +197,9 @@ class DataQualityGate:
     def check_data_sufficiency(self, df: pd.DataFrame) -> dict:
         """
         Check data sufficiency for training.
+
+        Only counts training-valid observations (is_training_valid=True).
+        Stale observations are excluded from sufficiency calculations.
         
         Args:
             df: DataFrame to check
@@ -166,17 +209,29 @@ class DataQualityGate:
         """
         checks = {}
         
-        # Check total observations
-        total_observations = len(df)
+        # Filter to training-valid observations only
+        if "is_training_valid" in df.columns:
+            valid_df = df[df["is_training_valid"] == True]
+            invalid_count = len(df) - len(valid_df)
+            checks["training_valid_filter"] = {
+                "total_rows": len(df),
+                "training_valid_rows": len(valid_df),
+                "excluded_stale_rows": invalid_count,
+            }
+        else:
+            valid_df = df
+        
+        # Check total observations (training-valid only)
+        total_observations = len(valid_df)
         checks["total_observations"] = {
             "value": total_observations,
             "threshold": self.MIN_OBSERVATIONS_PER_CITY * 3,  # 3 cities
             "passed": total_observations >= self.MIN_OBSERVATIONS_PER_CITY * 3,
         }
         
-        # Check observations per city
-        if "location_id" in df.columns:
-            city_counts = df["location_id"].value_counts().to_dict()
+        # Check observations per city (training-valid only)
+        if "location_id" in valid_df.columns:
+            city_counts = valid_df["location_id"].value_counts().to_dict()
             checks["per_city"] = {}
             for city, count in city_counts.items():
                 checks["per_city"][city] = {
@@ -185,11 +240,12 @@ class DataQualityGate:
                     "passed": count >= self.MIN_OBSERVATIONS_PER_CITY,
                 }
         
-        # Check date range
-        if "timestamp" in df.columns:
+        # Check date range (training-valid only)
+        ts_col = "raw_response_time" if "raw_response_time" in valid_df.columns else "timestamp"
+        if ts_col in valid_df.columns:
             try:
-                df["timestamp"] = pd.to_datetime(df["timestamp"])
-                date_range = (df["timestamp"].max() - df["timestamp"].min()).days
+                timestamps = pd.to_datetime(valid_df[ts_col], format="mixed", utc=True)
+                date_range = (timestamps.max() - timestamps.min()).days
                 checks["date_range_days"] = {
                     "value": date_range,
                     "threshold": self.MIN_DAYS_COLLECTED,
@@ -243,6 +299,7 @@ class DataQualityGate:
         results["checks"]["completeness"] = self.check_completeness(df)
         results["checks"]["freshness"] = self.check_freshness(df)
         results["checks"]["duplicates"] = self.check_duplicates(df)
+        results["checks"]["training_validity"] = self.check_training_validity(df)
         results["checks"]["data_sufficiency"] = self.check_data_sufficiency(df)
         
         if required_columns:
