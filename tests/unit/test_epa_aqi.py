@@ -481,8 +481,16 @@ class TestAQIMetadata:
         assert "derived" in meta["derived_disclosure"].lower()
         assert "not an official" in meta["derived_disclosure"].lower()
 
-    def test_nowcast_reference(self):
-        """NowCast reference is documented."""
+    def test_method_version(self):
+        """Method version is documented for audit trail."""
         meta = get_aqi_metadata()
-        assert "nowcast_reference" in meta
-        assert "NowCast" in meta["nowcast_reference"]
+        assert "aqi_method_version" in meta
+        assert "EPA-454/B-24-002" in meta["aqi_method_version"]
+
+    def test_included_pollutants(self):
+        """Included pollutants are documented."""
+        meta = get_aqi_metadata()
+        assert meta["scope"] == "particle_pollution_only"
+        assert "pm25" in meta["included_pollutants"]
+        assert "pm10" in meta["included_pollutants"]
+        assert "o3" in meta["excluded_pollutants"]

@@ -380,31 +380,52 @@ Authentication failures (401/403) and invalid requests (4xx) are permanent and w
 
 ---
 
-### DEC-014
+### DEC-014 (Amended)
 
-**Date:** 2 August 2026  
-**Topic:** Data Source Ownership  
-**Phase:** 2  
+**Date:** 2 August 2026 | **Amended:** 26 August 2026  
+**Topic:** Data Source Authority  
+**Phase:** 2 | **Amended in:** Phase 17  
 
 **Problem:**  
-Both OpenWeather and AQICN provide overlapping data. Need clear ownership rules.
+Both OpenWeather and AQICN provide overlapping data. Need clear ownership rules for weather, AQI, and pollutant fields.
 
-**Options Considered:**
+**Amendment trigger:**  
+AQICN stations for Karachi, Lahore, and Islamabad are confirmed stale (data months/years old). AQICN cannot provide training-quality AQI observations for Pakistani cities.
 
-- **Option A:** Use whichever source is available — Unpredictable data quality
-- **Option B:** Define authoritative source per field category — Consistent, predictable
+**Weather:**  
+OpenWeather remains authoritative for temperature, humidity, wind, pressure, and weather conditions.
 
-**Chosen Approach:** Define authoritative source per field category
+**External US EPA AQI:**  
+AQICN remains the preferred external AQI source when the selected station is geographically valid and the observation satisfies the approved freshness requirement.
 
-**Reason:**  
-Weather fields are more accurate from OpenWeather (specialized weather API). AQI/pollution values from AQICN use the US EPA scale and are more reliable for air quality assessment.
+**Pakistan operational condition:**  
+The validated AQICN stations for Karachi, Lahore, and Islamabad are currently too stale to provide training-quality AQI observations.
+
+**Fallback target:**  
+When AQICN is unavailable or stale, the project derives a US EPA-method particle-pollution NowCast AQI from OpenWeather PM2.5 and PM10 hourly concentrations.
+
+For each timestamp:
+- Calculate PM2.5 NowCast AQI when valid
+- Calculate PM10 NowCast AQI when valid
+- Select the higher valid sub-index
+- Record its pollutant as dominant
+
+**Derived data description:**  
+This derived value is described as a "US EPA-method PM NowCast AQI derived from OpenWeather pollutant concentrations". It is NOT an official EPA/AirNow monitor observation and is not yet a complete multi-pollutant AQI because O3, CO, SO2, and NO2 sub-indices are not included in the Phase 17 target.
+
+**OpenWeather main.aqi:**  
+The OpenWeather 1-5 index is never substituted for this project's 0-500 AQI target.
+
+**Methodology:**  
+EPA-454/B-24-002, May 2024.
 
 **Trade-offs:**  
 - Requires merge logic between sources (implemented in AQICNClient.merge_with_openweather)
-- Clear, documented data provenance
+- Derived AQI introduces estimation uncertainty vs official monitor readings
+- Clear, documented data provenance and full metadata trail
 
 **Impact:**  
-OpenWeather is authoritative for temperature, humidity, wind, pressure, weather_condition. AQICN is authoritative for AQI, PM2.5, PM10, CO, NO2, SO2, O3.
+OpenWeather is authoritative for temperature, humidity, wind, pressure, weather_condition, PM2.5, PM10. AQI target is derived from OpenWeather pollutants using EPA PM NowCast methodology when AQICN is stale.
 
 ---
 
