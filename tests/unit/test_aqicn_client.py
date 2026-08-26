@@ -266,10 +266,10 @@ class TestAQICNFetchData:
     @responses.activate
     def test_fetch_data_success(self, aqicn_response_karachi):
         """Successful data fetch returns observation."""
-        # AQICN client uses bound station ID @7393 for karachi (no trailing slash)
+        # AQICN client uses bound station ID @11790 for karachi (no trailing slash)
         responses.add(
             responses.GET,
-            "https://api.waqi.info/feed/@7393",
+            "https://api.waqi.info/feed/@11790",
             json=aqicn_response_karachi,
             status=200,
         )
@@ -285,10 +285,10 @@ class TestAQICNFetchData:
     @responses.activate
     def test_fetch_data_auth_failure(self):
         """Authentication failure raises error."""
-        # AQICN client uses bound station ID @7393 for karachi (no trailing slash)
+        # AQICN client uses bound station ID @11790 for karachi (no trailing slash)
         responses.add(
             responses.GET,
-            "https://api.waqi.info/feed/@7393",
+            "https://api.waqi.info/feed/@11790",
             json={"status": "error", "data": "Invalid token"},
             status=401,
         )

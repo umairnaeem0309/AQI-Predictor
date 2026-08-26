@@ -37,8 +37,15 @@ def _parse_aqicn_timestamp(time_data: Optional[Dict[str, Any]]) -> Optional[date
     """Parse AQICN timestamp to UTC datetime.
 
     AQICN provides:
-    - iso: ISO 8601 string (may or may not include timezone)
-    - v: Unix timestamp
+    - iso: ISO 8601 string with explicit timezone offset (e.g. 2026-08-26T11:00:00+05:00)
+    - v: Unix timestamp (NOTE: AQICN Unix timestamps are unreliable — they often
+      represent local clock time misinterpreted as UTC, causing a timezone-offset
+      discrepancy. Always prefer the ISO string with explicit offset.)
+    - tz: Timezone offset string (e.g. '+05:00')
+
+    IMPORTANT: The ISO string is the authoritative timestamp source.
+    The Unix timestamp (time.v) MUST NOT be used as primary because AQICN
+    encodes local clock time into the Unix value without applying the offset.
 
     Args:
         time_data: AQICN time dictionary.
@@ -49,19 +56,27 @@ def _parse_aqicn_timestamp(time_data: Optional[Dict[str, Any]]) -> Optional[date
     if not time_data:
         return None
 
-    # Prefer Unix timestamp (unambiguous)
-    if "v" in time_data and time_data["v"]:
-        return datetime.fromtimestamp(time_data["v"], tz=timezone.utc)
-
-    # Fallback to ISO string
+    # PREFER ISO string — it contains the explicit timezone offset
+    # AQICN Unix timestamps are unreliable (local time stored as UTC)
     if "iso" in time_data and time_data["iso"]:
         try:
-            dt = pd.to_datetime(time_data["iso"])
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt
+            dt = datetime.fromisoformat(time_data["iso"])
+            # If timezone-aware, convert to UTC
+            if dt.tzinfo is not None:
+                return dt.astimezone(timezone.utc)
+            # If naive, treat as UTC
+            return dt.replace(tzinfo=timezone.utc)
         except Exception as e:
-            logger.warning("Failed to parse AQICN ISO timestamp: %s", e)
+            logger.warning("Failed to parse AQICN ISO timestamp '%s': %s", time_data["iso"], e)
+
+    # Fallback to Unix timestamp only if ISO unavailable
+    # Log warning because this path uses the unreliable AQICN Unix value
+    if "v" in time_data and time_data["v"]:
+        logger.warning(
+            "AQICN ISO timestamp unavailable, falling back to Unix timestamp. "
+            "Note: AQICN Unix timestamps may be offset by the timezone value."
+        )
+        return datetime.fromtimestamp(time_data["v"], tz=timezone.utc)
 
     return None
 
@@ -91,13 +106,17 @@ def _extract_iaqi_value(iaqi: Optional[Dict[str, Any]], key: str) -> Optional[fl
     return None
 
 
-# Bound station IDs for Pakistani cities — provides fresh data
-# City-level feeds (/feed/karachi/) return stale cached data
-# Bound station IDs (/feed/@7393/) return current observations
+# Bound station IDs for Pakistani cities — AQICN UID-based stations
+# Verified: these are actual monitoring stations in Pakistan
+# City-level feeds may return different/stale data; bound stations are preferred
+#
+# IMPORTANT: AQICN Pakistani stations may have very infrequent updates.
+# The ISO timestamp is authoritative; never use the Unix timestamp as primary
+# because AQICN encodes local clock time as if it were UTC.
 CITY_STATION_MAP = {
-    "karachi": "@7393",
-    "lahore": "@7432",
-    "islamabad": "@7433",
+    "karachi": "@11790",    # Karachi US Consulate, Pakistan (uid=11790)
+    "lahore": "@11765",     # Lahore US Embassy, Pakistan (uid=11765)
+    "islamabad": "@11739",  # Islamabad US Embassy, Pakistan (uid=11739)
 }
 
 
