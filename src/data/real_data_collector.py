@@ -7,6 +7,7 @@ Tracks API usage metrics and audit trails.
 
 import os
 import json
+import logging
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -18,6 +19,8 @@ import pandas as pd
 from src.config import load_environment, get_api_key
 from src.data.api_manager import APIManager
 from src.data.schemas import CityConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -68,8 +71,26 @@ class RealDataCollector:
         self.output_dir = output_dir or Path("data/raw/real")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize APIManager (reads keys from env)
-        self.api_manager = APIManager()
+        # Initialize NowCast history manager
+        from src.data.nowcast_history import NowCastHistoryManager
+        self.nowcast_history = NowCastHistoryManager(
+            history_path=self.output_dir / "nowcast_history.json"
+        )
+
+        # Load warm-up data into NowCast history if available
+        master_csv = self.output_dir / "master_observations.csv"
+        if master_csv.exists():
+            self.nowcast_history.load_from_master_csv(master_csv)
+            for city_id in ["karachi", "lahore", "islamabad"]:
+                count = self.nowcast_history.get_history_count(city_id)
+                if count > 0:
+                    logger.info(
+                        "Loaded %d NowCast history entries for %s from CSV",
+                        count, city_id,
+                    )
+
+        # Initialize APIManager with NowCast history
+        self.api_manager = APIManager(nowcast_history=self.nowcast_history)
 
         # Collection rounds tracking
         self.rounds: List[CollectionRound] = []
@@ -154,6 +175,9 @@ class RealDataCollector:
         )
         self.rounds.append(collection_round)
         self._save_rounds()
+
+        # Persist NowCast history for next round
+        self.nowcast_history.save_history()
 
         # Save raw data
         if save_raw and not df.empty:
