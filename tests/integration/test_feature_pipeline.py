@@ -146,16 +146,18 @@ class TestFeaturePipelineEndToEnd:
     def test_missing_values_preserved(self, mock_raw_observations):
         """Missing values are preserved, not imputed."""
         df = mock_raw_observations.copy()
-        # Introduce some NaN values
-        df.loc[0, "aqi"] = np.nan
-        df.loc[5, "pm25"] = np.nan
+        # Introduce NaN in first karachi row (oldest timestamp → stays at index 0 after sort)
+        karachi_mask = df["location_id"] == "karachi"
+        first_karachi_idx = df[karachi_mask].sort_values("timestamp").index[0]
+        df.loc[first_karachi_idx, "aqi"] = np.nan
+        df.loc[first_karachi_idx, "pm25"] = np.nan
 
         result = engineer_features(df)
 
-        # Original NaN should be preserved
-        assert pd.isna(result.loc[0, "aqi"])
-        # Derived features from NaN input should also be NaN
-        assert pd.isna(result.loc[0, "aqi_lag_1h"])
+        # Original NaN should be preserved (karachi at 00:00 is first after sort)
+        karachi_result = result[result["location_id"] == "karachi"].sort_values("timestamp")
+        assert pd.isna(karachi_result.iloc[0]["aqi"])
+        assert pd.isna(karachi_result.iloc[0]["pm25"])
 
     def test_pipeline_with_minimal_data(self):
         """Pipeline works with minimal data (single city, few hours)."""

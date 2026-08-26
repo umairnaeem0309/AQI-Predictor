@@ -313,10 +313,25 @@ class AlertManager:
         
         alerts = []
         for item in data:
+            # Handle both serialized enum values ("data_drift")
+            # and full repr ("AlertType.DATA_DRIFT") from dataclasses.asdict()
+            at_raw = item["alert_type"]
+            if isinstance(at_raw, str) and "." in at_raw:
+                at_raw = at_raw.rsplit(".", 1)[-1]
+            # Enum names are uppercase, values are lowercase
+            at_value = at_raw.lower() if at_raw.isupper() else at_raw
+            alert_type = AlertType(at_value)
+
+            lvl_raw = item["level"]
+            if isinstance(lvl_raw, str) and "." in lvl_raw:
+                lvl_raw = lvl_raw.rsplit(".", 1)[-1]
+            lvl_value = lvl_raw.lower() if lvl_raw.isupper() else lvl_raw
+            level = AlertLevel(lvl_value)
+
             alerts.append(Alert(
                 alert_id=item["alert_id"],
-                alert_type=AlertType(item["alert_type"]),
-                level=AlertLevel(item["level"]),
+                alert_type=alert_type,
+                level=level,
                 message=item["message"],
                 details=item["details"],
                 city=item["city"],

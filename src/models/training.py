@@ -59,18 +59,18 @@ def validate_training_data(metadata: DatasetMetadata) -> None:
     Raises:
         ValueError: If validation fails.
     """
+    # Check dataset type first — synthetic data is never allowed
+    if metadata.dataset_type == DatasetType.SYNTHETIC_TEST:
+        raise ValueError(
+            f"Cannot train on synthetic test data. "
+            f"Dataset type: {metadata.dataset_type.value}"
+        )
+
     # Check approved_for_training
     if not metadata.approved_for_training:
         raise ValueError(
             f"Dataset {metadata.dataset_version} is not approved for training. "
             f"approved_for_training={metadata.approved_for_training}"
-        )
-
-    # Check dataset type
-    if metadata.dataset_type == DatasetType.SYNTHETIC_TEST:
-        raise ValueError(
-            f"Cannot train on synthetic test data. "
-            f"Dataset type: {metadata.dataset_type.value}"
         )
 
     logger.info(

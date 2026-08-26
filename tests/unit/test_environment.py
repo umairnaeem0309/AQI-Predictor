@@ -68,8 +68,9 @@ class TestCriticalImports:
         assert yaml.__version__ is not None
 
     def test_import_dotenv(self):
-        import dotenv
-        assert dotenv.__version__ is not None
+        from importlib.metadata import version as get_version
+        pkg_version = get_version("python-dotenv")
+        assert pkg_version is not None
 
     def test_import_requests(self):
         import requests

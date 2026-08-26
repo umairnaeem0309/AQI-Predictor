@@ -134,28 +134,49 @@ class DriftDetector:
         drift_results = []
         overall_drift = False
         
-        # Extract column-level results
+        # Extract column-level results from Evidently v0.7+ format
         metrics = report_dict.get("metrics", [])
         for metric in metrics:
-            if metric.get("metric") == "DatasetDriftMetric":
-                drift_detected = metric.get("result", {}).get("drift_detected", False)
-                overall_drift = drift_detected
+            metric_name = metric.get("metric_name", "")
+            
+            # Overall drift count metric
+            if "DriftedColumnsCount" in metric_name:
+                value = metric.get("value", {})
+                if isinstance(value, dict):
+                    drift_count = value.get("count", 0)
+                    overall_drift = drift_count > 0
+            
+            # Per-column drift metric
+            if metric_name.startswith("ValueDrift"):
+                # Extract column name from config
+                config = metric.get("config", {})
+                col_name = config.get("column", "unknown")
+                method = config.get("method", "psi")
+                threshold_val = config.get("threshold", self.psi_threshold)
                 
-                # Extract column details
-                columns_info = metric.get("result", {}).get("columns", {})
-                for col_name, col_info in columns_info.items():
-                    drift_result = DriftResult(
-                        column_name=col_name,
-                        drift_detected=col_info.get("drift_detected", False),
-                        drift_score=col_info.get("drift_score", 0.0),
-                        drift_method="psi",
-                        threshold=self.psi_threshold,
-                        details={
-                            "stattest": col_info.get("stattest", "unknown"),
-                            "stattest_threshold": col_info.get("stattest_threshold", 0),
-                        },
-                    )
-                    drift_results.append(drift_result)
+                # Value is the drift score; True/1.0 means drift detected
+                score = metric.get("value", 0.0)
+                if isinstance(score, bool):
+                    detected = score
+                    score_val = 1.0 if score else 0.0
+                elif isinstance(score, (int, float)):
+                    detected = score > threshold_val
+                    score_val = float(score)
+                else:
+                    detected = False
+                    score_val = 0.0
+                
+                drift_result = DriftResult(
+                    column_name=col_name,
+                    drift_detected=detected,
+                    drift_score=score_val,
+                    drift_method=method,
+                    threshold=threshold_val,
+                    details={
+                        "metric_name": metric_name,
+                    },
+                )
+                drift_results.append(drift_result)
         
         # Create summary
         drifted_columns = [r for r in drift_results if r.drift_detected]

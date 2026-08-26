@@ -116,7 +116,9 @@ class TestMergeLogic:
         assert result.aqi == 168  # From AQICN
 
     def test_only_openweather_available(self, city_config, openweather_obs):
-        """When only OpenWeather available, AQI fields are None."""
+        """When only OpenWeather available with no PM history, AQI is None."""
+        from src.data.nowcast_history import NowCastHistoryManager
+
         ow_client = MagicMock()
         ow_client.api_key = "test"
         ow_client.fetch_data.return_value = [openweather_obs]
@@ -125,15 +127,20 @@ class TestMergeLogic:
         aqicn_client.api_key = None
         aqicn_client.fetch_data.side_effect = APIClientError("No API key")
 
+        # Use empty NowCast history so no PM history → no derived AQI
+        empty_history = NowCastHistoryManager.__new__(NowCastHistoryManager)
+        empty_history.history = {}
+
         manager = APIManager(
             openweather_client=ow_client,
             aqicn_client=aqicn_client,
+            nowcast_history=empty_history,
         )
         result = manager.fetch_city_data(city_config)
 
         assert result is not None
         assert result.temperature == 34.5
-        assert result.aqi is None  # No US EPA AQI available
+        assert result.aqi is None  # No PM history → cannot derive AQI
         assert result.pm25 is None
 
     def test_only_aqicn_available(self, city_config, aqicn_obs):
@@ -185,17 +192,24 @@ class TestAQIScaleIntegrity:
     """Verify OpenWeather 1-5 AQI is never used as US EPA AQI."""
 
     def test_openweather_only_no_aqi(self, city_config, openweather_obs):
-        """OpenWeather-only observation has no AQI value."""
+        """OpenWeather AQI (1-5) must NOT appear as US EPA AQI."""
+        from src.data.nowcast_history import NowCastHistoryManager
+
         ow_client = MagicMock()
         ow_client.api_key = "test"
         ow_client.fetch_data.return_value = [openweather_obs]
 
         aqicn_client = MagicMock()
         aqicn_client.api_key = None
+        aqicn_client.fetch_data.side_effect = APIClientError("No API key")
+
+        empty_history = NowCastHistoryManager.__new__(NowCastHistoryManager)
+        empty_history.history = {}
 
         manager = APIManager(
             openweather_client=ow_client,
             aqicn_client=aqicn_client,
+            nowcast_history=empty_history,
         )
         result = manager.fetch_city_data(city_config)
 
