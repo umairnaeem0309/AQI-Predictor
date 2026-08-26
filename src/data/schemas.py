@@ -160,6 +160,7 @@ class DataSource(str, Enum):
 
     OPENWEATHER = "openweather"
     AQICN = "aqicn"
+    OPENWEATHER_AQICN = "openweather+aqicn"
 
 
 class StandardObservation(BaseModel):
@@ -192,7 +193,19 @@ class StandardObservation(BaseModel):
     # Metadata
     data_source: DataSource = Field(..., description="Source API identifier")
     raw_response_time: Optional[datetime] = Field(
-        None, description="Original API response timestamp (before timezone normalization)"
+        None, description="Source provider observation timestamp (before timezone normalization)"
+    )
+    collected_at: Optional[datetime] = Field(
+        None, description="Local collection timestamp (when API call was made)"
+    )
+    is_training_valid: bool = Field(
+        True,
+        description="Whether this observation meets freshness requirements for training. "
+        "False if source data is stale (e.g. AQICN returning cached observations).",
+    )
+    staleness_reason: Optional[str] = Field(
+        None,
+        description="Reason why observation was marked as not training-valid",
     )
 
     class Config:

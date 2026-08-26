@@ -91,11 +91,24 @@ def _extract_iaqi_value(iaqi: Optional[Dict[str, Any]], key: str) -> Optional[fl
     return None
 
 
+# Bound station IDs for Pakistani cities — provides fresh data
+# City-level feeds (/feed/karachi/) return stale cached data
+# Bound station IDs (/feed/@7393/) return current observations
+CITY_STATION_MAP = {
+    "karachi": "@7393",
+    "lahore": "@7432",
+    "islamabad": "@7433",
+}
+
+
 class AQICNClient(BaseAPIClient):
     """Client for AQICN/WAQI API.
 
     Fetches AQI and pollutant data. Includes staleness detection
     because AQICN ground stations update infrequently.
+
+    Uses bound station IDs (e.g. @7393) instead of city-level feeds
+    (/feed/karachi/) because city-level feeds return stale cached data.
 
     Usage:
         client = AQICNClient(api_key="your-token")
@@ -130,6 +143,9 @@ class AQICNClient(BaseAPIClient):
     def _build_request(self, **kwargs) -> tuple:
         """Build AQICN request parameters.
 
+        Uses bound station IDs for known cities to get fresh data.
+        Falls back to city-level feed for unknown cities.
+
         Expected kwargs:
             city_id (str): City identifier (used in AQICN path).
 
@@ -137,7 +153,9 @@ class AQICNClient(BaseAPIClient):
             Tuple of (endpoint, params).
         """
         city_id: str = kwargs.get("city_id", "")
-        endpoint = f"feed/{city_id}"
+        # Use bound station ID if available for fresh data
+        station_id = CITY_STATION_MAP.get(city_id.lower(), city_id)
+        endpoint = f"feed/{station_id}"
         params = {"token": self.api_key}
         return endpoint, params
 
@@ -235,14 +253,15 @@ class AQICNClient(BaseAPIClient):
             logger.warning("AQICN response has no data for %s", city_id)
             return []
 
-        # Parse timestamp
-        dt_utc = _parse_aqicn_timestamp(data.time)
+        # Parse timestamp — convert Pydantic model to dict for parser
+        time_dict = data.time.model_dump() if data.time else None
+        dt_utc = _parse_aqicn_timestamp(time_dict)
         if dt_utc is None:
             dt_utc = datetime.now(timezone.utc)
             logger.warning("No timestamp in AQICN response for %s, using current time", city_id)
 
         # Check staleness
-        staleness_warning = self._check_staleness(data.time)
+        staleness_warning = self._check_staleness(time_dict)
         if staleness_warning:
             # Data is stale but still usable
             pass
@@ -264,6 +283,18 @@ class AQICNClient(BaseAPIClient):
         if data.city and "name" in data.city:
             city_name = data.city["name"]
 
+        # Determine training validity based on source freshness
+        collected_at = datetime.now(timezone.utc)
+        is_training_valid = True
+        staleness_reason = None
+        if staleness_warning:
+            is_training_valid = False
+            staleness_reason = staleness_warning
+            logger.warning(
+                "AQICN observation for %s marked as NOT training-valid: %s",
+                city_id, staleness_reason,
+            )
+
         observation = StandardObservation(
             timestamp=dt_utc,
             location_id=city_id,
@@ -284,6 +315,9 @@ class AQICNClient(BaseAPIClient):
             o3=o3,
             data_source=DataSource.AQICN,
             raw_response_time=dt_utc,
+            collected_at=collected_at,
+            is_training_valid=is_training_valid,
+            staleness_reason=staleness_reason,
         )
 
         return [observation]
@@ -309,6 +343,8 @@ class AQICNClient(BaseAPIClient):
         """
         # Start with OpenWeather data (authoritative for weather)
         merged = openweather_obs.model_dump()
+        # Indicate both sources contributed
+        merged["data_source"] = DataSource.OPENWEATHER_AQICN.value
 
         # Override AQI/pollution with AQICN values where available
         aqicn_dict = aqicn_obs.model_dump()
@@ -323,5 +359,21 @@ class AQICNClient(BaseAPIClient):
         if aqicn_obs.timestamp and openweather_obs.timestamp:
             if aqicn_obs.timestamp > openweather_obs.timestamp:
                 merged["raw_response_time"] = aqicn_obs.raw_response_time
+
+        # Propagate freshness metadata:
+        # If AQICN source is stale, the merged observation is NOT training-valid
+        merged["is_training_valid"] = (
+            openweather_obs.is_training_valid and aqicn_obs.is_training_valid
+        )
+        if aqicn_obs.staleness_reason:
+            merged["staleness_reason"] = aqicn_obs.staleness_reason
+
+        # collected_at = time of the most recent API call
+        if openweather_obs.collected_at and aqicn_obs.collected_at:
+            merged["collected_at"] = max(openweather_obs.collected_at, aqicn_obs.collected_at)
+        elif openweather_obs.collected_at:
+            merged["collected_at"] = openweather_obs.collected_at
+        elif aqicn_obs.collected_at:
+            merged["collected_at"] = aqicn_obs.collected_at
 
         return StandardObservation(**merged)
