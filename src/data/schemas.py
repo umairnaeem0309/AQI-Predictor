@@ -212,6 +212,37 @@ class StandardObservation(BaseModel):
         description="Pollutant producing the selected AQI sub-index (pm25 or pm10). "
         "Set when AQI is derived from PM NowCast methodology.",
     )
+    # NowCast audit fields
+    pm25_nowcast: Optional[float] = Field(
+        None,
+        description="PM2.5 NowCast concentration (ug/m3). "
+        "Weighted 12-hour average from EPA methodology.",
+    )
+    pm10_nowcast: Optional[float] = Field(
+        None,
+        description="PM10 NowCast concentration (ug/m3). "
+        "Weighted 12-hour average from EPA methodology.",
+    )
+    aqi_standard: Optional[str] = Field(
+        None,
+        description="AQI standard used (e.g. US_EPA).",
+    )
+    aqi_method: Optional[str] = Field(
+        None,
+        description="AQI calculation method (e.g. PM_NOWCAST).",
+    )
+    aqi_method_version: Optional[str] = Field(
+        None,
+        description="AQI methodology version (e.g. EPA-454/B-24-002_MAY_2024).",
+    )
+    aqi_derived: Optional[bool] = Field(
+        None,
+        description="True if AQI was derived from pollutant concentrations.",
+    )
+    aqi_source: Optional[str] = Field(
+        None,
+        description="Source of pollutant data for AQI derivation (e.g. openweather_pollutants).",
+    )
 
     class Config:
         use_enum_values = True

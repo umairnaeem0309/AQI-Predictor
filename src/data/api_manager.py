@@ -26,6 +26,7 @@ from src.data.aqicn_client import AQICNClient
 from src.data.schemas import CityConfig, StandardObservation, DataSource
 from src.data.validators import full_validation, drop_duplicates
 from src.data.exceptions import APIClientError
+from src.data.nowcast_history import NowCastHistoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,7 @@ class APIManager:
         self,
         openweather_client: Optional[OpenWeatherClient] = None,
         aqicn_client: Optional[AQICNClient] = None,
+        nowcast_history: Optional[NowCastHistoryManager] = None,
     ):
         """Initialize API manager.
 
@@ -103,6 +105,8 @@ class APIManager:
                 If None, creates one from environment credentials.
             aqicn_client: Pre-configured AQICN client.
                 If None, creates one from environment credentials.
+            nowcast_history: NowCast history manager for PM2.5/PM10 history.
+                If None, creates one with default path.
         """
         if openweather_client is not None:
             self._openweather = openweather_client
@@ -115,6 +119,11 @@ class APIManager:
         else:
             aqicn_key = get_api_key("aqicn")
             self._aqicn = AQICNClient(api_key=aqicn_key)
+
+        if nowcast_history is not None:
+            self._nowcast_history = nowcast_history
+        else:
+            self._nowcast_history = NowCastHistoryManager()
 
         logger.info(
             "API Manager initialized — OpenWeather: %s, AQICN: %s",
@@ -195,6 +204,15 @@ class APIManager:
             )
             return None
 
+        # Update NowCast history with new observation
+        if merged.pm25 is not None or merged.pm10 is not None:
+            self._nowcast_history.add_observation(
+                city_id=city_config.id,
+                timestamp=str(merged.timestamp) if merged.timestamp else datetime.now(timezone.utc).isoformat(),
+                pm25=merged.pm25,
+                pm10=merged.pm10,
+            )
+
         logger.info(
             "Merged observation for %s — source=%s, AQI=%s, temp=%s",
             city_config.name,
@@ -268,7 +286,8 @@ class APIManager:
         """Derive PM NowCast AQI from OpenWeather pollutants when AQICN is stale.
 
         Uses EPA PM NowCast methodology (EPA-454/B-24-002, May 2024).
-        PM2.5 and PM10 sub-indices are calculated and the higher one is selected.
+        PM2.5 and PM10 sub-indices are calculated from the NowCast
+        concentration (weighted 12-hour average) and the higher one is selected.
 
         Args:
             merged: Merged observation (may have stale AQICN AQI).
@@ -277,50 +296,40 @@ class APIManager:
         Returns:
             Observation with derived PM NowCast AQI.
         """
-        from src.utils.epa_aqi import calculate_pm25_aqi, calculate_pm10_aqi
+        from src.utils.epa_aqi import calculate_nowcast_aqi, get_aqi_metadata
 
         obs_dict = merged.model_dump()
 
-        # Calculate PM2.5 AQI sub-index if available
-        pm25_aqi = None
-        if merged.pm25 is not None:
-            pm25_aqi = calculate_pm25_aqi(merged.pm25)
+        # Get PM history from NowCast history manager
+        city_id = obs_dict.get("location_id", "unknown")
+        pm25_history, pm10_history, _ = self._nowcast_history.get_history(city_id)
 
-        # Calculate PM10 AQI sub-index if available
-        pm10_aqi = None
-        if merged.pm10 is not None:
-            pm10_aqi = calculate_pm10_aqi(merged.pm10)
+        # Calculate NowCast AQI from history
+        aqi, dominant, nc_metadata = calculate_nowcast_aqi(pm25_history, pm10_history)
 
-        # Select higher valid sub-index (EPA principle)
-        if pm25_aqi is not None and pm10_aqi is not None:
-            if pm25_aqi >= pm10_aqi:
-                obs_dict["aqi"] = pm25_aqi
-                obs_dict["data_source"] = DataSource.OPENWEATHER_AQICN.value
-                obs_dict["is_training_valid"] = True
-                obs_dict["staleness_reason"] = None
-                obs_dict["aqi_dominant_pollutant"] = "pm25"
-            else:
-                obs_dict["aqi"] = pm10_aqi
-                obs_dict["data_source"] = DataSource.OPENWEATHER_AQICN.value
-                obs_dict["is_training_valid"] = True
-                obs_dict["staleness_reason"] = None
-                obs_dict["aqi_dominant_pollutant"] = "pm10"
-        elif pm25_aqi is not None:
-            obs_dict["aqi"] = pm25_aqi
+        if aqi is not None:
+            obs_dict["aqi"] = aqi
             obs_dict["data_source"] = DataSource.OPENWEATHER_AQICN.value
             obs_dict["is_training_valid"] = True
             obs_dict["staleness_reason"] = None
-            obs_dict["aqi_dominant_pollutant"] = "pm25"
-        elif pm10_aqi is not None:
-            obs_dict["aqi"] = pm10_aqi
-            obs_dict["data_source"] = DataSource.OPENWEATHER_AQICN.value
-            obs_dict["is_training_valid"] = True
-            obs_dict["staleness_reason"] = None
-            obs_dict["aqi_dominant_pollutant"] = "pm10"
+            obs_dict["aqi_dominant_pollutant"] = dominant
+            # Store NowCast concentrations for audit
+            obs_dict["pm25_nowcast"] = nc_metadata.get("pm25_nowcast")
+            obs_dict["pm10_nowcast"] = nc_metadata.get("pm10_nowcast")
         else:
             obs_dict["aqi"] = None
             obs_dict["is_training_valid"] = False
-            obs_dict["staleness_reason"] = "No valid PM pollutant data for AQI derivation"
+            obs_dict["staleness_reason"] = "Insufficient PM history for NowCast calculation"
+            obs_dict["pm25_nowcast"] = None
+            obs_dict["pm10_nowcast"] = None
+
+        # Add AQI method metadata
+        aqi_meta = get_aqi_metadata()
+        obs_dict["aqi_standard"] = aqi_meta["aqi_standard"]
+        obs_dict["aqi_method"] = aqi_meta["aqi_method"]
+        obs_dict["aqi_method_version"] = aqi_meta["aqi_method_version"]
+        obs_dict["aqi_derived"] = aqi_meta["aqi_derived"]
+        obs_dict["aqi_source"] = aqi_meta["aqi_source"]
 
         return StandardObservation(**obs_dict)
 
@@ -330,50 +339,47 @@ class APIManager:
     ) -> StandardObservation:
         """Derive PM NowCast AQI from OpenWeather pollutants when AQICN unavailable.
 
+        Uses EPA PM NowCast methodology with historical PM2.5/PM10 data.
+
         Args:
             openweather_obs: OpenWeather observation with pollutant data.
 
         Returns:
             Observation with derived PM NowCast AQI.
         """
-        from src.utils.epa_aqi import calculate_pm25_aqi, calculate_pm10_aqi
+        from src.utils.epa_aqi import calculate_nowcast_aqi, get_aqi_metadata
 
         obs_dict = openweather_obs.model_dump()
 
-        # Calculate PM2.5 AQI sub-index if available
-        pm25_aqi = None
-        if openweather_obs.pm25 is not None:
-            pm25_aqi = calculate_pm25_aqi(openweather_obs.pm25)
+        # Get PM history from NowCast history manager
+        city_id = obs_dict.get("location_id", "unknown")
+        pm25_history, pm10_history, _ = self._nowcast_history.get_history(city_id)
 
-        # Calculate PM10 AQI sub-index if available
-        pm10_aqi = None
-        if openweather_obs.pm10 is not None:
-            pm10_aqi = calculate_pm10_aqi(openweather_obs.pm10)
+        # Calculate NowCast AQI from history
+        aqi, dominant, nc_metadata = calculate_nowcast_aqi(pm25_history, pm10_history)
 
-        # Select higher valid sub-index (EPA principle)
-        if pm25_aqi is not None and pm10_aqi is not None:
-            if pm25_aqi >= pm10_aqi:
-                obs_dict["aqi"] = pm25_aqi
-                obs_dict["aqi_dominant_pollutant"] = "pm25"
-            else:
-                obs_dict["aqi"] = pm10_aqi
-                obs_dict["aqi_dominant_pollutant"] = "pm10"
-        elif pm25_aqi is not None:
-            obs_dict["aqi"] = pm25_aqi
-            obs_dict["aqi_dominant_pollutant"] = "pm25"
-        elif pm10_aqi is not None:
-            obs_dict["aqi"] = pm10_aqi
-            obs_dict["aqi_dominant_pollutant"] = "pm10"
+        if aqi is not None:
+            obs_dict["aqi"] = aqi
+            obs_dict["data_source"] = DataSource.OPENWEATHER.value
+            obs_dict["is_training_valid"] = True
+            obs_dict["staleness_reason"] = None
+            obs_dict["aqi_dominant_pollutant"] = dominant
+            obs_dict["pm25_nowcast"] = nc_metadata.get("pm25_nowcast")
+            obs_dict["pm10_nowcast"] = nc_metadata.get("pm10_nowcast")
         else:
             obs_dict["aqi"] = None
             obs_dict["is_training_valid"] = False
-            obs_dict["staleness_reason"] = "No valid PM pollutant data for AQI derivation"
-            return StandardObservation(**obs_dict)
+            obs_dict["staleness_reason"] = "Insufficient PM history for NowCast calculation"
+            obs_dict["pm25_nowcast"] = None
+            obs_dict["pm10_nowcast"] = None
 
-        # OpenWeather AQI is 1-5, NOT US EPA — do not use
-        obs_dict["data_source"] = DataSource.OPENWEATHER.value
-        obs_dict["is_training_valid"] = True
-        obs_dict["staleness_reason"] = None
+        # Add AQI method metadata
+        aqi_meta = get_aqi_metadata()
+        obs_dict["aqi_standard"] = aqi_meta["aqi_standard"]
+        obs_dict["aqi_method"] = aqi_meta["aqi_method"]
+        obs_dict["aqi_method_version"] = aqi_meta["aqi_method_version"]
+        obs_dict["aqi_derived"] = aqi_meta["aqi_derived"]
+        obs_dict["aqi_source"] = aqi_meta["aqi_source"]
 
         return StandardObservation(**obs_dict)
 
