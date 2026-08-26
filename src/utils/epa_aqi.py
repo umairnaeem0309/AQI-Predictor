@@ -1,20 +1,25 @@
 """
-US EPA AQI Calculation from Pollutant Concentrations.
+US EPA PM NowCast AQI Calculation from Pollutant Concentrations.
 
-Implements:
-1. Standard AQI equation (linear interpolation between breakpoints)
-2. NowCast algorithm for PM2.5 and PM10 (real-time hourly AQI)
-3. Unit conversions for gas pollutants (ug/m3 -> ppm/ppb)
-4. Dominant pollutant selection
-5. Full metadata for audit trail
+Implements the US EPA-method particle-pollution NowCast AQI:
+1. NowCast algorithm for PM2.5 and PM10 (EPA methodology)
+2. Standard AQI equation (linear interpolation between breakpoints)
+3. Dominant pollutant selection (max of valid sub-indices)
+4. Full metadata for audit trail
+
+Phase 17 scope: Particle-pollution AQI only (PM2.5 + PM10).
+O3, NO2, SO2, CO sub-indices are NOT included in this target.
+This is NOT a complete multi-pollutant EPA AQI.
 
 References:
-- EPA AQI Breakpoints (May 2024): https://aqs.epa.gov/aqsweb/documents/codetables/aqi_breakpoints.html
-- EPA NowCast Methodology: https://en.wikipedia.org/wiki/NowCast_(air_quality_index)
-- EPA Technical Assistance Document: EPA-454/B-24-002 (May 2024)
+- EPA-454/B-24-002, Technical Assistance Document for the Reporting of
+  Daily Air Quality — the Air Quality Index (AQI), May 2024.
+- EPA AQI Breakpoints (May 2024):
+  https://aqs.epa.gov/aqsweb/documents/codetables/aqi_breakpoints.html
 
-IMPORTANT: This calculates a DERIVED EPA-method AQI estimate from OpenWeather
-pollutant concentrations. It is NOT an official EPA/AirNow monitor reading.
+IMPORTANT: This calculates a DERIVED EPA-method PM NowCast AQI estimate
+from OpenWeather pollutant concentrations. It is NOT an official EPA/AirNow
+monitor reading.
 """
 import math
 from typing import Any, Dict, List, Optional, Tuple
@@ -102,10 +107,10 @@ CO_BREAKPOINTS_PPM: List[BreakpointRow] = [
 ]
 
 # Metadata
-AQI_CALCULATION_VERSION = "US_EPA_2024_May"
+AQI_CALCULATION_VERSION = "EPA-454/B-24-002_MAY_2024"
 AQI_CALCULATION_REFERENCE = "https://aqs.epa.gov/aqsweb/documents/codetables/aqi_breakpoints.html"
 AQI_STANDARD = "US_EPA"
-NOWCAST_REFERENCE = "https://en.wikipedia.org/wiki/NowCast_(air_quality_index)"
+AQI_METHOD = "PM_NOWCAST"
 
 
 # ============================================================================
@@ -567,12 +572,19 @@ def get_aqi_metadata() -> Dict[str, str]:
     """
     return {
         "aqi_standard": AQI_STANDARD,
+        "aqi_method": AQI_METHOD,
         "aqi_method_version": AQI_CALCULATION_VERSION,
         "aqi_derived": True,
         "aqi_source": "openweather_pollutants",
         "aqi_reference": AQI_CALCULATION_REFERENCE,
-        "nowcast_reference": NOWCAST_REFERENCE,
         "pm25_breakpoint_note": "Updated May 2024: Good 0.0-9.0 ug/m3 (was 0.0-12.0)",
-        "derived_disclosure": "US EPA-method AQI derived from OpenWeather pollutant concentrations. Not an official EPA/AirNow monitor reading.",
-        "unit_conversion_note": "Gas concentrations (ug/m3) converted to ppm/ppb using standard conditions (25C, 1 atm). Error typically <5% for ambient conditions.",
+        "derived_disclosure": (
+            "US EPA-method PM NowCast AQI derived from OpenWeather pollutant "
+            "concentrations. NOT an official EPA/AirNow monitor reading. "
+            "Phase 17 scope: particle-pollution only (PM2.5 + PM10). "
+            "O3, NO2, SO2, CO sub-indices are not included."
+        ),
+        "scope": "particle_pollution_only",
+        "included_pollutants": ["pm25", "pm10"],
+        "excluded_pollutants": ["o3", "no2", "so2", "co"],
     }

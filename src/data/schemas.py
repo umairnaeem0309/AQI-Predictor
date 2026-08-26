@@ -207,6 +207,11 @@ class StandardObservation(BaseModel):
         None,
         description="Reason why observation was marked as not training-valid",
     )
+    aqi_dominant_pollutant: Optional[str] = Field(
+        None,
+        description="Pollutant producing the selected AQI sub-index (pm25 or pm10). "
+        "Set when AQI is derived from PM NowCast methodology.",
+    )
 
     class Config:
         use_enum_values = True
