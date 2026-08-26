@@ -136,11 +136,28 @@ class OpenWeatherClient(BaseAPIClient):
             "appid": self.api_key,
         }
 
+    def _parse_response(
+        self,
+        raw_json: Dict[str, Any],
+        **kwargs,
+    ) -> list:
+        """Parse raw JSON into StandardObservation(s).
+
+        Delegates to _parse_weather_response using kwargs for city context.
+        Called by base class fetch_data for the weather endpoint.
+        """
+        city_id = kwargs.get("city_id", "unknown")
+        city_name = kwargs.get("city_name", city_id)
+        obs = self._parse_weather_response(raw_json, city_id, city_name)
+        return [obs] if obs else []
+
     def _validate_response(self, raw_json: Dict[str, Any]) -> bool:
         """Validate OpenWeather weather response.
 
         Args:
             raw_json: Raw JSON response.
+
+
 
         Returns:
             True if response contains minimum required fields.
