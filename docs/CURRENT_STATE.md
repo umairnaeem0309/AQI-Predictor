@@ -3,7 +3,7 @@
 ## AQI Predictor — Project Status
 
 **Last Updated:** 26 August 2026  
-**Current Phase:** Phase 17 — Real Data Validation (Active Collection)  
+**Current Phase:** Phase 17 — AQI Source Resolution (Active)
 
 ---
 
@@ -28,102 +28,65 @@
 | Phase 14 — Deployment | ✅ Completed | 20 Aug 2026 |
 | Phase 15 — Final Documentation | ✅ Completed | 21 Aug 2026 |
 | Phase 16 — Demo Preparation | ✅ Completed | 21 Aug 2026 |
-| Phase 17 — Real Data Validation | 🔄 Active Collection | 26 Aug 2026 |
-
-**⚠️ CRITICAL: Synthetic Data Restriction**
-
-Real API credentials configured and validated. Python 3.11 environment established.
-Hopsworks cloud connection verified. Initial real data collected from live APIs.
-
-- `dataset_type`: synthetic_test_data (existing files only)
-- `approved_for_training`: false (synthetic data only)
-- Real data collection is ACTIVE — bound AQICN stations returning fresh data.
-- Training readiness: NOT MET (21-day minimum, 500 obs/city target).
-- Historical data: NOT available on currently tested free-tier endpoints.
-
-Synthetic data must remain testing-only. Final model training and evaluation
-require real API data collected over 21-30 days.
+| Phase 17 — Real Data Validation | 🔄 Active | 26 Aug 2026 |
 
 ---
 
 ## 2. Current Phase Details
 
-**Phase 17 — Real Data Validation** 🔄 ACTIVE COLLECTION (26 Aug 2026)
+**Phase 17 — AQI Source Resolution** 🔄 ACTIVE
 
-**Objective:** Validate real API data collection, build data quality infrastructure.
+**Objective:** Resolve AQI target methodology, integrate PM NowCast AQI, prepare for sustained collection.
 
-**Status:** All infrastructure validated. Fresh data collection verified. Hourly cadence confirmed.
+**Status:** AQI methodology validated, pipeline integrated, pilot verified.
 
-### 2.1 API Validation Results
+### 2.1 AQI Methodology
+
+| Aspect | Specification |
+|---|---|
+| Target | US EPA-method PM NowCast AQI |
+| Primary pollutant | PM2.5 (NowCast methodology) |
+| Secondary pollutant | PM10 (NowCast methodology) |
+| AQI equation | Standard EPA linear interpolation |
+| Breakpoints | EPA May 2024 (PM2.5 Good: 0.0-9.0 ug/m3) |
+| Methodology source | EPA-454/B-24-002, May 2024 |
+| Scope | Particle-pollution only (PM2.5 + PM10) |
+| Derived status | NOT official EPA/AirNow monitor reading |
+
+### 2.2 Pilot Results (26 Aug 2026)
+
+| City | PM2.5 | PM10 | AQI | Dominant | Training Valid |
+|---|---|---|---|---|---|
+| Karachi | 161.0 | 70.23 | 236 | pm25 | ✅ |
+| Lahore | 34.0 | 175.66 | 111 | pm10 | ✅ |
+| Islamabad | 154.0 | 151.23 | 229 | pm25 | ✅ |
+
+### 2.3 API Status
 
 | API | Status | Notes |
 |---|---|---|
 | OpenWeather Weather | ✅ Working | Current endpoint (free tier) |
-| OpenWeather Pollution | ✅ Working | Air pollution endpoint (free tier) |
-| OpenWeather Historical | ❌ Not available | Requires paid subscription (tested) |
-| AQICN City Feed | ⚠️ Stale data | City-level feeds return stale timestamps |
-| AQICN Bound Stations | ✅ Fresh data | Bound station IDs return fresh observations |
-| AQICN Station Search | ✅ Working | Finds Pakistan stations |
+| OpenWeather Air Pollution | ✅ Working | Current + historical |
+| OpenWeather Historical Pollution | ✅ Working | 90+ days available |
+| AQICN Bound Stations | ⚠️ Stale | Pakistani stations months/years old |
 
-### 2.2 Fresh Data Collection (26 Aug 2026)
+### 2.4 Environment
 
-| City | Station ID | AQI | Source | Freshness | Training Valid |
-|---|---|---|---|---|---|
-| Karachi | @7393 | 26 | AQICN+OpenWeather | ~6h | ⚠️ Stale |
-| Lahore | @7432 | 47 | AQICN+OpenWeather | ~7h | ⚠️ Stale |
-| Islamabad | @7433 | 35 | AQICN+OpenWeather | ~6h | ⚠️ Stale |
+| Item | Status |
+|---|---|
+| Python | 3.11.15 ✅ |
+| duckdb | 1.0.0 ✅ |
+| hopsworks | 5.8.0 ✅ |
+| mlflow | 2.22.0 ✅ |
+| Hopsworks Cloud | ✅ Connected |
 
-**Note:** Initial observations correctly marked as training-invalid due to AQICN update frequency.
-Hourly collection will accumulate training-valid observations as fresh AQI data arrives.
+### 2.5 Test Results
 
-### 2.3 Environment Verified (Python 3.11)
-
-| Item | Expected | Actual | Status |
-|---|---|---|---|
-| Python | 3.11.x | 3.11.15 | ✅ |
-| duckdb | >=0.8.0 | 1.3.0 | ✅ |
-| hopsworks | >=4.0.0 | 5.8.0 | ✅ |
-| mlflow | >=2.8.0,<3.0.0 | 2.22.0 | ✅ |
-| Hopsworks Cloud | Connected | eu-west endpoint | ✅ |
-| Local Fallback | Available | DuckDB+Parquet | ✅ |
-
-**Phase 0 Tasks Completed:**
-- [x] Read and analyzed MASTER_AGENT_INSTRUCTIONS.md
-- [x] Read and analyzed all source documents
-- [x] Confirmed project understanding
-- [x] Created PRD.md, ARCHITECTURE.md, DESIGN.md, RULES.md, PHASES.md, PLAN.md
-- [x] Created CURRENT_STATE.md, MEMORY.md, DECISIONS.md, PROJECT_JOURNAL.md
-- [x] Git commit: `882d484` (31 Jul 2026)
-
-**Phase 1 Tasks Completed:**
-- [x] Repository directory structure created
-- [x] requirements.txt with pinned dependencies (tensorflow-cpu)
-- [x] .env.example with HOPSWORKS_HOST placeholder
-- [x] config.yaml without hardcoded Hopsworks host
-- [x] .gitignore, Dockerfile, docker-compose.yml
-- [x] .pre-commit-config.yaml (black, isort, flake8)
-- [x] src/config/__init__.py with setup_logging
-- [x] tests/conftest.py and tests/unit/test_environment.py
-- [x] Placeholder source files for all modules
-- [x] Git commit: `3a06cdb` (1 Aug 2026)
-
-**Phase 2 Tasks In Progress:**
-- [x] src/data/exceptions.py — Custom exception classes
-- [x] src/data/base_client.py — Abstract base with retry + caching readiness
-- [x] src/data/schemas.py — Pydantic models for all API responses
-- [x] src/data/validators.py — Full validation logic
-- [x] src/data/openweather_client.py — Full implementation with merge
-- [x] src/data/aqicn_client.py — Full implementation with staleness detection
-- [x] Mock API response JSON files (7 files)
-- [x] tests/unit/test_schemas.py
-- [x] tests/unit/test_openweather_client.py
-- [x] tests/unit/test_aqicn_client.py
-- [x] tests/unit/test_validators.py
-- [x] tests/unit/test_retry_logic.py
-- [x] docs/DATA_DICTIONARY.md
-- [ ] Git commit (pending)
-
----
+| Suite | Tests | Passed |
+|---|---|---|
+| EPA AQI (NowCast) | 57 | ✅ 57 |
+| Core Phase 17 | 177 | ✅ 177 |
+| All Phase 17 | 234 | ✅ 234 |
 
 ---
 
@@ -131,59 +94,34 @@ Hourly collection will accumulate training-valid observations as fresh AQI data 
 
 | Priority | Task | Phase |
 |---|---|---|
-| Current | Environment verification tests | Phase 1 |
-| Current | Git commit for Phase 1 | Phase 1 |
-| Next | Data collection architecture | Phase 2 |
-| Future | Real API integration | Phase 3 |
-| Future | Feature engineering pipeline | Phase 4 |
-| Future | Historical data backfill | Phase 5 |
-| Future | Feature store implementation | Phase 6 |
-| Future | ML experiment pipeline | Phase 7 |
-| Future | Model selection | Phase 8 |
-
+| Current | 30-day forward collection | Phase 17 |
+| Current | Historical pollution warm-up | Phase 17 |
+| Next | Production model training | Phase 18 |
 
 ---
 
-## 4. Known Issues
-
-| Issue | Severity | Status |
-|---|---|---|
-| Hopsworks may have installation issues on Windows | Medium | Documented; local fallback available |
-| tensorflow-cpu may take time to install | Low | Expected; CPU-only is lighter |
-
----
-
-## 5. Decisions Made
+## 4. Key Decisions
 
 | ID | Decision | Date |
 |---|---|---|
-| DEC-001 | Use Python 3.11 as primary runtime | 31 Jul 2026 |
-| DEC-002 | Use FastAPI as backend (not Flask) | 31 Jul 2026 |
-| DEC-003 | OpenWeather as primary data source | 31 Jul 2026 |
-| DEC-004 | Hopsworks + DuckDB/Parquet feature store | 31 Jul 2026 |
-| DEC-005 | Multi-output model for 3-day forecast | 31 Jul 2026 |
-| DEC-006 | US EPA AQI categories for alerts | 31 Jul 2026 |
-| DEC-007 | Initial cities: Karachi, Lahore, Islamabad (extensible architecture) | 31 Jul 2026 |
-| DEC-008 | 90 days mock data for testing only | 31 Jul 2026 |
-| DEC-009 | Use tensorflow-cpu by default | 1 Aug 2026 |
-| DEC-010 | Hopsworks host from env var, not config file | 1 Aug 2026 |
-| DEC-011 | Pre-commit hooks: black, isort, flake8 | 1 Aug 2026 |
+| DEC-014 | Data Source Authority (Amended: PM NowCast AQI fallback) | 26 Aug 2026 |
+| DEC-015 | Synthetic data restricted to pipeline testing only | 8 Aug 2026 |
+| DEC-016 | Production Deployment Strategy | 20 Aug 2026 |
 
 ---
 
-## 6. Environment Information
+## 5. Collection Readiness
 
-| Item | Value |
+| Criterion | Status |
 |---|---|
-| Python Version | 3.11 (required) |
-| Operating System | Windows |
-| IDE | VS Code |
-| Containerization | Docker |
-| Version Control | Git + GitHub |
-| Code Quality | black, isort, flake8 via pre-commit |
+| AQI methodology | ✅ Approved |
+| Pipeline integration | ✅ Verified |
+| Pilot collection | ✅ Successful |
+| 30-day forward collection | ⏳ Pending owner approval |
+| Historical pollution warm-up | ⏳ Ready to collect |
 
 ---
 
-## 7. Next Required Action
+## 6. Next Required Action
 
-Complete Phase 17 implementation. Wait for approval before Phase 18.
+Wait for project-owner approval to enable 30-day sustained collection.
