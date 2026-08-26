@@ -239,6 +239,7 @@ class OpenWeatherClient(BaseAPIClient):
             weather_condition=weather_condition,
             data_source=DataSource.OPENWEATHER,
             raw_response_time=dt_utc,
+            collected_at=datetime.now(timezone.utc),
         )
 
     def _parse_pollution_response(
