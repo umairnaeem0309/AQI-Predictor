@@ -97,32 +97,35 @@ class TestHopsworksConfiguration:
 class TestHopsworksConnection:
     """Tests for Hopsworks connection handling."""
 
-    @patch("src.feature_store.hopsworks_store.hopsworks")
-    def test_connect_success(self, mock_hopsworks, mock_env):
+    def test_connect_success(self, mock_env):
         """Successful connection."""
-        mock_hopsworks.login.return_value = MagicMock()
-        store = HopsworksStore()
-        store.connect()
-        mock_hopsworks.login.assert_called_once()
+        mock_hops = MagicMock()
+        mock_hops.login.return_value = MagicMock()
+        with patch.dict("sys.modules", {"hopsworks": mock_hops}):
+            store = HopsworksStore()
+            store.connect()
+            mock_hops.login.assert_called_once()
 
-    @patch("src.feature_store.hopsworks_store.hopsworks")
-    def test_connect_retries_on_failure(self, mock_hopsworks, mock_env):
+    def test_connect_retries_on_failure(self, mock_env):
         """Connection retries on failure."""
-        mock_hopsworks.login.side_effect = [
+        mock_hops = MagicMock()
+        mock_hops.login.side_effect = [
             Exception("Connection failed"),
             MagicMock(),  # Second attempt succeeds
         ]
-        store = HopsworksStore(max_retries=2)
-        store.connect()
-        assert mock_hopsworks.login.call_count == 2
-
-    @patch("src.feature_store.hopsworks_store.hopsworks")
-    def test_connect_all_retries_fail(self, mock_hopsworks, mock_env):
-        """ConfigurationError when all retries fail."""
-        mock_hopsworks.login.side_effect = Exception("Connection failed")
-        store = HopsworksStore(max_retries=2)
-        with pytest.raises(ConfigurationError, match="Failed to connect"):
+        with patch.dict("sys.modules", {"hopsworks": mock_hops}):
+            store = HopsworksStore(max_retries=2)
             store.connect()
+            assert mock_hops.login.call_count == 2
+
+    def test_connect_all_retries_fail(self, mock_env):
+        """ConfigurationError when all retries fail."""
+        mock_hops = MagicMock()
+        mock_hops.login.side_effect = Exception("Connection failed")
+        with patch.dict("sys.modules", {"hopsworks": mock_hops}):
+            store = HopsworksStore(max_retries=2)
+            with pytest.raises(ConfigurationError, match="Failed to connect"):
+                store.connect()
 
 
 # =============================================================================
@@ -135,7 +138,8 @@ class TestHopsworksInsert:
 
     def test_synthetic_rejected_from_prod(self, mock_env, sample_features, synthetic_metadata):
         """Synthetic data is rejected from production groups."""
-        with patch("src.feature_store.hopsworks_store.hopsworks"):
+        mock_hops = MagicMock()
+        with patch.dict("sys.modules", {"hopsworks": mock_hops}):
             store = HopsworksStore()
             store._connection = MagicMock()
 
@@ -148,7 +152,8 @@ class TestHopsworksInsert:
 
     def test_real_data_accepted_in_prod(self, mock_env, sample_features, real_metadata):
         """Real data is accepted in production groups."""
-        with patch("src.feature_store.hopsworks_store.hopsworks"):
+        mock_hops = MagicMock()
+        with patch.dict("sys.modules", {"hopsworks": mock_hops}):
             store = HopsworksStore()
             store._connection = MagicMock()
 
@@ -174,8 +179,9 @@ class TestHopsworksFallback:
 
     def test_fallback_on_connection_failure(self, mock_env):
         """Falls back to local store when Hopsworks fails."""
-        with patch("src.feature_store.hopsworks_store.hopsworks") as mock_hops:
-            mock_hops.login.side_effect = Exception("Connection failed")
+        mock_hops = MagicMock()
+        mock_hops.login.side_effect = Exception("Connection failed")
+        with patch.dict("sys.modules", {"hopsworks": mock_hops}):
 
             from src.feature_store import get_feature_store
             store = get_feature_store()

@@ -289,7 +289,7 @@ class TestDuckDBQuery:
             "aqi_features_test",
             "aqi > 110",
         )
-        assert len(result) == 3  # aqi values: 115, 120
+        assert len(result) == 2  # aqi values: 115, 120
         assert (result["aqi"] > 110).all()
 
 
