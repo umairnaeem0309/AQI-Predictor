@@ -56,36 +56,36 @@ class TestDataQualityGate:
         })
         
         results = gate.check_completeness(df)
-        assert results["passed"] is True
+        assert results["passed"] == True  # numpy bool, use == not is
         assert results["score"] == 1.0
     
     def test_check_completeness_fail(self):
         """Test completeness check fails."""
         gate = DataQualityGate()
         
-        # Create DataFrame with 20% missing values
+        # Create DataFrame with 30% missing values (well below 90% threshold)
         df = pd.DataFrame({
             "timestamp": pd.date_range("2026-08-01", periods=100, freq="h"),
-            "value": [np.nan if i < 20 else 1.0 for i in range(100)],
+            "value": [np.nan if i < 30 else 1.0 for i in range(100)],
         })
         
         results = gate.check_completeness(df)
-        assert results["passed"] is False
+        assert results["passed"] == False  # numpy bool
         assert results["score"] < 0.90
     
     def test_check_duplicates(self):
         """Test duplicate check."""
         gate = DataQualityGate()
         
-        # Create DataFrame with duplicates
+        # Create DataFrame with genuine full-row duplicates
         df = pd.DataFrame({
             "timestamp": ["2026-08-01"] * 100,
-            "value": range(100),
+            "value": [1.0] * 100,
         })
         
         results = gate.check_duplicates(df)
-        assert results["duplicate_rows"] == 0
-        assert results["passed"] is True
+        assert results["duplicate_rows"] == 99  # 99 duplicates out of 100
+        assert results["passed"] == False  # 99% duplicates exceeds 1% threshold
     
     def test_check_data_sufficiency_insufficient(self):
         """Test data sufficiency check fails."""
@@ -121,11 +121,11 @@ class TestDatasetVersioning:
     
     def test_version_creation(self):
         """Test version creation."""
+        import tempfile
         from src.data.dataset_versioning import DatasetVersionManager
         
-        with pytest.raises(Exception):
-            # This would fail without proper setup
-            manager = DatasetVersionManager(Path("/tmp/test_versions"))
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = DatasetVersionManager(Path(tmp))
             version = manager.create_version(
                 dataset_type="real_api_data",
                 source="test",
@@ -138,3 +138,5 @@ class TestDatasetVersioning:
                 quality_score=0.95,
             )
             assert version.dataset_type == "real_api_data"
+            assert version.approved_for_training is True
+            assert version.approved_for_evaluation is True

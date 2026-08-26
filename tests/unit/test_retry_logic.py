@@ -12,6 +12,7 @@ Tests cover:
 import time
 import pytest
 import responses
+from requests.exceptions import Timeout as RequestsTimeout
 
 from src.data.base_client import BaseAPIClient
 from src.data.exceptions import (
@@ -32,6 +33,10 @@ from src.data.exceptions import (
 
 class TestClient(BaseAPIClient):
     """Concrete implementation of BaseAPIClient for testing."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("base_url", "https://api.test.com")
+        super().__init__(**kwargs)
 
     def _build_request(self, **kwargs):
         endpoint = kwargs.get("endpoint", "test")
@@ -90,7 +95,7 @@ class TestRetryableErrors:
         responses.add(
             responses.GET,
             "https://api.test.com/test",
-            body=responses.exceptions.Timeout(),
+            body=RequestsTimeout("mocked timeout"),
         )
         responses.add(
             responses.GET,
@@ -284,7 +289,7 @@ class TestMaxRetriesExhaustion:
             responses.add(
                 responses.GET,
                 "https://api.test.com/test",
-                body=responses.exceptions.Timeout(),
+                body=RequestsTimeout("mocked timeout"),
             )
 
         client = TestClient(api_key="test", max_retries=3, retry_backoff_base=0.01)
