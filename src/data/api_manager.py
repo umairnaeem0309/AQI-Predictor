@@ -313,15 +313,20 @@ class APIManager:
             obs_dict["is_training_valid"] = True
             obs_dict["staleness_reason"] = None
             obs_dict["aqi_dominant_pollutant"] = dominant
-            # Store NowCast concentrations for audit
+            # Store NowCast concentrations and sub-indices for audit
             obs_dict["pm25_nowcast"] = nc_metadata.get("pm25_nowcast")
             obs_dict["pm10_nowcast"] = nc_metadata.get("pm10_nowcast")
+            individual = nc_metadata.get("individual_aqi", {})
+            obs_dict["pm25_aqi_subindex"] = individual.get("pm25")
+            obs_dict["pm10_aqi_subindex"] = individual.get("pm10")
         else:
             obs_dict["aqi"] = None
             obs_dict["is_training_valid"] = False
             obs_dict["staleness_reason"] = "Insufficient PM history for NowCast calculation"
             obs_dict["pm25_nowcast"] = None
             obs_dict["pm10_nowcast"] = None
+            obs_dict["pm25_aqi_subindex"] = None
+            obs_dict["pm10_aqi_subindex"] = None
 
         # Add AQI method metadata
         aqi_meta = get_aqi_metadata()
@@ -366,12 +371,17 @@ class APIManager:
             obs_dict["aqi_dominant_pollutant"] = dominant
             obs_dict["pm25_nowcast"] = nc_metadata.get("pm25_nowcast")
             obs_dict["pm10_nowcast"] = nc_metadata.get("pm10_nowcast")
+            individual = nc_metadata.get("individual_aqi", {})
+            obs_dict["pm25_aqi_subindex"] = individual.get("pm25")
+            obs_dict["pm10_aqi_subindex"] = individual.get("pm10")
         else:
             obs_dict["aqi"] = None
             obs_dict["is_training_valid"] = False
             obs_dict["staleness_reason"] = "Insufficient PM history for NowCast calculation"
             obs_dict["pm25_nowcast"] = None
             obs_dict["pm10_nowcast"] = None
+            obs_dict["pm25_aqi_subindex"] = None
+            obs_dict["pm10_aqi_subindex"] = None
 
         # Add AQI method metadata
         aqi_meta = get_aqi_metadata()

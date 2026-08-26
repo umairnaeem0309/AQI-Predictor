@@ -223,6 +223,14 @@ class StandardObservation(BaseModel):
         description="PM10 NowCast concentration (ug/m3). "
         "Weighted 12-hour average from EPA methodology.",
     )
+    pm25_aqi_subindex: Optional[int] = Field(
+        None,
+        description="PM2.5 AQI sub-index calculated from NowCast concentration.",
+    )
+    pm10_aqi_subindex: Optional[int] = Field(
+        None,
+        description="PM10 AQI sub-index calculated from NowCast concentration.",
+    )
     aqi_standard: Optional[str] = Field(
         None,
         description="AQI standard used (e.g. US_EPA).",
