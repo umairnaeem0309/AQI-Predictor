@@ -148,7 +148,7 @@ class HopsworksStore(FeatureStoreInterface):
         Returns:
             Hopsworks FeatureGroup object.
         """
-        fs = self._connection.feature_store
+        fs = self._connection.get_feature_store()
 
         # Build column definitions
         primary_key_cols = [col.name for col in schema.columns if col.is_primary_key]
@@ -304,7 +304,7 @@ class HopsworksStore(FeatureStoreInterface):
             DataFrame with features.
         """
         try:
-            fs = self._connection.feature_store
+            fs = self._connection.get_feature_store()
             fg = fs.get_feature_group(
                 name=feature_group_name,
                 version=version,
@@ -343,7 +343,7 @@ class HopsworksStore(FeatureStoreInterface):
     ) -> bool:
         """Delete a feature group from Hopsworks."""
         try:
-            fs = self._connection.feature_store
+            fs = self._connection.get_feature_store()
             fg = fs.get_feature_group(name=group_name, version=version)
             fg.delete()
             logger.info("Deleted Hopsworks feature group %s v%d", group_name, version)
@@ -355,7 +355,7 @@ class HopsworksStore(FeatureStoreInterface):
     def get_metadata(self, group_name: str, version: int = 1) -> Optional[Dict[str, Any]]:
         """Get metadata for a Hopsworks feature group."""
         try:
-            fs = self._connection.feature_store
+            fs = self._connection.get_feature_store()
             fg = fs.get_feature_group(name=group_name, version=version)
             return {
                 "name": fg.name,
