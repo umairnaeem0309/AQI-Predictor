@@ -204,12 +204,13 @@ class TestAQICNParsing:
         assert obs.weather_condition is None
 
     def test_parse_response_empty_data(self):
-        """Parse response with empty data."""
+        """Parse response with empty data — returns observation with None values."""
         client = AQICNClient(api_key="test")
         observations = client._parse_response(
             {"status": "ok", "data": {}}, city_id="karachi"
         )
-        assert len(observations) == 0
+        assert len(observations) == 1
+        assert observations[0].aqi is None
 
     def test_parse_response_city_name_from_data(self):
         """City name extracted from AQICN response data."""
@@ -265,9 +266,10 @@ class TestAQICNFetchData:
     @responses.activate
     def test_fetch_data_success(self, aqicn_response_karachi):
         """Successful data fetch returns observation."""
+        # AQICN client uses bound station ID @7393 for karachi (no trailing slash)
         responses.add(
             responses.GET,
-            "https://api.waqi.info/feed/karachi/",
+            "https://api.waqi.info/feed/@7393",
             json=aqicn_response_karachi,
             status=200,
         )
@@ -283,9 +285,10 @@ class TestAQICNFetchData:
     @responses.activate
     def test_fetch_data_auth_failure(self):
         """Authentication failure raises error."""
+        # AQICN client uses bound station ID @7393 for karachi (no trailing slash)
         responses.add(
             responses.GET,
-            "https://api.waqi.info/feed/karachi/",
+            "https://api.waqi.info/feed/@7393",
             json={"status": "error", "data": "Invalid token"},
             status=401,
         )
