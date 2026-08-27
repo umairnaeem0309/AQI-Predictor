@@ -5,6 +5,7 @@ Handles model loading, validation, and management.
 Enforces production safety checks.
 """
 
+import json
 import logging
 from typing import Optional, Tuple, Any, Dict
 from datetime import datetime, timezone
@@ -56,6 +57,41 @@ class ModelService:
         self.registry = registry
         self._model = None
         self._model_info = None
+    
+    def load_local_model(self, model_path: str = "models/production/xgboost_model.pkl",
+                          metadata_path: str = "models/production/model_metadata.json") -> Tuple[Any, Dict]:
+        """
+        Load model from local pickle file (fallback when MLflow registry unavailable).
+        
+        Args:
+            model_path: Path to pickled model.
+            metadata_path: Path to model metadata JSON.
+        
+        Returns:
+            Tuple of (model, model_info)
+        """
+        import pickle
+        from pathlib import Path
+        
+        model_file = Path(model_path)
+        meta_file = Path(metadata_path)
+        
+        if not model_file.exists():
+            raise ModelNotLoadedError(f"Model file not found: {model_path}")
+        
+        with open(model_file, "rb") as f:
+            model = pickle.load(f)
+        
+        model_info = {}
+        if meta_file.exists():
+            with open(meta_file) as f:
+                model_info = json.load(f)
+        
+        self._model = model
+        self._model_info = model_info
+        
+        logger.info("Loaded local model from %s", model_path)
+        return model, model_info
     
     def load_production_model(self) -> Tuple[Any, Dict]:
         """
