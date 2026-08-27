@@ -4,7 +4,7 @@
 
 **Project:** Production-grade AQI forecasting system for Pakistani cities
 **Duration:** July–August 2026
-**Status:** Dataset ready for model training
+**Status:** ✅ Model training complete — XGBoost selected as production model
 
 ---
 
@@ -227,7 +227,7 @@ historical_ingestion.py:
 
 ---
 
-## 9. Current State — Data Readiness Complete
+## 9. Model Training Complete
 
 ### 9.1 Dataset Generated
 
@@ -250,21 +250,45 @@ historical_ingestion.py:
 | PROJECT_JOURNEY.md | This document: engineering history |
 | MODEL_EXPERIMENT_PLAN.md | Training strategy, model candidates, selection criteria |
 
-### 9.3 Notebooks Created
+### 9.3 Full Dataset Training Results
+
+**Test set:** 2026 data (16,920 rows) — unseen during training.
+**Split:** Train 2022–2024 → Val 2025 → Test 2026.
+
+| Model | MAE | RMSE | R² | Train Time | Inference |
+|-------|-----|------|----|-----------|----------|
+| **XGBoost** | **21.32** | 30.89 | 0.6065 | 18.2s | 0.030ms |
+| RandomForest | 21.47 | **30.74** | **0.6103** | 477.7s | 0.047ms |
+| Ridge | 21.98 | 31.99 | 0.5779 | 1.9s | 0.001ms |
+| LSTM | 26.17 | 38.86 | 0.3771 | 224.3s | 0.371ms |
+
+### 9.4 Selection Reasoning
+
+**XGBoost selected as production model:**
+- Lowest MAE overall (21.32) and at every horizon
+- Fastest non-linear training (18.2s vs RF's 477.7s)
+- Nearly identical to RF but 26× faster
+- Inference speed adequate for real-time API (0.030ms/sample)
+- Strong R² (0.6065) — explains 60.65% of AQI variance
+
+**Ridge as backup:** Within 3% of XGBoost — problem has strong linear signal.
+
+**LSTM excluded:** R²=0.3771 vs XGBoost's 0.6065 — temporal patterns already captured by engineered features.
+
+### 9.5 Notebooks Created
 
 | Notebook | Purpose |
 |----------|---------|
 | 01_dataset_exploration.ipynb | Dataset overview, distributions, patterns |
 | 02_feature_analysis.ipynb | Correlations, feature importance, engineering |
-| 03_model_experiments.ipynb | Model training and evaluation |
+| 03_model_experiments.ipynb | Model training and evaluation (all 4 models) |
 | 04_model_comparison.ipynb | Final comparison and selection |
 
 ---
 
 ## 10. Next Steps
 
-1. **Run notebook 03** to train Ridge, RF, XGBoost models
-2. **Compare results** in notebook 04
-3. **Select production model** based on performance + complexity
-4. **Log to MLflow** model registry
-5. **Deploy** with FastAPI backend + Streamlit dashboard
+1. **Register XGBoost** in MLflow model registry
+2. **Deploy** with FastAPI backend + Streamlit dashboard
+3. **Set up live monitoring** on production infrastructure
+4. **Tune LSTM** on server with GPU when time permits
