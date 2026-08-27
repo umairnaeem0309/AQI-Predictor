@@ -80,7 +80,30 @@ class PredictionService:
             # 1. Validate model is ready
             self.model_service.validate_model_for_request()
             
-            # 2. Retrieve features (try feature store, fallback to live adapter)
+            # 2. Retrieve features (try live fetcher first, then feature store, then adapter)
+            try:
+                from src.data.live_fetcher import get_live_prediction as fetch_live
+                import pickle
+                from pathlib import Path
+                model_path = Path("models/production/xgboost_model.pkl")
+                if model_path.exists():
+                    with open(model_path, "rb") as f:
+                        live_model = pickle.load(f)
+                    result = fetch_live(city, live_model)
+                    self._last_prediction_time = result.get("timestamp")
+                    if self.prediction_logger:
+                        self.prediction_logger.log_prediction(
+                            city=city,
+                            model_version=result.get("model_version", "live"),
+                            input_features={},
+                            predictions=result,
+                            latency_ms=(time.time() - start_time) * 1000,
+                            metadata={"endpoint": "prediction", "source": "live"},
+                        )
+                    return result
+            except Exception as e:
+                logger.warning(f"Live fetch failed ({e}), trying feature store")
+
             try:
                 features = self.feature_service.get_features(city)
             except Exception as e:
