@@ -83,3 +83,12 @@ coverage.xml
 # --- Logs ---
 *.log
 logs/
+
+# --- Dev/Test Scripts ---
+scripts/test_*.py
+scripts/verify_*.py
+scripts/validate_*.py
+scripts/check_*.py
+scripts/show_*.py
+scripts/merge_*.py
+data/predictions/
