@@ -416,7 +416,25 @@ This selection covers the full spectrum from simple to complex, linear to non-li
 | Ridge | 19.63 | 22.47 | 23.85 | 0.6648 | 0.5585 | 0.5094 |
 | LSTM | 25.61 | 26.12 | 26.79 | 0.3994 | 0.3757 | 0.3558 |
 
-### 7.5 What the Results Tell Us
+### 7.5 Comparison vs Ridge Baseline
+
+| Model | MAE | vs Ridge Baseline |
+|-------|-----|-------------------|
+| **XGBoost** | 21.32 | **3.0% BETTER** |
+| RandomForest | 21.47 | 2.3% BETTER |
+| Ridge | 21.98 | baseline |
+| LSTM | 26.17 | 19.1% WORSE |
+
+### 7.6 Ranking by MAE (lower is better)
+
+| Rank | Model | MAE | R² | Train Time |
+|------|-------|-----|----|------------|
+| 1 | **XGBoost** | **21.32** | 0.6065 | 18.2s |
+| 2 | RandomForest | 21.47 | 0.6103 | 477.7s |
+| 3 | Ridge | 21.98 | 0.5779 | 1.9s |
+| 4 | LSTM | 26.17 | 0.3771 | 224.3s |
+
+### 7.7 What the Results Tell Us
 
 1. **All models degrade gracefully from 24h → 72h** — expected for time-series forecasting. Longer horizons are harder.
 
