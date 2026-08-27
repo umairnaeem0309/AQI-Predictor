@@ -71,9 +71,13 @@ async def lifespan(app: FastAPI):
         
         logger.info("Services initialized successfully")
         
-        # Note: Model loading is deferred to when registry is available
-        # In production, this would load the actual model
-        logger.info("Model loading deferred - waiting for registry")
+        # Load production model from local file
+        try:
+            model_service.load_local_model()
+            logger.info("Production model loaded successfully")
+        except Exception as e:
+            logger.warning(f"Could not load local model: {e}")
+            logger.info("API will start without model - health check only")
         
     except Exception as e:
         logger.error(f"Startup error: {e}")
