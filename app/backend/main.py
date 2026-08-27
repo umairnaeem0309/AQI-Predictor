@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.backend.config import default_config
-from app.routes import prediction, health, model
+from app.routes import prediction, health, model, data, explain
 from app.services.model_service import (
     init_model_service,
     ModelService,
@@ -133,6 +133,8 @@ def create_app() -> FastAPI:
     app.include_router(prediction.router)
     app.include_router(health.router)
     app.include_router(model.router)
+    app.include_router(data.router)
+    app.include_router(explain.router)
     
     return app
 
