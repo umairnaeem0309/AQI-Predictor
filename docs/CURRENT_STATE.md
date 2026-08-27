@@ -2,8 +2,8 @@
 
 ## AQI Predictor — Project Status
 
-**Last Updated:** 26 August 2026  
-**Current Phase:** Phase 17 — AQI Source Resolution (Active)
+**Last Updated:** 27 August 2026  
+**Current Phase:** Phase 17 — Historical Dataset Generation (Open-Meteo)
 
 ---
 
@@ -28,17 +28,27 @@
 | Phase 14 — Deployment | ✅ Completed | 20 Aug 2026 |
 | Phase 15 — Final Documentation | ✅ Completed | 21 Aug 2026 |
 | Phase 16 — Demo Preparation | ✅ Completed | 21 Aug 2026 |
-| Phase 17 — Real Data Validation | 🔄 Active | 26 Aug 2026 |
+| Phase 17 — Historical Dataset (Open-Meteo) | 🔄 Active | 27 Aug 2026 |
 
 ---
 
 ## 2. Current Phase Details
 
-**Phase 17 — Sustained Collection** 🔄 ACTIVE
+**Phase 17 — Historical Dataset Generation** 🔄 ACTIVE
 
-**Objective:** Collect 30 days of real data with PM NowCast AQI targets.
+**Objective:** Generate 4-5 year ML-ready dataset from Open-Meteo historical APIs.
 
-**Status:** Warm-up collected, pipeline integrated, collection activated.
+**Status:** Provider abstraction implemented, ingestion pipeline created, dataset generation ready.
+
+### 2.0 Data Source Migration (DEC-018)
+
+| Aspect | Previous | Current |
+|---|---|---|
+| Weather source | OpenWeather (current only) | Open-Meteo Archive (2017+) |
+| AQ source | AQICN (stale) + OpenWeather fallback | Open-Meteo Air Quality (Aug 2022+) |
+| Collection approach | 30-day live hourly collection | Historical batch download |
+| API key required | Yes (OpenWeather, AQICN) | No (Open-Meteo free tier) |
+| Data volume | ~720 rows/city (30 days) | ~35,000 rows/city (4+ years) |
 
 ### 2.1 AQI Methodology
 
@@ -53,21 +63,27 @@
 | Scope | Particle-pollution only (PM2.5 + PM10) |
 | Derived status | NOT official EPA/AirNow monitor reading |
 
-### 2.2 Pilot Results (26 Aug 2026)
+### 2.2 Open-Meteo Provider Architecture
 
-| City | PM2.5 | PM10 | AQI | Dominant | Training Valid |
-|---|---|---|---|---|---|
-| Karachi | 161.0 | 70.23 | 236 | pm25 | ✅ |
-| Lahore | 34.0 | 175.66 | 111 | pm10 | ✅ |
-| Islamabad | 154.0 | 151.23 | 229 | pm25 | ✅ |
+```
+src/data/providers/
+├── __init__.py                    — Package exports
+├── base_provider.py               — Abstract historical provider
+├── open_meteo_weather.py          — /v1/archive (weather from 2017+)
+└── open_meteo_air_quality.py      — /v1/air-quality (CAMS from Aug 2022+)
+
+src/data/historical_ingestion.py   — Batch download + merge + AQI calc
+scripts/build_dataset.py           — CLI entry point
+```
 
 ### 2.3 API Status
 
 | API | Status | Notes |
 |---|---|---|
-| OpenWeather Weather | ✅ Working | Current endpoint (free tier) |
-| OpenWeather Air Pollution | ✅ Working | Current + historical |
-| OpenWeather Historical Pollution | ✅ Working | 90+ days available |
+| Open-Meteo Weather | ✅ Working | /v1/archive, hourly from 2017+, no API key |
+| Open-Meteo Air Quality | ✅ Working | /v1/air-quality, CAMS Global from Aug 2022+ |
+| OpenWeather Weather | ✅ Working | Current endpoint (free tier) — retained for real-time |
+| OpenWeather Air Pollution | ✅ Working | Current + historical — retained for real-time |
 | AQICN Bound Stations | ⚠️ Stale | Pakistani stations months/years old |
 
 ### 2.4 Environment
@@ -80,35 +96,37 @@
 | mlflow | 2.22.0 ✅ |
 | Hopsworks Cloud | ✅ Connected |
 
-### 2.5 Collection Status
+### 2.5 Dataset Generation Status
 
 | Item | Status |
 |---|---|
-| Warm-up (7 days) | ✅ 504 rows |
-| Official start | 26 Aug 2026 18:29 UTC |
-| Target end | 25 Sep 2026 |
-| Scheduler | Windows Task Scheduler (hourly) |
-| Collection script | scripts/collect_real_data.py |
-| Lock protection | ✅ Prevents overlapping runs |
-| Audit logs | data/raw/real/logs/ |
+| Provider abstraction | ✅ Implemented |
+| Weather provider | ✅ OpenMeteoWeatherProvider |
+| AQ provider | ✅ OpenMeteoAirQualityProvider |
+| Ingestion pipeline | ✅ historical_ingestion.py |
+| CLI entry point | ✅ scripts/build_dataset.py |
+| Unit tests | ✅ 21 tests passing |
+| Integration tests | ✅ 25 tests passing |
+| Full test suite | ✅ 598 tests, 0 failures |
 
 ### 2.6 Test Results
 
 | Suite | Tests | Passed |
 |---|---|---|
-| EPA AQI (NowCast) | 57 | ✅ 57 |
-| Core Phase 17 | 177 | ✅ 177 |
-| All Phase 17 | 234 | ✅ 234 |
+| Open-Meteo Providers | 21 | ✅ 21 |
+| Historical Ingestion | 25 | ✅ 25 |
+| Full Project Suite | 598 | ✅ 598 |
+| Skipped | 1 | (expected) |
 
 ---
 
 ## 3. Pending Tasks
 
 | Priority | Task | Phase |
-|---|---|---|
-| Current | 30-day forward collection | Phase 17 |
-| Current | Historical pollution warm-up | Phase 17 |
-| Next | Production model training | Phase 18 |
+|---|---|
+| Current | Run build_dataset.py to generate historical dataset | Phase 17 |
+| Current | Validate generated dataset quality | Phase 17 |
+| Next | Production model training on real dataset | Phase 18 |
 
 ---
 
@@ -119,21 +137,22 @@
 | DEC-014 | Data Source Authority (Amended: PM NowCast AQI fallback) | 26 Aug 2026 |
 | DEC-015 | Synthetic data restricted to pipeline testing only | 8 Aug 2026 |
 | DEC-016 | Production Deployment Strategy | 20 Aug 2026 |
+| DEC-018 | Historical Data Source Migration to Open-Meteo | 27 Aug 2026 |
 
 ---
 
-## 5. Collection Readiness
+## 5. Dataset Readiness
 
 | Criterion | Status |
 |---|---|
-| AQI methodology | ✅ Approved |
-| Pipeline integration | ✅ Verified |
-| Pilot collection | ✅ Successful |
-| 30-day forward collection | ⏳ Pending owner approval |
-| Historical pollution warm-up | ⏳ Ready to collect |
+| AQI methodology | ✅ Approved (EPA-454/B-24-002 May 2024) |
+| Open-Meteo providers | ✅ Implemented and tested |
+| Ingestion pipeline | ✅ Implemented and tested |
+| Dataset generation | ⏳ Ready to run build_dataset.py |
+| Historical data availability | ✅ Weather 2017+, AQ Aug 2022+ |
 
 ---
 
 ## 6. Next Required Action
 
-Wait for project-owner approval to enable 30-day sustained collection.
+Run `python scripts/build_dataset.py` to generate the historical dataset from Open-Meteo APIs. No API keys required.

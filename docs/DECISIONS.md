@@ -538,3 +538,65 @@ Bound station IDs provide genuinely fresh AQI observations. City-level feeds are
 
 **Impact:**  
 AQICN client uses bound station IDs for fresh data. Quality gate validates source observation freshness. Training dataset excludes stale observations.
+
+---
+
+### DEC-018
+
+**Date:** 27 August 2026  
+**Topic:** Historical Data Source Migration to Open-Meteo  
+**Phase:** 17 (Revision)  
+
+**Problem:**  
+The previous Phase 17 strategy depended on OpenWeather + AQICN + 30-day live collection. Timeline constraints require an immediate historical dataset without waiting 30 days. AQICN Pakistan stations are confirmed stale. OpenWeather historical weather requires a paid subscription.
+
+**Options Considered:**
+
+- **Option A:** Continue 30-day live collection — Correct but too slow for timeline
+- **Option B:** Open-Meteo Historical Weather + Air Quality APIs — Free, no API key, 5+ years hourly data
+- **Option C:** Purchase OpenWeather historical access — Paid, single source
+- **Option D:** Switch to another paid AQI provider — Requires new credentials, untested
+
+**Chosen Approach:** Option B — Open-Meteo Historical APIs
+
+**Reason:**  
+Open-Meteo provides free, no-API-key-required access to:
+- Historical Weather: hourly data from 2017+ (IFS 9km) or 1940+ (ERA5)
+- Air Quality: hourly CAMS data from Aug 2022+ (Global) or 2013+ (European)
+
+This enables immediate generation of a 4-5 year dataset without waiting, paid subscriptions, or API key management.
+
+**Data sources:**  
+- Weather: `/v1/archive` endpoint — temperature, humidity, pressure, wind, cloud cover, precipitation
+- Air Quality: `/v1/air-quality` endpoint — PM2.5, PM10, CO, NO2, SO2, O3
+- US AQI: also available from Open-Meteo for validation; project uses own EPA calculation
+
+**AQI methodology preserved:**  
+US EPA PM AQI calculated from Open-Meteo PM2.5 and PM10 concentrations using existing EPA-454/B-24-002 May 2024 breakpoints. The project does NOT use Open-Meteo's built-in US AQI values as the prediction target.
+
+**Provider abstraction maintained:**  
+New Open-Meteo providers implement `BaseHistoricalProvider`. Existing OpenWeather/AQICN real-time collection remains functional for future live inference.
+
+**Constraints:**  
+- Open-Meteo weather: IFS 9km from 2017+, ERA5 from 1940+
+- Open-Meteo air quality: CAMS Global from Aug 2022+ (45km resolution)
+- Effective overlap for both weather + AQ: Aug 2022+
+- Free tier: non-commercial use only, no API key required
+- Rate limits: generous (sub-second response, chunked requests for large ranges)
+
+**Trade-offs:**  
+- CAMS Global AQ is 45km resolution (coarser than ground monitors) — acceptable for city-level modeling
+- Air quality data starts Aug 2022 (not full 5 years) — 4 years of overlap is sufficient
+- Reanalysis weather data may differ slightly from ground station observations — documented
+- No real-time data from Open-Meteo for production inference (existing OpenWeather/AQICN retained)
+
+**Impact:**  
+- New provider classes: `OpenMeteoWeatherProvider`, `OpenMeteoAirQualityProvider`
+- New pipeline: `historical_ingestion.py` for batch download, merge, AQI calculation
+- New CLI: `scripts/build_dataset.py` for dataset generation
+- Existing real-time collection (`api_manager.py`, `real_data_collector.py`) unchanged
+- Dataset output: `data/processed/{train,val,test}_{features,targets}.csv`
+- Configuration added to `config.yaml` under `api.open_meteo`
+
+**DEC-014 relationship:**  
+DEC-014 (Data Source Authority) is amended to include Open-Meteo as the historical data source. For real-time inference, OpenWeather and AQICN remain the primary and fallback sources per DEC-014.
