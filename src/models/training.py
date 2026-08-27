@@ -176,13 +176,128 @@ def get_model(model_name: str, params: Optional[Dict[str, Any]] = None, random_s
             return None
 
     elif model_name == "lstm":
-        # LSTM is defined in lstm_model.py
-        # Return placeholder; actual implementation in separate file
-        logger.info("LSTM model requires TensorFlow — defined in lstm_model.py")
-        return None
+        # LSTM is a separate class, not a sklearn estimator
+        # Return a sentinel that train_model() will handle specially
+        logger.info("LSTM model will be handled by train_lstm_model()")
+        return "lstm_sentinel"
 
     else:
         raise ValueError(f"Unknown model: {model_name}")
+
+
+def _train_lstm(
+    X_train: pd.DataFrame,
+    y_train: pd.DataFrame,
+    X_val: pd.DataFrame,
+    y_val: pd.DataFrame,
+    params: Optional[Dict[str, Any]] = None,
+    random_seed: int = DEFAULT_RANDOM_SEED,
+) -> Dict[str, Any]:
+    """Train LSTM model with sequence creation.
+
+    LSTM requires sequential input, so this function handles
+    the sequence creation and wraps the LSTM-specific training.
+
+    Args:
+        X_train: Training features.
+        y_train: Training targets.
+        X_val: Validation features.
+        y_val: Validation targets.
+        params: LSTM hyperparameters.
+        random_seed: Random seed.
+
+    Returns:
+        Training result dictionary.
+    """
+    from src.models.evaluation import evaluate_model
+    from src.models.lstm_model import LSTMModel
+
+    params = params or {}
+    sequence_length = params.get("sequence_length", 24)
+    epochs = params.get("epochs", 50)
+    batch_size = params.get("batch_size", 32)
+
+    # Select numeric columns only
+    X_train_num = X_train.select_dtypes(include=[np.number]).fillna(0).values
+    X_val_num = X_val.select_dtypes(include=[np.number]).fillna(0).values
+    y_train_arr = y_train.fillna(0).values
+    y_val_arr = y_val.fillna(0).values
+
+    n_features = X_train_num.shape[1]
+    n_targets = y_train_arr.shape[1]
+
+    logger.info(
+        "LSTM: n_features=%d, n_targets=%d, seq_len=%d",
+        n_features, n_targets, sequence_length,
+    )
+
+    model = LSTMModel(
+        sequence_length=sequence_length,
+        n_features=n_features,
+        n_targets=n_targets,
+        lstm_units=params.get("lstm_units", [64, 32]),
+        dropout_rate=params.get("dropout_rate", 0.2),
+        learning_rate=params.get("learning_rate", 0.001),
+        random_seed=random_seed,
+    )
+
+    start_time = time.time()
+    history = model.fit(
+        X_train_num, y_train_arr,
+        X_val_num, y_val_arr,
+        epochs=epochs,
+        batch_size=batch_size,
+        verbose=0,
+    )
+    training_time = time.time() - start_time
+
+    # Predict on validation set
+    y_pred = model.predict(X_val_num)
+
+    # Create a wrapper for evaluate_model compatibility
+    # evaluate_model expects (n_rows, n_targets) but LSTM produces
+    # (n_rows - seq_len + 1, n_targets) due to sequence creation
+    # We need to align predictions with actual targets
+    n_pred = len(y_pred)
+    y_val_aligned = y_val_arr[sequence_length - 1:sequence_length - 1 + n_pred]
+
+    # Evaluate using the aligned arrays
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+    metrics_per_horizon = []
+    horizon_labels = ['24h', '48h', '72h']
+    for i, h in enumerate(horizon_labels):
+        mae = mean_absolute_error(y_val_aligned[:, i], y_pred[:, i])
+        rmse = np.sqrt(mean_squared_error(y_val_aligned[:, i], y_pred[:, i]))
+        r2 = r2_score(y_val_aligned[:, i], y_pred[:, i])
+        metrics_per_horizon.append({
+            'horizon': h,
+            'mae': round(mae, 4),
+            'rmse': round(rmse, 4),
+            'r2': round(r2, 4),
+        })
+
+    overall_mae = mean_absolute_error(y_val_aligned.flatten(), y_pred.flatten())
+    overall_rmse = np.sqrt(mean_squared_error(y_val_aligned.flatten(), y_pred.flatten()))
+    overall_r2 = r2_score(y_val_aligned.flatten(), y_pred.flatten())
+
+    metrics = {
+        'overall_mae': round(overall_mae, 4),
+        'overall_rmse': round(overall_rmse, 4),
+        'overall_r2': round(overall_r2, 4),
+        'per_horizon': metrics_per_horizon,
+    }
+
+    return {
+        'model': model,
+        'model_name': 'lstm',
+        'metrics': metrics,
+        'training_time': training_time,
+        'feature_importance': {},
+        'feature_columns': X_train.select_dtypes(include=[np.number]).columns.tolist(),
+        'random_seed': random_seed,
+        'params': params,
+        'epochs_trained': history.get('epochs_trained', 0),
+    }
 
 
 def train_model(
@@ -213,8 +328,12 @@ def train_model(
     logger.info("Training model: %s", model_name)
     start_time = time.time()
 
+    # Handle LSTM separately (not a sklearn estimator)
+    if model_name == "lstm":
+        return _train_lstm(X_train, y_train, X_val, y_val, params, random_seed)
+
     model = get_model(model_name, params, random_seed)
-    if model is None:
+    if model is None or model == "lstm_sentinel":
         return {"model": None, "error": f"Model {model_name} unavailable"}
 
     # Handle non-numeric columns
