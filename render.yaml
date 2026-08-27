@@ -1,0 +1,36 @@
+# Render Blueprint — AQI Predictor
+# Deploy both backend and frontend as separate services
+
+services:
+  # FastAPI Backend
+  - type: web
+    name: aqi-predictor-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: MOCK_MODE
+        value: "false"
+      - key: API_KEY
+        generateValue: true
+      - key: LOG_LEVEL
+        value: "info"
+    healthCheckPath: /health
+    port: 8000
+    autoDeploy: true
+
+  # Streamlit Dashboard
+  - type: web
+    name: aqi-predictor-dashboard
+    runtime: docker
+    dockerfilePath: ./Dockerfile.frontend
+    envVars:
+      - key: API_BASE_URL
+        fromService:
+          name: aqi-predictor-api
+          property: host
+      - key: API_KEY
+        fromService:
+          name: aqi-predictor-api
+          property: env.API_KEY
+    port: 8501
+    autoDeploy: true
