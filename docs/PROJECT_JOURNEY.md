@@ -227,9 +227,44 @@ historical_ingestion.py:
 
 ---
 
-## 9. Next Steps
+## 9. Current State — Data Readiness Complete
 
-1. **Model training** on the generated dataset
-2. **Model comparison** (Ridge, RF, XGBoost, LSTM)
-3. **Production model selection** based on performance + complexity tradeoff
-4. **Deployment** with FastAPI backend + Streamlit dashboard
+### 9.1 Dataset Generated
+
+| Metric | Value |
+|--------|-------|
+| Total rows | 107,064 |
+| Cities | 3 (Karachi, Lahore, Islamabad) |
+| Date range | Aug 2022 – Aug 2026 (4 years) |
+| Features | 79 (time, lag, rolling, derived, current) |
+| AQI valid | 99.8% |
+| Train/Val/Test | 63,648 / 26,280 / 17,136 |
+| API calls | 66 (0 errors) |
+| Generation time | ~128 seconds |
+
+### 9.2 Documentation Created
+
+| Document | Content |
+|----------|---------|
+| DATASET_REPORT.md | Full analysis: features, AQI distribution, quality checks |
+| PROJECT_JOURNEY.md | This document: engineering history |
+| MODEL_EXPERIMENT_PLAN.md | Training strategy, model candidates, selection criteria |
+
+### 9.3 Notebooks Created
+
+| Notebook | Purpose |
+|----------|---------|
+| 01_dataset_exploration.ipynb | Dataset overview, distributions, patterns |
+| 02_feature_analysis.ipynb | Correlations, feature importance, engineering |
+| 03_model_experiments.ipynb | Model training and evaluation |
+| 04_model_comparison.ipynb | Final comparison and selection |
+
+---
+
+## 10. Next Steps
+
+1. **Run notebook 03** to train Ridge, RF, XGBoost models
+2. **Compare results** in notebook 04
+3. **Select production model** based on performance + complexity
+4. **Log to MLflow** model registry
+5. **Deploy** with FastAPI backend + Streamlit dashboard
