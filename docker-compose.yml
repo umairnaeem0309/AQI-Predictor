@@ -19,8 +19,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./data:/app/data
-      - ./models:/app/models
+      - ./data/processed:/app/data/processed
+      - ./models/production:/app/models/production
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
