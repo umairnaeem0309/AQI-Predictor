@@ -158,7 +158,23 @@ This was the most challenging part of the project. We went through **four differ
 
 **Impact:** Eliminated the 30-day wait entirely. Generated complete training dataset immediately.
 
-### 3.5 API Selection Summary
+### 3.5 Data Range Limitation — 4 Years, Not 5
+
+**Original request:** 5 years of historical data.
+**Actual result:** 4 years (August 2022 — August 2026).
+**Root cause:** Open-Meteo CAMS Global air quality data only starts from August 2022.
+
+**Details:**
+- Weather data IS available from 2017+ (9 years)
+- Air quality data starts August 2022 (4 years)
+- Merged dataset limited by AQ availability: 4 years
+- Weather data before August 2022 was discarded because no matching AQ data exists
+
+**Why this matters:** More data generally improves model performance. 5 years would have captured more seasonal cycles and edge cases. However, 4 years (107K hourly observations) is still substantial for AQI prediction.
+
+**Mitigation:** The 4-year dataset covers full annual cycles, diverse pollution seasons (winter smog in Lahore), and provides 107,064 training samples across 3 cities.
+
+### 3.6 API Selection Summary
 
 | Source | Weather | AQI | Historical | Free | Pakistan Fresh | Used |
 |--------|---------|-----|-----------|------|---------------|------|
@@ -624,7 +640,8 @@ LSTM was the worst performer:
 |--------|-------|
 | Total rows | 107,064 |
 | Cities | 3 (Karachi, Lahore, Islamabad) |
-| Date range | Aug 2022 – Aug 2026 (4 years) |
+| Date range | Aug 2022 – Aug 2026 (**4 years** — not 5) |
+| **Data range note** | **Originally requested 5 years. Open-Meteo CAMS AQ data starts Aug 2022. Weather available from 2017+ but merged dataset limited by AQ.** |
 | Features | 79 |
 | AQI valid | 99.8% |
 | Train/Val/Test | 63,648 / 26,280 / 17,136 |

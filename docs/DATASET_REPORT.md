@@ -6,6 +6,13 @@
 **Status:** Ready for model training
 **Dataset type:** real_api_data (approved_for_training: true)
 
+**Data Range Transparency:**
+- Original request: 5 years of historical data
+- Actual dataset: **4 years** (2022-08-01 to 2026-08-26)
+- Reason: Open-Meteo CAMS Global air quality data starts August 2022
+- Weather data available from 2017+ (9 years) but merged dataset limited by AQ availability
+- 4 years provides 107,064 hourly observations across 3 cities — sufficient for training
+
 ---
 
 ## 1. Dataset Overview
@@ -15,7 +22,7 @@
 | Total rows | 107,064 |
 | Cities | 3 (Karachi, Lahore, Islamabad) |
 | Date range | 2022-08-01 to 2026-08-26 |
-| Time span | 4 years, 0 months, 26 days |
+| Time span | **4 years, 0 months, 26 days** (not 5 — see transparency note above) |
 | Hourly resolution | 35,688 unique hours |
 | Rows per city | 35,688 (uniform) |
 | Weather features | 7 (temperature, humidity, pressure, wind_speed, wind_direction, cloud_cover, precipitation) |
