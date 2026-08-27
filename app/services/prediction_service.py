@@ -80,8 +80,14 @@ class PredictionService:
             # 1. Validate model is ready
             self.model_service.validate_model_for_request()
             
-            # 2. Retrieve features
-            features = self.feature_service.get_features(city)
+            # 2. Retrieve features (try feature store, fallback to live adapter)
+            try:
+                features = self.feature_service.get_features(city)
+            except Exception as e:
+                logger.warning(f"Feature store unavailable ({e}), using live adapter")
+                from src.feature_store.live_feature_adapter import get_live_adapter
+                adapter = get_live_adapter()
+                features = adapter.get_latest_features(city)
             
             # 3. Run model prediction
             model = self.model_service.get_model()
