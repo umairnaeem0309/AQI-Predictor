@@ -6,8 +6,6 @@
 #   frontend — Streamlit dashboard (port 8501)
 # =============================================================================
 
-version: "3.8"
-
 services:
   backend:
     build:
