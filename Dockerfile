@@ -40,9 +40,13 @@ COPY src/ ./src/
 COPY app/ ./app/
 COPY pipelines/ ./pipelines/
 COPY config.yaml .
+COPY models/ ./models/
 
 # Copy environment template (actual .env is mounted at runtime)
 COPY .env.example .env
+
+# Copy processed data for feature adapter
+COPY data/processed/ ./data/processed/
 
 # Expose FastAPI port
 EXPOSE 8000
@@ -52,4 +56,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Default command: run FastAPI via uvicorn
-CMD ["python", "-m", "uvicorn", "app.backend.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
