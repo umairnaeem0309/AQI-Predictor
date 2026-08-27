@@ -15,7 +15,7 @@
 | **Ridge Regression** | Linear baseline | Simple, fast, interpretable. Sets the performance floor. |
 | **Random Forest** | Ensemble tree | Handles non-linear relationships, robust to outliers, feature importance built-in. |
 | **XGBoost** | Gradient boosting | State-of-the-art tabular performance, handles missing values natively. |
-| **LSTM** | Recurrent neural net | Captures temporal patterns directly, but higher complexity and training cost. |
+| **LSTM** | Recurrent neural net | Captures temporal patterns directly from sequential data. Required in final comparison. |
 
 **Important:** Complex models do not have to beat Ridge. Ridge is a comparison baseline. Selection considers performance AND complexity.
 
@@ -91,10 +91,12 @@
 
 ## 5. Experiment Execution Order
 
+All four models are mandatory. No model is optional.
+
 1. **Ridge** — Establish baseline performance
 2. **Random Forest** — Test non-linear improvement
 3. **XGBoost** — Test gradient boosting improvement
-4. **LSTM** — Test temporal pattern capture (if time permits)
+4. **LSTM** — Test temporal pattern capture
 
 Each model:
 1. Train on training set
