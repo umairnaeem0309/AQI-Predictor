@@ -145,11 +145,124 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             raise APIClientError(f"API error: {e}")
     
+    def get_historical_data(self, city: str, start_date: str = None, end_date: str = None, limit: int = 500) -> Dict[str, Any]:
+        """
+        Get historical AQI data for a city.
+
+        Args:
+            city: City name
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD)
+            limit: Max rows to return
+
+        Returns:
+            Historical data response dictionary
+        """
+        if self.mock_mode:
+            return self._mock_historical(city)
+
+        try:
+            params = {"city": city, "limit": limit}
+            if start_date:
+                params["start_date"] = start_date
+            if end_date:
+                params["end_date"] = end_date
+
+            response = requests.get(
+                f"{self.base_url}/data/historical",
+                params=params,
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_statistics(self, city: str) -> Dict[str, Any]:
+        """
+        Get statistics for a city.
+
+        Args:
+            city: City name
+
+        Returns:
+            Statistics response dictionary
+        """
+        if self.mock_mode:
+            return self._mock_statistics(city)
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/data/statistics",
+                params={"city": city},
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_feature_importance(self, top_n: int = 20) -> Dict[str, Any]:
+        """
+        Get feature importance from the model.
+
+        Args:
+            top_n: Number of top features to return
+
+        Returns:
+            Feature importance response dictionary
+        """
+        if self.mock_mode:
+            return self._mock_feature_importance()
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/explain/feature-importance",
+                params={"top_n": top_n},
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_model_summary(self) -> Dict[str, Any]:
+        """
+        Get model summary for explainability.
+
+        Returns:
+            Model summary response dictionary
+        """
+        if self.mock_mode:
+            return self._mock_model_summary()
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/explain/model-summary",
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
     def is_available(self) -> bool:
         """Check if API is available."""
         if self.mock_mode:
             return True
-        
+
         try:
             self.get_health()
             return True
@@ -196,4 +309,42 @@ class APIClient:
             "dataset_type": "real_api_data",
             "feature_version": "1.0.0",
             "metrics": {"mae": 15.2, "rmse": 20.1, "r2": 0.85},
+        }
+
+    def _mock_historical(self, city: str) -> Dict[str, Any]:
+        """Return mock historical data."""
+        return {
+            "city": city,
+            "count": 5,
+            "start": "2026-08-20T00:00:00+00:00",
+            "end": "2026-08-20T04:00:00+00:00",
+            "data": [],
+        }
+
+    def _mock_statistics(self, city: str) -> Dict[str, Any]:
+        """Return mock statistics."""
+        return {
+            "city": city,
+            "total_rows": 35688,
+            "date_range": {"start": "2022-08-01", "end": "2026-08-26"},
+            "statistics": {},
+        }
+
+    def _mock_feature_importance(self) -> Dict[str, Any]:
+        """Return mock feature importance."""
+        return {
+            "model_name": "xgboost_aqi_predictor",
+            "total_features": 71,
+            "top_n": 10,
+            "features": [],
+            "category_importance": {},
+        }
+
+    def _mock_model_summary(self) -> Dict[str, Any]:
+        """Return mock model summary."""
+        return {
+            "model_name": "xgboost_aqi_predictor",
+            "model_type": "XGBoost",
+            "parameters": {},
+            "metrics": {"mae": 21.32, "rmse": 30.89, "r2": 0.6065},
         }
