@@ -47,6 +47,23 @@ api:
     base_url: "https://api.waqi.info"
     timeout_seconds: 30
     max_retries: 3
+  open_meteo:
+    weather:
+      base_url: "https://archive-api.open-meteo.com/v1"
+      dataset: "best_match"  # IFS 9km (2017+), ERA5 (1940+)
+      wind_speed_unit: "ms"
+      temperature_unit: "celsius"
+    air_quality:
+      base_url: "https://air-quality-api.open-meteo.com/v1"
+      domain: "auto"  # auto, cams_europe, cams_global
+      cell_selection: "nearest"
+    historical:
+      start_date: "2021-01-01"
+      end_date: "2026-08-26"
+      # Weather available from 2017+ (IFS), Air Quality from Aug 2022+
+      # Effective overlap for both: Aug 2022+
+      max_days_per_weather_request: 365
+      max_days_per_aq_request: 92
 
 logging:
   level: "INFO"
