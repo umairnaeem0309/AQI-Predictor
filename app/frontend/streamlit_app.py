@@ -5,6 +5,11 @@ Main Streamlit application for AQI prediction visualization.
 """
 
 import os
+import sys
+
+# Add project root to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
 import streamlit as st
 
 from app.frontend.utils.api_client import APIClient
