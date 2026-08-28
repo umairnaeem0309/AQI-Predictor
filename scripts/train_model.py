@@ -143,8 +143,8 @@ def prepare_training_data(df):
     elif not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
 
-    # Sort by location and time
-    df = df.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
+    # Sort by timestamp only for proper chronological split
+    df = df.sort_values("timestamp").reset_index(drop=True)
 
     # Add time features
     df = add_time_features(df)
@@ -566,15 +566,22 @@ def save_model_locally(result, run_id=None):
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
     # Save model
-    model_path = MODELS_DIR / "xgboost_model.pkl"
+    model_name = result["model_key"]
+    model_path = MODELS_DIR / f"{model_name}_model.pkl"
     with open(model_path, "wb") as f:
         pickle.dump(result["model"], f)
     logger.info(f"Model saved to {model_path}")
 
+    # Also save as generic production model for API
+    production_path = MODELS_DIR / "xgboost_model.pkl"
+    with open(production_path, "wb") as f:
+        pickle.dump(result["model"], f)
+    logger.info(f"Production model saved to {production_path}")
+
     # Save metadata
     metadata = {
         "model_version": f"v{datetime.now(timezone.utc).strftime('%Y%m%d')}",
-        "model_name": "xgboost_aqi_predictor",
+        "model_name": result["model_name"],
         "training_date": datetime.now(timezone.utc).isoformat(),
         "dataset_type": "real_api_data",
         "data_provider": "open-meteo",

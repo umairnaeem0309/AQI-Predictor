@@ -44,7 +44,7 @@ A production-grade MLOps system that fetches real-time weather and pollution dat
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    DATA COLLECTION (Hourly)                  │
+│                    DATA COLLECTION (Hourly)                 │
 │  Open-Meteo Weather + Air Quality APIs                      │
 │  → scripts/collect_features.py                              │
 │  → Hopsworks Feature Store (PRIMARY)                        │
@@ -52,7 +52,7 @@ A production-grade MLOps system that fetches real-time weather and pollution dat
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
-│                    MODEL TRAINING (Daily)                    │
+│                    MODEL TRAINING (Daily)                   │
 │  scripts/train_model.py                                     │
 │  → Reads from Hopsworks Feature Store                       │
 │  → Trains Ridge, RF, XGBoost, LSTM                          │
@@ -61,7 +61,7 @@ A production-grade MLOps system that fetches real-time weather and pollution dat
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
-│                    API + DASHBOARD                           │
+│                    API + DASHBOARD                          │
 │  FastAPI (17 endpoints) → Streamlit (4 pages)               │
 │  → Loads model from MLflow or local pickle                  │
 │  → Real-time predictions for 3 cities                       │
@@ -175,15 +175,6 @@ store.insert_features("aqi_features_prod", df, metadata)
 python scripts/train_model.py --force-register
 ```
 
-**Output:**
-```
-Model                MAE     RMSE      R²     Time
-Ridge Regression   28.96    37.52  0.4762     0.2s
-Random Forest      29.31    38.14  0.4493   171.7s
-XGBoost            30.09    38.63  0.4365    15.3s
-LSTM               30.02    38.58  0.4467   112.7s
-🏆 BEST MODEL: Ridge Regression (MAE=28.96)
-```
 
 ---
 
