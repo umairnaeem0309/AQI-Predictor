@@ -16,5 +16,4 @@ services:
       - key: LOG_LEVEL
         value: "info"
     healthCheckPath: /health
-    port: 8000
     autoDeploy: true
