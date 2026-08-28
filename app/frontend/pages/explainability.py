@@ -138,7 +138,14 @@ def render_explainability(api_client: APIClient):
                 global_shap = api_client.get_global_shap(top_n=25)
 
             st.subheader("🎯 Global SHAP Feature Importance")
-            st.caption(f"Method: {global_shap.get('method', 'TreeExplainer')} | "
+
+            # Check if data is available
+            if global_shap.get("message"):
+                st.info(f"ℹ️ {global_shap['message']}")
+            elif global_shap.get("n_samples", 0) == 0:
+                st.info("ℹ️ Training data not available for SHAP computation. Feature importance from XGBoost gain is still available in the first tab.")
+            else:
+             st.caption(f"Method: {global_shap.get('method', 'TreeExplainer')} | "
                        f"Background samples: {global_shap.get('n_samples', 0)}")
 
             shap_features = global_shap.get("features", [])

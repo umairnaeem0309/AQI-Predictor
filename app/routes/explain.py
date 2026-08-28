@@ -346,7 +346,14 @@ async def get_global_shap_importance(
         if not os.path.exists(data_path):
             data_path = os.path.join("data", "processed", "raw_observations.csv")
         if not os.path.exists(data_path):
-            raise HTTPException(status_code=404, detail="Processed data not found for SHAP background sample")
+            return {
+                "model_name": "xgboost_aqi_predictor",
+                "method": "TreeExplainer mean |SHAP|",
+                "n_samples": 0,
+                "total_features": 0,
+                "features": [],
+                "message": "Training dataset not available in this environment. SHAP requires train_features.csv.",
+            }
 
         df = pd.read_csv(data_path)
 

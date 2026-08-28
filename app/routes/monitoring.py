@@ -76,7 +76,14 @@ async def get_drift_report(
 
         df = _load_processed_data()
         if df is None or df.empty:
-            raise HTTPException(status_code=404, detail="Processed data not found")
+            return {
+                "status": "unavailable",
+                "message": "Training dataset not available in this environment. Drift detection requires train_features.csv or raw_observations.csv.",
+                "drift_detected": False,
+                "drifted_count": 0,
+                "drift_percentage": 0,
+                "total_features": 0,
+            }
 
         # Select numeric columns for drift detection
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()

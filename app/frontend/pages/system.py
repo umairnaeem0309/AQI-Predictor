@@ -211,32 +211,36 @@ def render_system(api_client: APIClient):
             with st.spinner("Running drift detection..."):
                 drift = api_client.get_drift_report()
 
-            drift_detected = drift.get("drift_detected", False)
-            drifted_count = drift.get("drifted_count", 0)
-            drift_pct = drift.get("drift_percentage", 0)
-            total = drift.get("total_features", 0)
-
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                render_status_card(
-                    "Drift Status",
-                    "Detected" if drift_detected else "No Drift",
-                    "warning" if drift_detected else "ok",
-                )
-            with col2:
-                st.metric("Drifted Features", f"{drifted_count}/{total}")
-            with col3:
-                st.metric("Drift %", f"{drift_pct:.1f}%")
-
-            if drift_detected:
-                st.warning(f"⚠️ Data drift detected in {drifted_count} features ({drift_pct:.1f}%)")
-                drifted_cols = drift.get("drifted_columns", [])
-                if drifted_cols:
-                    st.markdown("**Drifted columns:**")
-                    for col_info in drifted_cols:
-                        st.markdown(f"- `{col_info.get('column', 'unknown')}`")
+            # Handle unavailable data gracefully
+            if drift.get("status") == "unavailable" or not drift.get("features") and drift.get("total_features", 0) == 0:
+                st.info(f"ℹ️ {drift.get('message', 'Training data not available for drift detection. This is expected in deployed environments.')}")
             else:
-                st.success("✅ No data drift detected. Feature distributions are stable.")
+                drift_detected = drift.get("drift_detected", False)
+                drifted_count = drift.get("drifted_count", 0)
+                drift_pct = drift.get("drift_percentage", 0)
+                total = drift.get("total_features", 0)
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    render_status_card(
+                        "Drift Status",
+                        "Detected" if drift_detected else "No Drift",
+                        "warning" if drift_detected else "ok",
+                    )
+                with col2:
+                    st.metric("Drifted Features", f"{drifted_count}/{total}")
+                with col3:
+                    st.metric("Drift %", f"{drift_pct:.1f}%")
+
+                if drift_detected:
+                    st.warning(f"⚠️ Data drift detected in {drifted_count} features ({drift_pct:.1f}%)")
+                    drifted_cols = drift.get("drifted_columns", [])
+                    if drifted_cols:
+                        st.markdown("**Drifted columns:**")
+                        for col_info in drifted_cols:
+                            st.markdown(f"- `{col_info.get('column', 'unknown')}`")
+                else:
+                    st.success("✅ No data drift detected. Feature distributions are stable.")
 
         except APIClientError as e:
             render_error_state("Cannot run drift detection", str(e))
