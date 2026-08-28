@@ -9,14 +9,15 @@ Tests for:
 """
 
 import os
+
 import pytest
 
 from src.models.lifecycle import (
-    ModelState,
-    ModelLifecycle,
-    LifecycleTransitionError,
-    LifecycleBlockError,
     VALID_TRANSITIONS,
+    LifecycleBlockError,
+    LifecycleTransitionError,
+    ModelLifecycle,
+    ModelState,
 )
 from src.models.registry import validate_for_production
 
@@ -62,15 +63,15 @@ class TestMissingSecretsHandling:
         """Test that missing API keys don't crash the system."""
         # Remove any existing API keys from environment
         env_vars = ["OPENWEATHER_API_KEY", "AQICN_API_KEY", "HOPSWORKS_HOST"]
-        
+
         original_values = {}
         for var in env_vars:
             original_values[var] = os.environ.pop(var, None)
-        
+
         try:
             # Import should not crash even without secrets
             from src.config import load_config
-            
+
             # Config loading should handle missing secrets
             # This tests graceful degradation
             assert True  # If we get here, no crash occurred
@@ -85,13 +86,12 @@ class TestMissingSecretsHandling:
         # This test verifies the skip logic exists
         # Actual skipping is handled by pytest markers
         credentials_available = all(
-            os.environ.get(key) is not None
-            for key in ["OPENWEATHER_API_KEY", "AQICN_API_KEY"]
+            os.environ.get(key) is not None for key in ["OPENWEATHER_API_KEY", "AQICN_API_KEY"]
         )
-        
+
         if not credentials_available:
             pytest.skip("API credentials not available")
-        
+
         # If we get here, credentials are available
         assert True
 

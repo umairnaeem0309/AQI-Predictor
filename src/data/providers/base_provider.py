@@ -155,16 +155,12 @@ class BaseHistoricalProvider(ABC):
 
                 if response.status_code == 429:
                     retry_after = int(response.headers.get("Retry-After", 60))
-                    logger.warning(
-                        "Rate limited (429). Waiting %d seconds...", retry_after
-                    )
+                    logger.warning("Rate limited (429). Waiting %d seconds...", retry_after)
                     time.sleep(retry_after)
                     continue
 
                 if response.status_code >= 500:
-                    raise requests.RequestException(
-                        f"Server error: HTTP {response.status_code}"
-                    )
+                    raise requests.RequestException(f"Server error: HTTP {response.status_code}")
 
                 if response.status_code == 400:
                     error_body = response.json() if response.content else {}
@@ -178,17 +174,20 @@ class BaseHistoricalProvider(ABC):
             except (requests.ConnectionError, requests.Timeout) as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    delay = 2 ** attempt
+                    delay = 2**attempt
                     logger.warning(
                         "Request attempt %d/%d failed: %s. Retrying in %ds...",
                         attempt + 1,
-                        self.max_retries, str(e), delay,
+                        self.max_retries,
+                        str(e),
+                        delay,
                     )
                     time.sleep(delay)
                 else:
                     logger.error(
                         "All %d retry attempts exhausted. Last error: %s",
-                        self.max_retries, str(e),
+                        self.max_retries,
+                        str(e),
                     )
 
         raise last_exception
@@ -222,8 +221,12 @@ class BaseHistoricalProvider(ABC):
         """
         logger.info(
             "Fetching %s historical data for %s (%.2f, %.2f) from %s to %s",
-            self.__class__.__name__, city_name, latitude, longitude,
-            start_date, end_date,
+            self.__class__.__name__,
+            city_name,
+            latitude,
+            longitude,
+            start_date,
+            end_date,
         )
 
         start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -242,14 +245,14 @@ class BaseHistoricalProvider(ABC):
             chunk_start_str = current_start.strftime("%Y-%m-%d")
             chunk_end_str = chunk_end.strftime("%Y-%m-%d")
 
-            logger.debug(
-                "  Fetching chunk: %s to %s", chunk_start_str, chunk_end_str
-            )
+            logger.debug("  Fetching chunk: %s to %s", chunk_start_str, chunk_end_str)
 
             try:
                 raw_json = self._fetch_chunk(
-                    latitude, longitude,
-                    chunk_start_str, chunk_end_str,
+                    latitude,
+                    longitude,
+                    chunk_start_str,
+                    chunk_end_str,
                     **kwargs,
                 )
                 df_chunk = self._parse_response(raw_json, location_id, city_name)
@@ -260,7 +263,9 @@ class BaseHistoricalProvider(ABC):
             except Exception as e:
                 logger.error(
                     "  Failed to fetch chunk %s to %s: %s",
-                    chunk_start_str, chunk_end_str, str(e),
+                    chunk_start_str,
+                    chunk_end_str,
+                    str(e),
                 )
                 self._error_count += 1
 
@@ -274,7 +279,9 @@ class BaseHistoricalProvider(ABC):
         if not chunks:
             logger.warning(
                 "No data returned for %s from %s to %s",
-                city_name, start_date, end_date,
+                city_name,
+                start_date,
+                end_date,
             )
             return pd.DataFrame()
 
@@ -287,8 +294,11 @@ class BaseHistoricalProvider(ABC):
 
         logger.info(
             "Completed %s fetch for %s: %d total rows, %d API requests, %d errors",
-            self.__class__.__name__, city_name,
-            len(df), self._request_count, self._error_count,
+            self.__class__.__name__,
+            city_name,
+            len(df),
+            self._request_count,
+            self._error_count,
         )
 
         return df

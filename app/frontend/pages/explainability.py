@@ -1,4 +1,7 @@
-import os, sys; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 """
 Explainability Page
 
@@ -6,17 +9,14 @@ Model explainability with XGBoost feature importance and SHAP values.
 Uses API client for data.
 """
 
-import streamlit as st
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import numpy as np
+import streamlit as st
 
+from app.frontend.components.metrics import render_error_state, render_info_card
 from app.frontend.utils.api_client import APIClient, APIClientError
-from app.frontend.utils.aqi_theme import get_dashboard_css, get_city_color
-from app.frontend.components.metrics import (
-    render_error_state,
-    render_info_card,
-)
+from app.frontend.utils.aqi_theme import get_city_color, get_dashboard_css
 
 
 def render_explainability(api_client: APIClient):
@@ -31,7 +31,13 @@ def render_explainability(api_client: APIClient):
     st.header("🔍 Model Explainability")
 
     # Tab layout for different explanation types
-    tab1, tab2, tab3 = st.tabs(["📊 Feature Importance", "🎯 SHAP Global Analysis", "🔬 SHAP Prediction Explanation"])
+    tab1, tab2, tab3 = st.tabs(
+        [
+            "📊 Feature Importance",
+            "🎯 SHAP Global Analysis",
+            "🔬 SHAP Prediction Explanation",
+        ]
+    )
 
     # ── Tab 1: XGBoost Feature Importance ──
     with tab1:
@@ -85,7 +91,7 @@ def render_explainability(api_client: APIClient):
                         "importance": st.column_config.ProgressColumn(
                             "Importance",
                             min_value=0,
-                            max_value=max(f["importance"] for f in features) if features else 1,
+                            max_value=(max(f["importance"] for f in features) if features else 1),
                         ),
                     },
                     hide_index=True,
@@ -143,22 +149,28 @@ def render_explainability(api_client: APIClient):
             if global_shap.get("message"):
                 st.info(f"ℹ️ {global_shap['message']}")
             elif global_shap.get("n_samples", 0) == 0:
-                st.info("ℹ️ Training data not available for SHAP computation. Feature importance from XGBoost gain is still available in the first tab.")
+                st.info(
+                    "ℹ️ Training data not available for SHAP computation. Feature importance from XGBoost gain is still available in the first tab."
+                )
             else:
-             st.caption(f"Method: {global_shap.get('method', 'TreeExplainer')} | "
-                       f"Background samples: {global_shap.get('n_samples', 0)}")
+                st.caption(
+                    f"Method: {global_shap.get('method', 'TreeExplainer')} | "
+                    f"Background samples: {global_shap.get('n_samples', 0)}"
+                )
 
             shap_features = global_shap.get("features", [])
             if shap_features:
                 # Waterfall-style horizontal bar chart
                 fig = go.Figure()
-                fig.add_trace(go.Bar(
-                    y=[f["feature"] for f in reversed(shap_features)],
-                    x=[f["mean_abs_shap"] for f in reversed(shap_features)],
-                    orientation="h",
-                    marker_color="#FF6B6B",
-                    name="Mean |SHAP|",
-                ))
+                fig.add_trace(
+                    go.Bar(
+                        y=[f["feature"] for f in reversed(shap_features)],
+                        x=[f["mean_abs_shap"] for f in reversed(shap_features)],
+                        orientation="h",
+                        marker_color="#FF6B6B",
+                        name="Mean |SHAP|",
+                    )
+                )
                 fig.update_layout(
                     title=f"Top {len(shap_features)} Features by Mean |SHAP Value|",
                     xaxis_title="Mean |SHAP Value|",
@@ -169,8 +181,14 @@ def render_explainability(api_client: APIClient):
 
                 # Table
                 st.dataframe(
-                    [{"Rank": i + 1, "Feature": f["feature"], "Mean |SHAP|": f["mean_abs_shap"]}
-                     for i, f in enumerate(shap_features)],
+                    [
+                        {
+                            "Rank": i + 1,
+                            "Feature": f["feature"],
+                            "Mean |SHAP|": f["mean_abs_shap"],
+                        }
+                        for i, f in enumerate(shap_features)
+                    ],
                     hide_index=True,
                     use_container_width=True,
                 )
@@ -200,31 +218,114 @@ def render_explainability(api_client: APIClient):
 
         with col1:
             city = st.selectbox("City", ["karachi", "lahore", "islamabad"], key="shap_city")
-            target = st.selectbox("Target", ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"], key="shap_target")
+            target = st.selectbox(
+                "Target",
+                ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"],
+                key="shap_target",
+            )
 
             st.markdown("**Pollutant Inputs**")
-            pm25 = st.number_input("PM2.5 (μg/m³)", value=50.0, min_value=0.0, max_value=500.0, step=1.0, key="shap_pm25")
-            pm10 = st.number_input("PM10 (μg/m³)", value=70.0, min_value=0.0, max_value=600.0, step=1.0, key="shap_pm10")
-            o3 = st.number_input("O3 (μg/m³)", value=40.0, min_value=0.0, max_value=200.0, step=1.0, key="shap_o3")
-            no2 = st.number_input("NO2 (μg/m³)", value=25.0, min_value=0.0, max_value=200.0, step=1.0, key="shap_no2")
-            so2 = st.number_input("SO2 (μg/m³)", value=10.0, min_value=0.0, max_value=100.0, step=1.0, key="shap_so2")
-            co = st.number_input("CO (μg/m³)", value=1000.0, min_value=0.0, max_value=10000.0, step=10.0, key="shap_co")
+            pm25 = st.number_input(
+                "PM2.5 (μg/m³)",
+                value=50.0,
+                min_value=0.0,
+                max_value=500.0,
+                step=1.0,
+                key="shap_pm25",
+            )
+            pm10 = st.number_input(
+                "PM10 (μg/m³)",
+                value=70.0,
+                min_value=0.0,
+                max_value=600.0,
+                step=1.0,
+                key="shap_pm10",
+            )
+            o3 = st.number_input(
+                "O3 (μg/m³)",
+                value=40.0,
+                min_value=0.0,
+                max_value=200.0,
+                step=1.0,
+                key="shap_o3",
+            )
+            no2 = st.number_input(
+                "NO2 (μg/m³)",
+                value=25.0,
+                min_value=0.0,
+                max_value=200.0,
+                step=1.0,
+                key="shap_no2",
+            )
+            so2 = st.number_input(
+                "SO2 (μg/m³)",
+                value=10.0,
+                min_value=0.0,
+                max_value=100.0,
+                step=1.0,
+                key="shap_so2",
+            )
+            co = st.number_input(
+                "CO (μg/m³)",
+                value=1000.0,
+                min_value=0.0,
+                max_value=10000.0,
+                step=10.0,
+                key="shap_co",
+            )
 
             st.markdown("**Weather Inputs**")
-            temp = st.number_input("Temperature (°C)", value=35.0, min_value=-10.0, max_value=55.0, step=1.0, key="shap_temp")
-            humidity = st.number_input("Humidity (%)", value=60.0, min_value=0.0, max_value=100.0, step=1.0, key="shap_humidity")
-            wind = st.number_input("Wind Speed (km/h)", value=10.0, min_value=0.0, max_value=100.0, step=1.0, key="shap_wind")
-            pressure = st.number_input("Pressure (hPa)", value=1010.0, min_value=900.0, max_value=1100.0, step=1.0, key="shap_pressure")
+            temp = st.number_input(
+                "Temperature (°C)",
+                value=35.0,
+                min_value=-10.0,
+                max_value=55.0,
+                step=1.0,
+                key="shap_temp",
+            )
+            humidity = st.number_input(
+                "Humidity (%)",
+                value=60.0,
+                min_value=0.0,
+                max_value=100.0,
+                step=1.0,
+                key="shap_humidity",
+            )
+            wind = st.number_input(
+                "Wind Speed (km/h)",
+                value=10.0,
+                min_value=0.0,
+                max_value=100.0,
+                step=1.0,
+                key="shap_wind",
+            )
+            pressure = st.number_input(
+                "Pressure (hPa)",
+                value=1010.0,
+                min_value=900.0,
+                max_value=1100.0,
+                step=1.0,
+                key="shap_pressure",
+            )
 
             explain_btn = st.button("🧠 Explain Prediction", type="primary", key="shap_btn")
 
         with col2:
             if explain_btn:
                 features = {
-                    "pm25": pm25, "pm10": pm10, "o3": o3, "no2": no2,
-                    "so2": so2, "co": co, "temperature": temp,
-                    "humidity": humidity, "wind_speed": wind, "pressure": pressure,
-                    "pm25_aqi": pm25, "pm10_aqi": pm10, "aqi": pm25,
+                    "pm25": pm25,
+                    "pm10": pm10,
+                    "o3": o3,
+                    "no2": no2,
+                    "so2": so2,
+                    "co": co,
+                    "temperature": temp,
+                    "humidity": humidity,
+                    "wind_speed": wind,
+                    "pressure": pressure,
+                    "pm25_aqi": pm25,
+                    "pm10_aqi": pm10,
+                    "aqi": pm25,
                     "aqi_derived": pm25,
                 }
 
@@ -236,7 +337,11 @@ def render_explainability(api_client: APIClient):
                     pred = explanation.get("prediction", 0)
                     base = explanation.get("base_value", 0)
 
-                    st.metric("SHAP Prediction", f"AQI {pred:.1f}", delta=f"{pred - base:+.1f} from average ({base:.1f})")
+                    st.metric(
+                        "SHAP Prediction",
+                        f"AQI {pred:.1f}",
+                        delta=f"{pred - base:+.1f} from average ({base:.1f})",
+                    )
 
                     # Waterfall chart
                     shap_vals = explanation.get("shap_values", [])
@@ -244,16 +349,21 @@ def render_explainability(api_client: APIClient):
                         top_n = min(15, len(shap_vals))
                         top_shap = shap_vals[:top_n]
 
-                        colors = ["#FF6B6B" if s["shap_value"] > 0 else "#4ECDC4" for s in reversed(top_shap)]
+                        colors = [
+                            "#FF6B6B" if s["shap_value"] > 0 else "#4ECDC4"
+                            for s in reversed(top_shap)
+                        ]
 
-                        fig = go.Figure(go.Bar(
-                            y=[s["feature"] for s in reversed(top_shap)],
-                            x=[s["shap_value"] for s in reversed(top_shap)],
-                            orientation="h",
-                            marker_color=colors,
-                            text=[f'{s["shap_value"]:+.2f}' for s in reversed(top_shap)],
-                            textposition="auto",
-                        ))
+                        fig = go.Figure(
+                            go.Bar(
+                                y=[s["feature"] for s in reversed(top_shap)],
+                                x=[s["shap_value"] for s in reversed(top_shap)],
+                                orientation="h",
+                                marker_color=colors,
+                                text=[f'{s["shap_value"]:+.2f}' for s in reversed(top_shap)],
+                                textposition="auto",
+                            )
+                        )
                         fig.update_layout(
                             title=f"SHAP Contributions to {target}",
                             xaxis_title="SHAP Value (pushes prediction ↑ or ↓)",
@@ -270,18 +380,24 @@ def render_explainability(api_client: APIClient):
                         with col_pos:
                             st.markdown("**🔴 Increases AQI (worse air)**")
                             for p in pos[:5]:
-                                st.markdown(f"- **{p['feature']}**: +{p['shap_value']:.2f} (value={p['feature_value']:.1f})")
+                                st.markdown(
+                                    f"- **{p['feature']}**: +{p['shap_value']:.2f} (value={p['feature_value']:.1f})"
+                                )
                         with col_neg:
                             st.markdown("**🟢 Decreases AQI (better air)**")
                             for n in neg[:5]:
-                                st.markdown(f"- **{n['feature']}**: {n['shap_value']:.2f} (value={n['feature_value']:.1f})")
+                                st.markdown(
+                                    f"- **{n['feature']}**: {n['shap_value']:.2f} (value={n['feature_value']:.1f})"
+                                )
                     else:
                         st.warning("No SHAP values returned.")
 
                 except APIClientError as e:
                     render_error_state("SHAP explanation failed", str(e))
             else:
-                st.info("👆 Enter feature values and click **Explain Prediction** to see SHAP analysis.")
+                st.info(
+                    "👆 Enter feature values and click **Explain Prediction** to see SHAP analysis."
+                )
                 st.markdown("""
                 **What this does:**
                 - Takes the feature values you enter

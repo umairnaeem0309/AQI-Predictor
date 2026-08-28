@@ -4,10 +4,11 @@ Tests for SHAP explainability endpoints.
 
 import json
 import os
+from pathlib import Path
+from unittest.mock import MagicMock, PropertyMock, patch
+
 import numpy as np
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock, PropertyMock
 
 
 class TestSHAPModels:
@@ -15,6 +16,7 @@ class TestSHAPModels:
 
     def test_request_model_valid(self):
         from app.routes.explain import PredictionExplanationRequest
+
         req = PredictionExplanationRequest(
             features={"pm25": 50.0, "temperature": 30.0},
             target="target_aqi_24h",
@@ -24,11 +26,13 @@ class TestSHAPModels:
 
     def test_request_model_default_target(self):
         from app.routes.explain import PredictionExplanationRequest
+
         req = PredictionExplanationRequest(features={"pm25": 50.0})
         assert req.target == "target_aqi_24h"
 
     def test_response_model_valid(self):
         from app.routes.explain import PredictionExplanationResponse
+
         resp = PredictionExplanationResponse(
             base_value=120.0,
             shap_values=[{"feature": "pm25", "shap_value": 10.5, "feature_value": 50.0}],
@@ -49,6 +53,7 @@ class TestSHAPHelperFunctions:
 
     def test_get_feature_names(self):
         from app.routes.explain import _get_feature_names
+
         names = _get_feature_names()
         assert isinstance(names, list)
         assert len(names) > 0
@@ -56,21 +61,25 @@ class TestSHAPHelperFunctions:
 
     def test_get_target_index_24h(self):
         from app.routes.explain import _get_target_index
+
         idx = _get_target_index("target_aqi_24h")
         assert idx == 0
 
     def test_get_target_index_48h(self):
         from app.routes.explain import _get_target_index
+
         idx = _get_target_index("target_aqi_48h")
         assert idx == 1
 
     def test_get_target_index_72h(self):
         from app.routes.explain import _get_target_index
+
         idx = _get_target_index("target_aqi_72h")
         assert idx == 2
 
     def test_get_target_index_unknown(self):
         from app.routes.explain import _get_target_index
+
         idx = _get_target_index("unknown_target")
         assert idx == 0  # Falls back to 0
 
@@ -93,6 +102,7 @@ class TestSHAPExplainer:
         # Fake XGBoost model that SHAP TreeExplainer can work with
         try:
             import xgboost as xgb
+
             # Train a tiny XGBoost for SHAP compatibility
             rng = np.random.RandomState(42)
             X = rng.randn(50, 3)
@@ -170,6 +180,7 @@ class TestAPIClientSHAP:
 
     def test_shap_explanation_mock(self):
         from app.frontend.utils.api_client import APIClient
+
         client = APIClient(mock_mode=True)
         result = client.get_shap_explanation({"pm25": 50.0})
         assert "base_value" in result
@@ -178,6 +189,7 @@ class TestAPIClientSHAP:
 
     def test_global_shap_mock(self):
         from app.frontend.utils.api_client import APIClient
+
         client = APIClient(mock_mode=True)
         result = client.get_global_shap(top_n=10)
         assert "features" in result

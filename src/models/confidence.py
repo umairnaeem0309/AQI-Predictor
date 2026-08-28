@@ -12,11 +12,11 @@ Method:
 3. At prediction time, apply the residual distribution to point predictions
 """
 
+import json
 import logging
 import os
-import json
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -52,7 +52,7 @@ def compute_residual_stats(
         "mean_residual": float(np.mean(residuals)),
         "std_residual": float(np.std(residuals)),
         "mae": float(np.mean(abs_residuals)),
-        "rmse": float(np.sqrt(np.mean(residuals ** 2))),
+        "rmse": float(np.sqrt(np.mean(residuals**2))),
         "median_abs_error": float(np.median(abs_residuals)),
         "n_samples": len(residuals),
     }
@@ -65,7 +65,9 @@ def compute_residual_stats(
 
         stats[f"interval_{int(level*100)}_lower"] = float(np.percentile(residuals, lower_q * 100))
         stats[f"interval_{int(level*100)}_upper"] = float(np.percentile(residuals, upper_q * 100))
-        stats[f"interval_{int(level*100)}_width"] = stats[f"interval_{int(level*100)}_upper"] - stats[f"interval_{int(level*100)}_lower"]
+        stats[f"interval_{int(level*100)}_width"] = (
+            stats[f"interval_{int(level*100)}_upper"] - stats[f"interval_{int(level*100)}_lower"]
+        )
 
     # Per-horizon stats (if 2D)
     if y_actual.ndim > 1 or (y_actual.ndim == 1 and len(y_actual.shape) > 0):
@@ -87,8 +89,12 @@ def compute_residual_stats(
             }
             for level in confidence_levels:
                 alpha = 1 - level
-                h_stats[f"interval_{int(level*100)}_lower"] = float(np.percentile(h_resid, alpha / 2 * 100))
-                h_stats[f"interval_{int(level*100)}_upper"] = float(np.percentile(h_resid, (1 - alpha / 2) * 100))
+                h_stats[f"interval_{int(level*100)}_lower"] = float(
+                    np.percentile(h_resid, alpha / 2 * 100)
+                )
+                h_stats[f"interval_{int(level*100)}_upper"] = float(
+                    np.percentile(h_resid, (1 - alpha / 2) * 100)
+                )
 
             stats["per_horizon"][h] = h_stats
 
@@ -160,13 +166,15 @@ def predict_with_confidence(
         for i, h in enumerate(["24h", "48h", "72h"]):
             if i < point_predictions.shape[1]:
                 pred_val = float(point_predictions[0, i])
-                result["intervals"].append({
-                    "horizon": h,
-                    "point_prediction": round(pred_val, 1),
-                    "lower": round(max(0, pred_val - interval_width), 1),
-                    "upper": round(pred_val + interval_width, 1),
-                    "width": round(interval_width * 2, 1),
-                })
+                result["intervals"].append(
+                    {
+                        "horizon": h,
+                        "point_prediction": round(pred_val, 1),
+                        "lower": round(max(0, pred_val - interval_width), 1),
+                        "upper": round(pred_val + interval_width, 1),
+                        "width": round(interval_width * 2, 1),
+                    }
+                )
 
         return result
 
@@ -201,12 +209,14 @@ def predict_with_confidence(
                 lower_offset = -stats.get("mae", 21.0) * 1.65
                 upper_offset = stats.get("mae", 21.0) * 1.65
 
-            result["intervals"].append({
-                "horizon": h,
-                "point_prediction": round(pred_val, 1),
-                "lower": round(max(0, pred_val + lower_offset), 1),
-                "upper": round(pred_val + upper_offset, 1),
-                "width": round(upper_offset - lower_offset, 1),
-            })
+            result["intervals"].append(
+                {
+                    "horizon": h,
+                    "point_prediction": round(pred_val, 1),
+                    "lower": round(max(0, pred_val + lower_offset), 1),
+                    "upper": round(pred_val + upper_offset, 1),
+                    "width": round(upper_offset - lower_offset, 1),
+                }
+            )
 
     return result

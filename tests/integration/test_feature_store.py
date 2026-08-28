@@ -5,12 +5,13 @@ Tests the complete flow: feature engineering → feature store insert → retrie
 Uses local store only (Hopsworks integration requires credentials).
 """
 
-import numpy as np
-import pandas as pd
-import pytest
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
 
 from src.feature_store.local_store import LocalStore
 from src.feature_store.schemas import (
@@ -19,7 +20,6 @@ from src.feature_store.schemas import (
     get_feature_group_name,
 )
 from src.features.feature_engineering import engineer_features
-
 
 # =============================================================================
 # Test Fixtures
@@ -41,27 +41,33 @@ def feature_engineered_data():
     """Feature-engineered dataset for 3 cities, 3 days."""
     base_time = datetime(2026, 8, 1, 0, 0, 0, tzinfo=timezone.utc)
     rows = []
-    for city_id, temp_base, aqi_base in [("karachi", 30, 100), ("lahore", 35, 160), ("islamabad", 28, 70)]:
+    for city_id, temp_base, aqi_base in [
+        ("karachi", 30, 100),
+        ("lahore", 35, 160),
+        ("islamabad", 28, 70),
+    ]:
         for i in range(72):  # 3 days
             ts = base_time + timedelta(hours=i)
-            rows.append({
-                "timestamp": ts,
-                "location_id": city_id,
-                "city_name": city_id.title(),
-                "temperature": temp_base + np.sin(i / 24 * 2 * np.pi) * 3 + np.random.randn(),
-                "humidity": 60 + np.random.randn() * 5,
-                "wind_speed": 3 + np.random.rand() * 3,
-                "pressure": 1010 + np.random.randn() * 2,
-                "aqi": aqi_base + np.sin(i / 48 * 2 * np.pi) * 20 + np.random.randn() * 5,
-                "pm25": 30 + np.random.rand() * 20,
-                "pm10": 50 + np.random.rand() * 25,
-                "co": 200 + np.random.rand() * 50,
-                "no2": 20 + np.random.rand() * 10,
-                "so2": 10 + np.random.rand() * 5,
-                "o3": 40 + np.random.rand() * 15,
-                "weather_condition": "clear",
-                "data_source": "openweather",
-            })
+            rows.append(
+                {
+                    "timestamp": ts,
+                    "location_id": city_id,
+                    "city_name": city_id.title(),
+                    "temperature": temp_base + np.sin(i / 24 * 2 * np.pi) * 3 + np.random.randn(),
+                    "humidity": 60 + np.random.randn() * 5,
+                    "wind_speed": 3 + np.random.rand() * 3,
+                    "pressure": 1010 + np.random.randn() * 2,
+                    "aqi": aqi_base + np.sin(i / 48 * 2 * np.pi) * 20 + np.random.randn() * 5,
+                    "pm25": 30 + np.random.rand() * 20,
+                    "pm10": 50 + np.random.rand() * 25,
+                    "co": 200 + np.random.rand() * 50,
+                    "no2": 20 + np.random.rand() * 10,
+                    "so2": 10 + np.random.rand() * 5,
+                    "o3": 40 + np.random.rand() * 15,
+                    "weather_condition": "clear",
+                    "data_source": "openweather",
+                }
+            )
     df = pd.DataFrame(rows)
     return engineer_features(df)
 
@@ -86,7 +92,9 @@ def synthetic_metadata():
 class TestFeatureStoreEndToEnd:
     """End-to-end feature store tests."""
 
-    def test_insert_and_retrieve_features(self, temp_store, feature_engineered_data, synthetic_metadata):
+    def test_insert_and_retrieve_features(
+        self, temp_store, feature_engineered_data, synthetic_metadata
+    ):
         """Features can be inserted and retrieved."""
         # Insert
         result = temp_store.insert_features(
@@ -122,7 +130,9 @@ class TestFeatureStoreEndToEnd:
         retrieved = temp_store.get_features("aqi_features_test")
         assert retrieved["location_id"].nunique() == 3
 
-    def test_lineage_metadata_complete(self, temp_store, feature_engineered_data, synthetic_metadata):
+    def test_lineage_metadata_complete(
+        self, temp_store, feature_engineered_data, synthetic_metadata
+    ):
         """Lineage metadata includes all required fields."""
         temp_store.insert_features(
             "aqi_features_test",

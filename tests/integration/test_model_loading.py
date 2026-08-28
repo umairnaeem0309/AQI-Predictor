@@ -5,18 +5,14 @@ Tests the full cycle of training, saving, loading, and predicting.
 """
 
 import tempfile
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.models.lifecycle import (
-    ModelState,
-    ModelLifecycle,
-    LifecycleTransitionError,
-)
+from src.models.lifecycle import LifecycleTransitionError, ModelLifecycle, ModelState
 from src.models.registry import ModelRegistry
 
 
@@ -35,6 +31,7 @@ class TestModelLoadingRoundTrip:
 
         # Save using joblib
         import joblib
+
         model_path = tmp_path / "test_model.joblib"
         joblib.dump(model, model_path)
 
@@ -49,8 +46,8 @@ class TestModelLoadingRoundTrip:
 
     def test_xgboost_model_save_and_load(self, tmp_path):
         """Test saving and loading an XGBoost model via joblib."""
-        import xgboost as xgb
         import joblib
+        import xgboost as xgb
 
         # Train small model
         X = np.random.randn(100, 5)
@@ -90,9 +87,16 @@ class TestModelLoadingRoundTrip:
         }
 
         required_keys = [
-            "model_name", "model_type", "version", "status",
-            "approval_status", "dataset_type", "feature_version",
-            "schema_version", "metrics", "creation_timestamp",
+            "model_name",
+            "model_type",
+            "version",
+            "status",
+            "approval_status",
+            "dataset_type",
+            "feature_version",
+            "schema_version",
+            "metrics",
+            "creation_timestamp",
         ]
 
         for key in required_keys:
@@ -104,10 +108,12 @@ class TestDriftBaselineRoundTrip:
 
     def test_drift_baseline_numerical(self):
         """Test drift baseline for numerical features."""
-        df = pd.DataFrame({
-            "temperature": np.random.randn(1000) * 10 + 30,
-            "humidity": np.random.randn(1000) * 5 + 60,
-        })
+        df = pd.DataFrame(
+            {
+                "temperature": np.random.randn(1000) * 10 + 30,
+                "humidity": np.random.randn(1000) * 5 + 60,
+            }
+        )
 
         baseline = {}
         for col in df.select_dtypes(include=[np.number]).columns:
@@ -167,8 +173,10 @@ class TestRegistryVersioning:
 
     def test_version_numbering(self, tmp_path):
         """Test that MLflow-based registry registers models correctly."""
-        import mlflow
         from pathlib import PureWindowsPath
+
+        import mlflow
+
         tracking_dir = str(tmp_path / "mlruns")
         # Use file:// URI for cross-platform compatibility (Windows paths with spaces)
         mlflow.set_tracking_uri(f"file:///{tracking_dir.replace(chr(92), '/').lstrip('/')}")
@@ -176,6 +184,7 @@ class TestRegistryVersioning:
         registry = ModelRegistry(experiment_name="test_versioning")
 
         from sklearn.linear_model import Ridge
+
         model = Ridge(alpha=1.0)
         X = np.random.randn(50, 3)
         y = np.random.randn(50)
@@ -187,7 +196,11 @@ class TestRegistryVersioning:
             model=model,
             metrics={"mae": 15.0},
             params={"alpha": 1.0},
-            dataset_metadata={"version": "v1", "type": "real_api_data", "approved": True},
+            dataset_metadata={
+                "version": "v1",
+                "type": "real_api_data",
+                "approved": True,
+            },
             feature_columns=["f1", "f2", "f3"],
         )
         assert run_id1 is not None
@@ -198,7 +211,11 @@ class TestRegistryVersioning:
             model=model,
             metrics={"mae": 12.0},
             params={"alpha": 0.5},
-            dataset_metadata={"version": "v2", "type": "real_api_data", "approved": True},
+            dataset_metadata={
+                "version": "v2",
+                "type": "real_api_data",
+                "approved": True,
+            },
             feature_columns=["f1", "f2", "f3"],
         )
         assert run_id2 is not None
@@ -207,6 +224,7 @@ class TestRegistryVersioning:
     def test_production_promotion_safety(self, tmp_path):
         """Test that production promotion rejects synthetic data."""
         import mlflow
+
         tracking_dir = str(tmp_path / "mlruns")
         mlflow.set_tracking_uri(f"file:///{tracking_dir.replace(chr(92), '/').lstrip('/')}")
 

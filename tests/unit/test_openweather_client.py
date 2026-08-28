@@ -7,22 +7,22 @@ Uses the `responses` library for HTTP mocking to test:
 - Error handling
 - Initialization without credentials
 """
+
+import json
+
+import pytest
+import responses
 import responses as _responses_mod
 from requests.exceptions import Timeout as RequestsTimeout
 
-import json
-import pytest
-import responses
-
-from src.data.openweather_client import OpenWeatherClient, _unix_to_utc
-from src.data.schemas import CityConfig, StandardObservation, DataSource
 from src.data.exceptions import (
-    APITimeoutError,
-    APINetworkError,
     APIAuthenticationError,
+    APINetworkError,
     APIRateLimitError,
+    APITimeoutError,
 )
-
+from src.data.openweather_client import OpenWeatherClient, _unix_to_utc
+from src.data.schemas import CityConfig, DataSource, StandardObservation
 
 # =============================================================================
 # Test Fixtures
@@ -138,9 +138,7 @@ class TestOpenWeatherParsing:
     def test_parse_weather_response(self, weather_response, city_config):
         """Parse valid weather response into StandardObservation."""
         client = OpenWeatherClient(api_key="test")
-        obs = client._parse_weather_response(
-            weather_response, "karachi", "Karachi"
-        )
+        obs = client._parse_weather_response(weather_response, "karachi", "Karachi")
         assert obs is not None
         assert obs.location_id == "karachi"
         assert obs.city_name == "Karachi"
@@ -207,9 +205,7 @@ class TestOpenWeatherMerging:
     def test_merge_with_pollution(self, weather_response):
         """Merge weather observation with pollution data."""
         client = OpenWeatherClient(api_key="test")
-        weather_obs = client._parse_weather_response(
-            weather_response, "karachi", "Karachi"
-        )
+        weather_obs = client._parse_weather_response(weather_response, "karachi", "Karachi")
         pollution_data = {"pm25": 55.8, "pm10": 78.2, "co": 230.5}
 
         merged = client._merge_observations(weather_obs, pollution_data)
@@ -221,9 +217,7 @@ class TestOpenWeatherMerging:
     def test_merge_without_pollution(self, weather_response):
         """Merge weather observation without pollution data."""
         client = OpenWeatherClient(api_key="test")
-        weather_obs = client._parse_weather_response(
-            weather_response, "karachi", "Karachi"
-        )
+        weather_obs = client._parse_weather_response(weather_response, "karachi", "Karachi")
 
         merged = client._merge_observations(weather_obs, None)
         assert merged is not None

@@ -7,7 +7,7 @@ This module fetches real-time data and engineers features on-the-fly.
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -32,6 +32,7 @@ def _load_model_features():
     if MODEL_FEATURES is None:
         import json
         from pathlib import Path
+
         meta_path = Path("models/production/model_metadata.json")
         if meta_path.exists():
             with open(meta_path) as f:
@@ -214,22 +215,24 @@ def fetch_historical_for_features(city_id: str, hours: int = 72) -> pd.DataFrame
         weather_hourly = weather_data.get("hourly", {})
         aq_hourly = aq_data.get("hourly", {})
 
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(weather_hourly.get("time", []), utc=True),
-            "temperature": weather_hourly.get("temperature_2m", []),
-            "humidity": weather_hourly.get("relative_humidity_2m", []),
-            "pressure": weather_hourly.get("surface_pressure", []),
-            "wind_speed": weather_hourly.get("wind_speed_10m", []),
-            "wind_direction": weather_hourly.get("wind_direction_10m", []),
-            "cloud_cover": weather_hourly.get("cloud_cover", []),
-            "precipitation": weather_hourly.get("precipitation", []),
-            "pm25": aq_hourly.get("pm2_5", []),
-            "pm10": aq_hourly.get("pm10", []),
-            "co": aq_hourly.get("carbon_monoxide", []),
-            "no2": aq_hourly.get("nitrogen_dioxide", []),
-            "so2": aq_hourly.get("sulphur_dioxide", []),
-            "o3": aq_hourly.get("ozone", []),
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(weather_hourly.get("time", []), utc=True),
+                "temperature": weather_hourly.get("temperature_2m", []),
+                "humidity": weather_hourly.get("relative_humidity_2m", []),
+                "pressure": weather_hourly.get("surface_pressure", []),
+                "wind_speed": weather_hourly.get("wind_speed_10m", []),
+                "wind_direction": weather_hourly.get("wind_direction_10m", []),
+                "cloud_cover": weather_hourly.get("cloud_cover", []),
+                "precipitation": weather_hourly.get("precipitation", []),
+                "pm25": aq_hourly.get("pm2_5", []),
+                "pm10": aq_hourly.get("pm10", []),
+                "co": aq_hourly.get("carbon_monoxide", []),
+                "no2": aq_hourly.get("nitrogen_dioxide", []),
+                "so2": aq_hourly.get("sulphur_dioxide", []),
+                "o3": aq_hourly.get("ozone", []),
+            }
+        )
 
         # Add location
         df["location_id"] = city_id
@@ -256,7 +259,11 @@ def build_features_for_prediction(city_id: str) -> Dict[str, float]:
     Returns:
         Dictionary of feature values matching model's expected format.
     """
-    from src.features.feature_engineering import add_time_features, add_lag_features, add_rolling_features
+    from src.features.feature_engineering import (
+        add_lag_features,
+        add_rolling_features,
+        add_time_features,
+    )
 
     model_features = _load_model_features()
     if not model_features:
@@ -275,7 +282,8 @@ def build_features_for_prediction(city_id: str) -> Dict[str, float]:
     hist_df = add_rolling_features(hist_df)
 
     # Calculate AQI from PM2.5 and PM10
-    from src.utils.epa_aqi import calculate_pm25_aqi, calculate_pm10_aqi
+    from src.utils.epa_aqi import calculate_pm10_aqi, calculate_pm25_aqi
+
     hist_df["pm25_aqi"] = hist_df["pm25"].apply(
         lambda x: calculate_pm25_aqi(x) if pd.notna(x) else None
     )
@@ -315,8 +323,8 @@ def get_live_prediction(city_id: str, model) -> Dict[str, Any]:
     Returns:
         Dictionary with prediction results.
     """
-    from src.utils.aqi_categories import get_aqi_category
     from src.models.confidence import predict_with_confidence
+    from src.utils.aqi_categories import get_aqi_category
 
     # Build features
     features = build_features_for_prediction(city_id)

@@ -36,8 +36,16 @@ class ModelState(Enum):
 VALID_TRANSITIONS = {
     ModelState.TRAINING: [ModelState.EVALUATED],
     ModelState.EVALUATED: [ModelState.REGISTERED, ModelState.REJECTED],
-    ModelState.REGISTERED: [ModelState.STAGING, ModelState.PRODUCTION, ModelState.ARCHIVED],
-    ModelState.STAGING: [ModelState.PRODUCTION, ModelState.ARCHIVED, ModelState.REJECTED],
+    ModelState.REGISTERED: [
+        ModelState.STAGING,
+        ModelState.PRODUCTION,
+        ModelState.ARCHIVED,
+    ],
+    ModelState.STAGING: [
+        ModelState.PRODUCTION,
+        ModelState.ARCHIVED,
+        ModelState.REJECTED,
+    ],
     ModelState.PRODUCTION: [ModelState.ARCHIVED],
     ModelState.ARCHIVED: [],  # Terminal state
     ModelState.REJECTED: [],  # Terminal state
@@ -49,11 +57,13 @@ REAL_DATA_REQUIRED_STATES = {ModelState.REGISTERED, ModelState.PRODUCTION}
 
 class LifecycleTransitionError(Exception):
     """Raised when an invalid lifecycle transition is attempted."""
+
     pass
 
 
 class LifecycleBlockError(Exception):
     """Raised when synthetic data is blocked from a state."""
+
     pass
 
 

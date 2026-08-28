@@ -56,12 +56,19 @@ class SelectionWeights:
     def __post_init__(self):
         """Validate weights sum to 1.0."""
         perf_total = self.rmse_weight + self.mae_weight + self.r2_weight
-        eng_total = (self.speed_weight + self.complexity_weight +
-                     self.maintainability_weight + self.deployment_weight)
-        assert abs(perf_total - 1.0) < 0.01, f"Performance weights must sum to 1.0, got {perf_total}"
+        eng_total = (
+            self.speed_weight
+            + self.complexity_weight
+            + self.maintainability_weight
+            + self.deployment_weight
+        )
+        assert (
+            abs(perf_total - 1.0) < 0.01
+        ), f"Performance weights must sum to 1.0, got {perf_total}"
         assert abs(eng_total - 1.0) < 0.01, f"Engineering weights must sum to 1.0, got {eng_total}"
-        assert abs(self.performance + self.engineering - 1.0) < 0.01, \
-            f"performance + engineering must sum to 1.0, got {self.performance + self.engineering}"
+        assert (
+            abs(self.performance + self.engineering - 1.0) < 0.01
+        ), f"performance + engineering must sum to 1.0, got {self.performance + self.engineering}"
 
 
 # =============================================================================
@@ -167,13 +174,13 @@ def compute_performance_score(
     # Normalize (RMSE/MAE: lower is better, R²: higher is better)
     # Use absolute values for normalization context
     rmse_norm = max(0, 1 - rmse / 200) if rmse != float("inf") else 0  # Assume 200 as max RMSE
-    mae_norm = max(0, 1 - mae / 150) if mae != float("inf") else 0    # Assume 150 as max MAE
+    mae_norm = max(0, 1 - mae / 150) if mae != float("inf") else 0  # Assume 150 as max MAE
     r2_norm = max(0, r2)  # R² already in [0, 1] range approximately
 
     score = (
-        weights.rmse_weight * rmse_norm +
-        weights.mae_weight * mae_norm +
-        weights.r2_weight * r2_norm
+        weights.rmse_weight * rmse_norm
+        + weights.mae_weight * mae_norm
+        + weights.r2_weight * r2_norm
     )
 
     return score
@@ -208,10 +215,10 @@ def compute_engineering_score(
     deployment_norm = 1.0 if evaluation.model_name in ["ridge", "random_forest"] else 0.7
 
     score = (
-        weights.speed_weight * speed_norm +
-        weights.complexity_weight * complexity_norm +
-        weights.maintainability_weight * maintainability_norm +
-        weights.deployment_weight * deployment_norm
+        weights.speed_weight * speed_norm
+        + weights.complexity_weight * complexity_norm
+        + weights.maintainability_weight * maintainability_norm
+        + weights.deployment_weight * deployment_norm
     )
 
     return score
@@ -334,6 +341,7 @@ def evaluate_by_horizon(
                 idx = target_cols.index(target_col)
                 if idx < y_pred.shape[1]:
                     from src.models.evaluation import compute_metrics
+
                     metrics = compute_metrics(y_single[target_col].values, y_pred[:, idx])
                     horizon_results[horizon] = metrics
 

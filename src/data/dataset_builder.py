@@ -19,9 +19,16 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from src.features.feature_engineering import engineer_features, FEATURE_VERSION, SCHEMA_VERSION
-from src.features.feature_validation import check_no_future_leakage, get_feature_availability
-from src.data.validators import full_validation, drop_duplicates
+from src.data.validators import drop_duplicates, full_validation
+from src.features.feature_engineering import (
+    FEATURE_VERSION,
+    SCHEMA_VERSION,
+    engineer_features,
+)
+from src.features.feature_validation import (
+    check_no_future_leakage,
+    get_feature_availability,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +251,11 @@ def build_dataset(
     if dataset_version is None:
         dataset_version = generate_dataset_version()
 
-    logger.info("Building dataset %s from %d observations", dataset_version, len(observations_df))
+    logger.info(
+        "Building dataset %s from %d observations",
+        dataset_version,
+        len(observations_df),
+    )
 
     # Step 1: Source quality metadata
     df = add_source_quality_metadata(observations_df)
@@ -257,11 +268,21 @@ def build_dataset(
 
     # Step 4: Target leakage validation
     feature_cols = [
-        c for c in df.columns
-        if c not in [
-            "timestamp", "location_id", "city_name", "data_source",
-            "raw_response_time", "weather_available", "aqi_available",
-            "sources_used", "target_aqi_24h", "target_aqi_48h", "target_aqi_72h",
+        c
+        for c in df.columns
+        if c
+        not in [
+            "timestamp",
+            "location_id",
+            "city_name",
+            "data_source",
+            "raw_response_time",
+            "weather_available",
+            "aqi_available",
+            "sources_used",
+            "target_aqi_24h",
+            "target_aqi_48h",
+            "target_aqi_72h",
         ]
     ]
     target_cols = [c for c in df.columns if c.startswith("target_")]
@@ -272,14 +293,19 @@ def build_dataset(
 
     # Step 6: Save datasets
     if save:
-        for split_name, split_df in [("train", train_df), ("val", val_df), ("test", test_df)]:
+        for split_name, split_df in [
+            ("train", train_df),
+            ("val", val_df),
+            ("test", test_df),
+        ]:
             features_file = PROCESSED_DIR / f"{split_name}_features.csv"
             targets_file = PROCESSED_DIR / f"{split_name}_targets.csv"
 
             # Separate features and targets
             feat_cols = [c for c in split_df.columns if not c.startswith("target_")]
             tgt_cols = [c for c in split_df.columns if c.startswith("target_")] + [
-                "timestamp", "location_id"
+                "timestamp",
+                "location_id",
             ]
 
             split_df[feat_cols].to_csv(features_file, index=False)
@@ -297,7 +323,7 @@ def build_dataset(
         "test_records": len(test_df),
         "feature_count": len(feature_cols),
         "target_count": len(target_cols),
-        "cities": df["location_id"].unique().tolist() if "location_id" in df.columns else [],
+        "cities": (df["location_id"].unique().tolist() if "location_id" in df.columns else []),
         "leakage_errors": leakage_errors,
         "quality_report": full_validation(df).__dict__,
         "dataset_type": "synthetic_test_data",

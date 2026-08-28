@@ -2,8 +2,9 @@
 Tests for batch predictions and AQI alerts.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from app.frontend.utils.api_client import APIClient
 
@@ -13,23 +14,25 @@ class TestBatchPredictions:
 
     def test_batch_request_model(self):
         from app.routes.batch import BatchPredictionRequest
+
         req = BatchPredictionRequest(cities=["karachi", "lahore"])
         assert len(req.cities) == 2
 
     def test_batch_request_max_cities(self):
         from app.routes.batch import BatchPredictionRequest
-        req = BatchPredictionRequest(
-            cities=["karachi"] * 10
-        )
+
+        req = BatchPredictionRequest(cities=["karachi"] * 10)
         assert len(req.cities) == 10
 
     def test_batch_request_too_many(self):
         from app.routes.batch import BatchPredictionRequest
+
         with pytest.raises(Exception):
             BatchPredictionRequest(cities=["karachi"] * 11)
 
     def test_batch_response_model(self):
         from app.routes.batch import BatchPredictionResponse
+
         resp = BatchPredictionResponse(
             predictions=[],
             total_cities=3,
@@ -46,6 +49,7 @@ class TestAQIAlerts:
 
     def test_get_aqi_category(self):
         from app.routes.monitoring import _get_aqi_category
+
         assert _get_aqi_category(25) == "Good"
         assert _get_aqi_category(75) == "Moderate"
         assert _get_aqi_category(120) == "Unhealthy for Sensitive Groups"
@@ -55,22 +59,26 @@ class TestAQIAlerts:
 
     def test_get_recommendation_good(self):
         from app.routes.monitoring import _get_recommendation
+
         rec = _get_recommendation(30)
         assert "satisfactory" in rec.lower()
 
     def test_get_recommendation_hazardous(self):
         from app.routes.monitoring import _get_recommendation
+
         rec = _get_recommendation(350)
         assert "emergency" in rec.lower()
         assert "avoid" in rec.lower()
 
     def test_get_recommendation_moderate(self):
         from app.routes.monitoring import _get_recommendation
+
         rec = _get_recommendation(75)
         assert "sensitive" in rec.lower() or "acceptable" in rec.lower()
 
     def test_aqi_category_boundary(self):
         from app.routes.monitoring import _get_aqi_category
+
         # Boundary values
         assert _get_aqi_category(0) == "Good"
         assert _get_aqi_category(50) == "Good"

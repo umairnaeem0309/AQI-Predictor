@@ -6,7 +6,6 @@ Centralized color scheme and styling for dashboard.
 
 from typing import Dict, Tuple
 
-
 # US EPA AQI Colors
 AQI_COLORS = {
     "good": "#00E400",
@@ -49,10 +48,10 @@ CITY_COLORS = {
 def get_aqi_color(aqi_value: int) -> str:
     """
     Get AQI color from value.
-    
+
     Args:
         aqi_value: AQI value (0-500)
-        
+
     Returns:
         Hex color string
     """
@@ -73,10 +72,10 @@ def get_aqi_color(aqi_value: int) -> str:
 def get_aqi_category(aqi_value: int) -> str:
     """
     Get AQI category name from value.
-    
+
     Args:
         aqi_value: AQI value (0-500)
-        
+
     Returns:
         Category name
     """
@@ -97,10 +96,10 @@ def get_aqi_category(aqi_value: int) -> str:
 def get_aqi_category_key(aqi_value: int) -> str:
     """
     Get AQI category key from value.
-    
+
     Args:
         aqi_value: AQI value (0-500)
-        
+
     Returns:
         Category key
     """
@@ -121,10 +120,10 @@ def get_aqi_category_key(aqi_value: int) -> str:
 def get_city_color(city: str) -> str:
     """
     Get color for a city.
-    
+
     Args:
         city: City name
-        
+
     Returns:
         Hex color string
     """

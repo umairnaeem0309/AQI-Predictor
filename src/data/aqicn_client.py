@@ -19,13 +19,8 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from src.data.base_client import BaseAPIClient
-from src.data.schemas import (
-    CityConfig,
-    AQICNResponse,
-    StandardObservation,
-    DataSource,
-)
 from src.data.exceptions import APIValidationError, StalenessWarning
+from src.data.schemas import AQICNResponse, CityConfig, DataSource, StandardObservation
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +109,8 @@ def _extract_iaqi_value(iaqi: Optional[Dict[str, Any]], key: str) -> Optional[fl
 # The ISO timestamp is authoritative; never use the Unix timestamp as primary
 # because AQICN encodes local clock time as if it were UTC.
 CITY_STATION_MAP = {
-    "karachi": "@11790",    # Karachi US Consulate, Pakistan (uid=11790)
-    "lahore": "@11765",     # Lahore US Embassy, Pakistan (uid=11765)
+    "karachi": "@11790",  # Karachi US Consulate, Pakistan (uid=11790)
+    "lahore": "@11765",  # Lahore US Embassy, Pakistan (uid=11765)
     "islamabad": "@11739",  # Islamabad US Embassy, Pakistan (uid=11739)
 }
 
@@ -311,7 +306,8 @@ class AQICNClient(BaseAPIClient):
             staleness_reason = staleness_warning
             logger.warning(
                 "AQICN observation for %s marked as NOT training-valid: %s",
-                city_id, staleness_reason,
+                city_id,
+                staleness_reason,
             )
 
         observation = StandardObservation(

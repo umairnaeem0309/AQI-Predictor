@@ -8,14 +8,14 @@ Tests use mocked clients to verify:
 - Error handling for both sources failing
 """
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from src.data.api_manager import APIManager
-from src.data.schemas import CityConfig, StandardObservation, DataSource
-from src.data.exceptions import APIClientError
+import pytest
 
+from src.data.api_manager import APIManager
+from src.data.exceptions import APIClientError
+from src.data.schemas import CityConfig, DataSource, StandardObservation
 
 # =============================================================================
 # Test Fixtures
@@ -262,13 +262,15 @@ class TestErrorHandling:
 
         aqicn_client = MagicMock()
         aqicn_client.api_key = "test"
-        aqicn_client.fetch_data.return_value = [StandardObservation(
-            timestamp=datetime.now(timezone.utc),
-            location_id="karachi",
-            city_name="Karachi",
-            aqi=100,
-            data_source="aqicn",
-        )]
+        aqicn_client.fetch_data.return_value = [
+            StandardObservation(
+                timestamp=datetime.now(timezone.utc),
+                location_id="karachi",
+                city_name="Karachi",
+                aqi=100,
+                data_source="aqicn",
+            )
+        ]
         aqicn_client.merge_with_openweather.return_value = StandardObservation(
             timestamp=datetime.now(timezone.utc),
             location_id="karachi",

@@ -19,10 +19,10 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from src.feature_store.schemas import (
-    FeatureGroupMetadata,
     DatasetMetadata,
-    LineageMetadata,
     DatasetType,
+    FeatureGroupMetadata,
+    LineageMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -217,6 +217,7 @@ class FeatureStoreInterface(ABC):
             LineageMetadata with all required fields.
         """
         from datetime import datetime, timezone
+
         return LineageMetadata(
             feature_version=feature_version,
             schema_version=schema_version,

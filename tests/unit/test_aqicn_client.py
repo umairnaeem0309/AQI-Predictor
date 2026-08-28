@@ -11,10 +11,13 @@ Uses the `responses` library for HTTP mocking to test:
 import pytest
 import responses
 
-from src.data.aqicn_client import AQICNClient, _parse_aqicn_timestamp, _extract_iaqi_value
-from src.data.schemas import CityConfig, StandardObservation, DataSource
+from src.data.aqicn_client import (
+    AQICNClient,
+    _extract_iaqi_value,
+    _parse_aqicn_timestamp,
+)
 from src.data.exceptions import APIAuthenticationError
-
+from src.data.schemas import CityConfig, DataSource, StandardObservation
 
 # =============================================================================
 # Test Fixtures
@@ -47,7 +50,9 @@ def aqicn_response_karachi():
 def openweather_obs():
     """Sample OpenWeather observation for Karachi."""
     return StandardObservation(
-        timestamp=__import__("datetime").datetime(2026, 7, 31, 7, 0, 0, tzinfo=__import__("datetime").timezone.utc),
+        timestamp=__import__("datetime").datetime(
+            2026, 7, 31, 7, 0, 0, tzinfo=__import__("datetime").timezone.utc
+        ),
         location_id="karachi",
         city_name="Karachi",
         temperature=34.5,
@@ -179,9 +184,7 @@ class TestAQICNParsing:
     def test_parse_valid_response(self, aqicn_response_karachi):
         """Parse valid AQICN response."""
         client = AQICNClient(api_key="test")
-        observations = client._parse_response(
-            aqicn_response_karachi, city_id="karachi"
-        )
+        observations = client._parse_response(aqicn_response_karachi, city_id="karachi")
         assert len(observations) == 1
         obs = observations[0]
         assert obs.aqi == 168
@@ -193,9 +196,7 @@ class TestAQICNParsing:
     def test_parse_response_weather_fields_none(self, aqicn_response_karachi):
         """Weather fields are None in AQICN response."""
         client = AQICNClient(api_key="test")
-        observations = client._parse_response(
-            aqicn_response_karachi, city_id="karachi"
-        )
+        observations = client._parse_response(aqicn_response_karachi, city_id="karachi")
         obs = observations[0]
         assert obs.temperature is None
         assert obs.humidity is None
@@ -206,9 +207,7 @@ class TestAQICNParsing:
     def test_parse_response_empty_data(self):
         """Parse response with empty data — returns observation with None values."""
         client = AQICNClient(api_key="test")
-        observations = client._parse_response(
-            {"status": "ok", "data": {}}, city_id="karachi"
-        )
+        observations = client._parse_response({"status": "ok", "data": {}}, city_id="karachi")
         assert len(observations) == 1
         assert observations[0].aqi is None
 
@@ -239,6 +238,7 @@ class TestAQICNStaleness:
         """Fresh data produces no staleness warning."""
         client = AQICNClient(api_key="test", max_staleness_hours=2.0)
         import time
+
         now_v = int(time.time())
         time_data = {"v": now_v}
         warning = client._check_staleness(time_data)
@@ -248,6 +248,7 @@ class TestAQICNStaleness:
         """Stale data produces staleness warning."""
         client = AQICNClient(api_key="test", max_staleness_hours=1.0)
         import time
+
         old_v = int(time.time()) - 7200  # 2 hours ago
         time_data = {"v": old_v}
         warning = client._check_staleness(time_data)
@@ -309,9 +310,7 @@ class TestAQICNMerge:
     def test_merge_takes_aqicn_pollution(self, aqicn_response_karachi, openweather_obs):
         """Merge uses AQICN pollution values (authoritative)."""
         client = AQICNClient(api_key="test")
-        aqicn_obs = client._parse_response(
-            aqicn_response_karachi, city_id="karachi"
-        )[0]
+        aqicn_obs = client._parse_response(aqicn_response_karachi, city_id="karachi")[0]
 
         merged = client.merge_with_openweather(aqicn_obs, openweather_obs)
 

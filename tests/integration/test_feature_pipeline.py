@@ -6,21 +6,21 @@ Uses mock data (API-shaped) to verify pipeline correctness without
 requiring real API credentials.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timedelta, timezone
 
 from src.features.feature_engineering import (
+    FEATURE_VERSION,
     engineer_features,
     get_feature_metadata,
-    FEATURE_VERSION,
 )
 from src.features.feature_validation import (
     full_feature_validation,
     get_feature_availability,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -44,24 +44,28 @@ def mock_raw_observations():
     ]:
         for i in range(168):  # 7 days of hourly data
             ts = base_time + timedelta(hours=i)
-            rows.append({
-                "timestamp": ts,
-                "location_id": city_id,
-                "city_name": city_name,
-                "temperature": temp_base + np.sin(i / 24 * 2 * np.pi) * 5 + np.random.randn() * 2,
-                "humidity": 60 + np.cos(i / 24 * 2 * np.pi) * 15 + np.random.randn() * 5,
-                "wind_speed": 3 + np.random.rand() * 4,
-                "pressure": 1010 + np.random.randn() * 5,
-                "aqi": aqi_base + np.sin(i / 48 * 2 * np.pi) * 30 + np.random.randn() * 10,
-                "pm25": 40 + np.random.rand() * 30,
-                "pm10": 60 + np.random.rand() * 40,
-                "co": 200 + np.random.rand() * 100,
-                "no2": 20 + np.random.rand() * 20,
-                "so2": 10 + np.random.rand() * 10,
-                "o3": 40 + np.random.rand() * 30,
-                "weather_condition": ["clear"] * 1,
-                "data_source": ["openweather"] * 1,
-            })
+            rows.append(
+                {
+                    "timestamp": ts,
+                    "location_id": city_id,
+                    "city_name": city_name,
+                    "temperature": temp_base
+                    + np.sin(i / 24 * 2 * np.pi) * 5
+                    + np.random.randn() * 2,
+                    "humidity": 60 + np.cos(i / 24 * 2 * np.pi) * 15 + np.random.randn() * 5,
+                    "wind_speed": 3 + np.random.rand() * 4,
+                    "pressure": 1010 + np.random.randn() * 5,
+                    "aqi": aqi_base + np.sin(i / 48 * 2 * np.pi) * 30 + np.random.randn() * 10,
+                    "pm25": 40 + np.random.rand() * 30,
+                    "pm10": 60 + np.random.rand() * 40,
+                    "co": 200 + np.random.rand() * 100,
+                    "no2": 20 + np.random.rand() * 20,
+                    "so2": 10 + np.random.rand() * 10,
+                    "o3": 40 + np.random.rand() * 30,
+                    "weather_condition": ["clear"] * 1,
+                    "data_source": ["openweather"] * 1,
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -137,8 +141,17 @@ class TestFeaturePipelineEndToEnd:
 
         # Check that all feature columns have availability docs
         feature_cols = [
-            c for c in result.columns
-            if c not in ["timestamp", "location_id", "city_name", "data_source", "weather_condition", "raw_response_time"]
+            c
+            for c in result.columns
+            if c
+            not in [
+                "timestamp",
+                "location_id",
+                "city_name",
+                "data_source",
+                "weather_condition",
+                "raw_response_time",
+            ]
         ]
         for col in feature_cols:
             assert col in availability, f"Feature {col} missing from availability documentation"
@@ -162,16 +175,18 @@ class TestFeaturePipelineEndToEnd:
     def test_pipeline_with_minimal_data(self):
         """Pipeline works with minimal data (single city, few hours)."""
         base_time = datetime(2026, 8, 1, 0, 0, 0, tzinfo=timezone.utc)
-        df = pd.DataFrame({
-            "timestamp": [base_time + timedelta(hours=i) for i in range(10)],
-            "location_id": ["karachi"] * 10,
-            "city_name": ["Karachi"] * 10,
-            "aqi": range(100, 110),
-            "temperature": [30.0] * 10,
-            "humidity": [60.0] * 10,
-            "pm25": [40.0] * 10,
-            "data_source": ["openweather"] * 10,
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [base_time + timedelta(hours=i) for i in range(10)],
+                "location_id": ["karachi"] * 10,
+                "city_name": ["Karachi"] * 10,
+                "aqi": range(100, 110),
+                "temperature": [30.0] * 10,
+                "humidity": [60.0] * 10,
+                "pm25": [40.0] * 10,
+                "data_source": ["openweather"] * 10,
+            }
+        )
 
         result = engineer_features(df)
         assert len(result) == 10

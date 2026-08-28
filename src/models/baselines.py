@@ -15,8 +15,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from src.models.evaluation import compare_models, evaluate_model
 from src.models.training import get_model, train_model
-from src.models.evaluation import evaluate_model, compare_models
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,10 @@ def train_baseline(
     """
     return train_model(
         "ridge",
-        X_train, y_train,
-        X_val, y_val,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
         params={"alpha": alpha},
         random_seed=random_seed,
     )
@@ -74,8 +76,12 @@ def train_all_baselines(
 
     for alpha in [0.1, 1.0, 10.0, 100.0]:
         result = train_baseline(
-            X_train, y_train, X_val, y_val,
-            alpha=alpha, random_seed=random_seed,
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+            alpha=alpha,
+            random_seed=random_seed,
         )
         result["model_name"] = f"ridge_alpha_{alpha}"
         results.append(result)

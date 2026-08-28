@@ -22,10 +22,10 @@ from src.config import PROJECT_ROOT
 from src.feature_store.base import FeatureStoreInterface
 from src.feature_store.schemas import (
     DatasetMetadata,
+    DatasetType,
     FeatureGroupMetadata,
     FeatureSchema,
     LineageMetadata,
-    DatasetType,
 )
 
 logger = logging.getLogger(__name__)
@@ -135,9 +135,7 @@ class LocalStore(FeatureStoreInterface):
 
             # Build and save lineage
             lineage = self._build_lineage(metadata, "1.0.0", "1.0")
-            self._save_metadata(
-                feature_group_name, version, metadata, lineage, len(df)
-            )
+            self._save_metadata(feature_group_name, version, metadata, lineage, len(df))
 
             logger.info(
                 "Inserted %d records into %s (v%d)",
@@ -148,9 +146,7 @@ class LocalStore(FeatureStoreInterface):
             return True
 
         except Exception as e:
-            logger.error(
-                "Failed to insert into %s: %s", feature_group_name, str(e)
-            )
+            logger.error("Failed to insert into %s: %s", feature_group_name, str(e))
             return False
 
     def insert_targets(
@@ -180,9 +176,7 @@ class LocalStore(FeatureStoreInterface):
             df.to_parquet(parquet_path, index=False, engine="pyarrow")
 
             lineage = self._build_lineage(metadata, "1.0.0", "1.0")
-            self._save_metadata(
-                target_group_name, version, metadata, lineage, len(df)
-            )
+            self._save_metadata(target_group_name, version, metadata, lineage, len(df))
 
             logger.info(
                 "Inserted %d targets into %s (v%d)",
@@ -193,9 +187,7 @@ class LocalStore(FeatureStoreInterface):
             return True
 
         except Exception as e:
-            logger.error(
-                "Failed to insert targets into %s: %s", target_group_name, str(e)
-            )
+            logger.error("Failed to insert targets into %s: %s", target_group_name, str(e))
             return False
 
     def get_features(
@@ -217,9 +209,7 @@ class LocalStore(FeatureStoreInterface):
         parquet_path = self._get_parquet_path(feature_group_name, version)
 
         if not parquet_path.exists():
-            logger.warning(
-                "Feature group %s v%d not found", feature_group_name, version
-            )
+            logger.warning("Feature group %s v%d not found", feature_group_name, version)
             return pd.DataFrame()
 
         try:
@@ -237,9 +227,7 @@ class LocalStore(FeatureStoreInterface):
             return df
 
         except Exception as e:
-            logger.error(
-                "Failed to retrieve from %s: %s", feature_group_name, str(e)
-            )
+            logger.error("Failed to retrieve from %s: %s", feature_group_name, str(e))
             return pd.DataFrame()
 
     def get_targets(

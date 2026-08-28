@@ -59,7 +59,9 @@ class DatasetMetadata(BaseModel):
     dataset_version: str = Field(..., description="Dataset version identifier")
     dataset_type: DatasetType = Field(..., description="Type of dataset")
     approved_for_training: bool = Field(False, description="Whether approved for model training")
-    approved_for_evaluation: bool = Field(False, description="Whether approved for model evaluation")
+    approved_for_evaluation: bool = Field(
+        False, description="Whether approved for model evaluation"
+    )
     source: Optional[str] = Field(None, description="Data source (e.g., openweather, synthetic)")
     generation_timestamp: Optional[str] = Field(None, description="When dataset was generated")
     record_count: Optional[int] = Field(None, description="Number of records")
@@ -84,7 +86,9 @@ class FeatureGroupMetadata(BaseModel):
     schema: FeatureSchema = Field(..., description="Feature schema")
     lineage: Optional[LineageMetadata] = Field(None, description="Lineage tracking")
     description: Optional[str] = Field(None, description="Description")
-    online_enabled: bool = Field(False, description="Whether online store is enabled (offline only initially)")
+    online_enabled: bool = Field(
+        False, description="Whether online store is enabled (offline only initially)"
+    )
 
     class Config:
         use_enum_values = True
@@ -96,8 +100,19 @@ class FeatureGroupMetadata(BaseModel):
 
 # Standard feature columns for AQI features
 AQI_FEATURE_COLUMNS = [
-    FeatureColumn(name="location_id", dtype="string", is_primary_key=True, description="City identifier"),
-    FeatureColumn(name="timestamp", dtype="timestamp", is_event_time=True, is_primary_key=True, description="Observation time (UTC)"),
+    FeatureColumn(
+        name="location_id",
+        dtype="string",
+        is_primary_key=True,
+        description="City identifier",
+    ),
+    FeatureColumn(
+        name="timestamp",
+        dtype="timestamp",
+        is_event_time=True,
+        is_primary_key=True,
+        description="Observation time (UTC)",
+    ),
     FeatureColumn(name="city_name", dtype="string", description="City name"),
     FeatureColumn(name="temperature", dtype="float", description="Temperature (°C)"),
     FeatureColumn(name="humidity", dtype="float", description="Relative humidity (%)"),
@@ -118,7 +133,11 @@ AQI_FEATURE_COLUMNS = [
     FeatureColumn(name="hour", dtype="int", description="Hour of day (0-23)"),
     FeatureColumn(name="day_of_week", dtype="int", description="Day of week (0=Mon, 6=Sun)"),
     FeatureColumn(name="month", dtype="int", description="Month (1-12)"),
-    FeatureColumn(name="season", dtype="int", description="Season (0=Winter, 1=Spring, 2=Summer, 3=Fall)"),
+    FeatureColumn(
+        name="season",
+        dtype="int",
+        description="Season (0=Winter, 1=Spring, 2=Summer, 3=Fall)",
+    ),
     FeatureColumn(name="is_weekend", dtype="int", description="Weekend flag"),
     FeatureColumn(name="hour_sin", dtype="float", description="Cyclical hour encoding (sin)"),
     FeatureColumn(name="hour_cos", dtype="float", description="Cyclical hour encoding (cos)"),
@@ -132,7 +151,11 @@ AQI_FEATURE_COLUMNS = [
     FeatureColumn(name="pm25_lag_1h", dtype="float", description="PM2.5 1 hour ago"),
     FeatureColumn(name="pm25_lag_24h", dtype="float", description="PM2.5 24 hours ago"),
     FeatureColumn(name="temperature_lag_1h", dtype="float", description="Temperature 1 hour ago"),
-    FeatureColumn(name="temperature_lag_24h", dtype="float", description="Temperature 24 hours ago"),
+    FeatureColumn(
+        name="temperature_lag_24h",
+        dtype="float",
+        description="Temperature 24 hours ago",
+    ),
     FeatureColumn(name="humidity_lag_1h", dtype="float", description="Humidity 1 hour ago"),
     FeatureColumn(name="humidity_lag_24h", dtype="float", description="Humidity 24 hours ago"),
     # Rolling features
@@ -144,8 +167,16 @@ AQI_FEATURE_COLUMNS = [
     FeatureColumn(name="aqi_rolling_max_24h", dtype="float", description="AQI max over 24h"),
     FeatureColumn(name="pm25_rolling_mean_6h", dtype="float", description="PM2.5 mean over 6h"),
     FeatureColumn(name="pm25_rolling_mean_24h", dtype="float", description="PM2.5 mean over 24h"),
-    FeatureColumn(name="temperature_rolling_mean_24h", dtype="float", description="Temperature mean over 24h"),
-    FeatureColumn(name="humidity_rolling_mean_24h", dtype="float", description="Humidity mean over 24h"),
+    FeatureColumn(
+        name="temperature_rolling_mean_24h",
+        dtype="float",
+        description="Temperature mean over 24h",
+    ),
+    FeatureColumn(
+        name="humidity_rolling_mean_24h",
+        dtype="float",
+        description="Humidity mean over 24h",
+    ),
     # Derived features
     FeatureColumn(name="aqi_change_rate_1h", dtype="float", description="AQI change per hour"),
     FeatureColumn(name="aqi_change_rate_6h", dtype="float", description="AQI change per 6h"),
@@ -154,9 +185,17 @@ AQI_FEATURE_COLUMNS = [
     FeatureColumn(name="pm25_pm10_ratio", dtype="float", description="PM2.5/PM10 ratio"),
     FeatureColumn(name="no2_so2_ratio", dtype="float", description="NO2/SO2 ratio"),
     FeatureColumn(name="o3_no2_ratio", dtype="float", description="O3/NO2 ratio"),
-    FeatureColumn(name="temp_humidity_interaction", dtype="float", description="Temperature × humidity"),
+    FeatureColumn(
+        name="temp_humidity_interaction",
+        dtype="float",
+        description="Temperature × humidity",
+    ),
     FeatureColumn(name="wind_cooling_effect", dtype="float", description="Wind chill effect"),
-    FeatureColumn(name="aqi_deviation_from_24h_avg", dtype="float", description="AQI deviation from daily avg"),
+    FeatureColumn(
+        name="aqi_deviation_from_24h_avg",
+        dtype="float",
+        description="AQI deviation from daily avg",
+    ),
 ]
 
 # Target columns

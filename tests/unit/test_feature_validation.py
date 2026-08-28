@@ -9,24 +9,24 @@ Tests cover:
 - Full validation pipeline
 """
 
+from datetime import datetime, timedelta, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timedelta, timezone
 
-from src.features.feature_validation import (
-    check_no_future_leakage,
-    validate_lag_features,
-    validate_rolling_features,
-    get_feature_availability,
-    full_feature_validation,
-)
 from src.features.feature_engineering import (
     add_lag_features,
     add_rolling_features,
     add_time_features,
 )
-
+from src.features.feature_validation import (
+    check_no_future_leakage,
+    full_feature_validation,
+    get_feature_availability,
+    validate_lag_features,
+    validate_rolling_features,
+)
 
 # =============================================================================
 # Test Fixtures
@@ -42,14 +42,16 @@ def clean_hourly_data():
     np.random.seed(42)
     aqi_values = 100 + np.cumsum(np.random.randn(96) * 5)
 
-    df = pd.DataFrame({
-        "timestamp": timestamps,
-        "location_id": ["karachi"] * 96,
-        "aqi": aqi_values,
-        "pm25": 40 + np.random.rand(96) * 30,
-        "temperature": 30 + np.random.randn(96) * 3,
-        "humidity": 60 + np.random.randn(96) * 10,
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "location_id": ["karachi"] * 96,
+            "aqi": aqi_values,
+            "pm25": 40 + np.random.rand(96) * 30,
+            "temperature": 30 + np.random.randn(96) * 3,
+            "humidity": 60 + np.random.randn(96) * 10,
+        }
+    )
 
     df = add_lag_features(df, columns=["aqi"], lag_hours=[1, 24])
     df = add_rolling_features(df, columns=["aqi"], windows={"aqi": [("24h", "mean")]})
@@ -62,11 +64,13 @@ def data_with_leakage():
     base_time = datetime(2026, 8, 1, 0, 0, 0, tzinfo=timezone.utc)
     timestamps = [base_time + timedelta(hours=i) for i in range(10)]
 
-    df = pd.DataFrame({
-        "timestamp": timestamps,
-        "location_id": ["karachi"] * 10,
-        "aqi": [100, 110, 120, 130, 140, 150, 160, 170, 180, 190],
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "location_id": ["karachi"] * 10,
+            "aqi": [100, 110, 120, 130, 140, 150, 160, 170, 180, 190],
+        }
+    )
 
     # Create a lag feature with incorrect values (simulating leakage)
     # Position 0 should have NaN for lag_1h, but we set it to a future value
@@ -158,22 +162,37 @@ class TestRollingValidation:
 
     def test_rolling_std_non_negative(self):
         """Rolling std is validated as non-negative."""
-        df = pd.DataFrame({
-            "location_id": ["k"] * 10,
-            "timestamp": pd.date_range("2026-08-01", periods=10, freq="h", tz="UTC"),
-            "aqi_rolling_std_24h": [1.0, 2.0, 3.0, -1.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
-        })
+        df = pd.DataFrame(
+            {
+                "location_id": ["k"] * 10,
+                "timestamp": pd.date_range("2026-08-01", periods=10, freq="h", tz="UTC"),
+                "aqi_rolling_std_24h": [
+                    1.0,
+                    2.0,
+                    3.0,
+                    -1.0,
+                    5.0,
+                    6.0,
+                    7.0,
+                    8.0,
+                    9.0,
+                    10.0,
+                ],
+            }
+        )
         results = validate_rolling_features(df, rolling_columns=["aqi_rolling_std_24h"])
         assert results["aqi_rolling_std_24h"] is False
 
     def test_min_greater_than_max(self):
         """Rolling min > max is detected."""
-        df = pd.DataFrame({
-            "location_id": ["k"] * 10,
-            "timestamp": pd.date_range("2026-08-01", periods=10, freq="h", tz="UTC"),
-            "aqi_rolling_min_24h": [100.0] * 10,
-            "aqi_rolling_max_24h": [50.0] * 10,  # Min > Max!
-        })
+        df = pd.DataFrame(
+            {
+                "location_id": ["k"] * 10,
+                "timestamp": pd.date_range("2026-08-01", periods=10, freq="h", tz="UTC"),
+                "aqi_rolling_min_24h": [100.0] * 10,
+                "aqi_rolling_max_24h": [50.0] * 10,  # Min > Max!
+            }
+        )
         results = validate_rolling_features(
             df, rolling_columns=["aqi_rolling_min_24h", "aqi_rolling_max_24h"]
         )
@@ -214,11 +233,19 @@ class TestFeatureAvailability:
         """All expected features have availability documentation."""
         availability = get_feature_availability()
         expected_features = [
-            "hour", "day_of_week", "month", "season",
-            "aqi_lag_1h", "aqi_lag_24h", "aqi_lag_72h",
+            "hour",
+            "day_of_week",
+            "month",
+            "season",
+            "aqi_lag_1h",
+            "aqi_lag_24h",
+            "aqi_lag_72h",
             "aqi_rolling_mean_24h",
-            "aqi_change_rate_1h", "pm25_pm10_ratio",
-            "aqi", "temperature", "humidity",
+            "aqi_change_rate_1h",
+            "pm25_pm10_ratio",
+            "aqi",
+            "temperature",
+            "humidity",
         ]
         for feat in expected_features:
             assert feat in availability, f"Feature {feat} missing from availability docs"

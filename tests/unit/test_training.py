@@ -2,19 +2,19 @@
 Tests for ML training pipeline — data safety and model training.
 """
 
+from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timezone
 
+from src.feature_store.schemas import DatasetMetadata, DatasetType
 from src.models.training import (
-    validate_training_data,
+    TARGET_COLUMNS,
     get_model,
     train_model,
-    TARGET_COLUMNS,
+    validate_training_data,
 )
-from src.feature_store.schemas import DatasetMetadata, DatasetType
-
 
 # =============================================================================
 # Test Fixtures
@@ -48,18 +48,22 @@ def sample_training_data():
     """Sample training data for tests."""
     np.random.seed(42)
     n = 200
-    X = pd.DataFrame({
-        "aqi_lag_1h": np.random.randn(n) * 20 + 100,
-        "aqi_lag_24h": np.random.randn(n) * 20 + 100,
-        "temperature": np.random.randn(n) * 5 + 30,
-        "humidity": np.random.randn(n) * 10 + 60,
-        "pm25": np.random.rand(n) * 30 + 30,
-    })
-    y = pd.DataFrame({
-        "target_aqi_24h": X["aqi_lag_1h"] + np.random.randn(n) * 5,
-        "target_aqi_48h": X["aqi_lag_24h"] + np.random.randn(n) * 10,
-        "target_aqi_72h": X["aqi_lag_24h"] + np.random.randn(n) * 15,
-    })
+    X = pd.DataFrame(
+        {
+            "aqi_lag_1h": np.random.randn(n) * 20 + 100,
+            "aqi_lag_24h": np.random.randn(n) * 20 + 100,
+            "temperature": np.random.randn(n) * 5 + 30,
+            "humidity": np.random.randn(n) * 10 + 60,
+            "pm25": np.random.rand(n) * 30 + 30,
+        }
+    )
+    y = pd.DataFrame(
+        {
+            "target_aqi_24h": X["aqi_lag_1h"] + np.random.randn(n) * 5,
+            "target_aqi_48h": X["aqi_lag_24h"] + np.random.randn(n) * 10,
+            "target_aqi_72h": X["aqi_lag_24h"] + np.random.randn(n) * 15,
+        }
+    )
     return X, y
 
 

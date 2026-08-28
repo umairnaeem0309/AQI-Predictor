@@ -8,16 +8,16 @@ Provides:
 - Factory function: get_feature_store()
 """
 
-import os
 import logging
+import os
 
 from src.feature_store.base import FeatureStoreInterface
 from src.feature_store.local_store import LocalStore
 from src.feature_store.schemas import (
     DatasetMetadata,
     DatasetType,
-    FeatureSchema,
     FeatureGroupMetadata,
+    FeatureSchema,
     LineageMetadata,
     get_feature_group_name,
 )
@@ -58,7 +58,8 @@ def get_feature_store(
 
     # Try Hopsworks
     try:
-        from src.feature_store.hopsworks_store import HopsworksStore, ConfigurationError
+        from src.feature_store.hopsworks_store import ConfigurationError, HopsworksStore
+
         store = HopsworksStore()
         store.connect()
         logger.info("Connected to Hopsworks feature store")

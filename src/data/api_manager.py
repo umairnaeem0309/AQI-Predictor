@@ -21,12 +21,12 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from src.config import PROJECT_ROOT, get_api_key, mask_key
-from src.data.openweather_client import OpenWeatherClient
 from src.data.aqicn_client import AQICNClient
-from src.data.schemas import CityConfig, StandardObservation, DataSource
-from src.data.validators import full_validation, drop_duplicates
 from src.data.exceptions import APIClientError
 from src.data.nowcast_history import NowCastHistoryManager
+from src.data.openweather_client import OpenWeatherClient
+from src.data.schemas import CityConfig, DataSource, StandardObservation
+from src.data.validators import drop_duplicates, full_validation
 
 logger = logging.getLogger(__name__)
 
@@ -162,9 +162,7 @@ class APIManager:
                     openweather_obs.humidity,
                 )
         except APIClientError as e:
-            logger.warning(
-                "OpenWeather failed for %s: %s", city_config.name, str(e)
-            )
+            logger.warning("OpenWeather failed for %s: %s", city_config.name, str(e))
         except Exception as e:
             logger.error(
                 "Unexpected error from OpenWeather for %s: %s",
@@ -185,9 +183,7 @@ class APIManager:
                     aqicn_obs.aqi,
                 )
         except APIClientError as e:
-            logger.warning(
-                "AQICN failed for %s: %s", city_config.name, str(e)
-            )
+            logger.warning("AQICN failed for %s: %s", city_config.name, str(e))
         except Exception as e:
             logger.error(
                 "Unexpected error from AQICN for %s: %s",
@@ -199,16 +195,18 @@ class APIManager:
         merged = self._merge_sources(openweather_obs, aqicn_obs, city_config)
 
         if merged is None:
-            logger.error(
-                "All sources failed for %s — no data available", city_config.name
-            )
+            logger.error("All sources failed for %s — no data available", city_config.name)
             return None
 
         # Update NowCast history with new observation
         if merged.pm25 is not None or merged.pm10 is not None:
             self._nowcast_history.add_observation(
                 city_id=city_config.id,
-                timestamp=str(merged.timestamp) if merged.timestamp else datetime.now(timezone.utc).isoformat(),
+                timestamp=(
+                    str(merged.timestamp)
+                    if merged.timestamp
+                    else datetime.now(timezone.utc).isoformat()
+                ),
                 pm25=merged.pm25,
                 pm10=merged.pm10,
             )
@@ -409,9 +407,7 @@ class APIManager:
             from src.config import load_config
 
             config = load_config()
-            city_configs = [
-                CityConfig(**city) for city in config.get("cities", [])
-            ]
+            city_configs = [CityConfig(**city) for city in config.get("cities", [])]
 
         observations = []
         for city in city_configs:

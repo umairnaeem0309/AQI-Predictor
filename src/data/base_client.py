@@ -19,13 +19,13 @@ from typing import Any, Dict, Optional
 import requests
 
 from src.data.exceptions import (
+    APIAuthenticationError,
     APIClientError,
+    APINetworkError,
     APIRateLimitError,
+    APIRequestError,
     APIServerError,
     APITimeoutError,
-    APINetworkError,
-    APIAuthenticationError,
-    APIRequestError,
     APIValidationError,
 )
 
@@ -198,10 +198,15 @@ class BaseAPIClient(ABC):
         for attempt in range(self.max_retries):
             try:
                 return self._make_request(endpoint, params)
-            except (APINetworkError, APITimeoutError, APIRateLimitError, APIServerError) as e:
+            except (
+                APINetworkError,
+                APITimeoutError,
+                APIRateLimitError,
+                APIServerError,
+            ) as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    delay = self.retry_backoff_base * (2 ** attempt)
+                    delay = self.retry_backoff_base * (2**attempt)
                     logger.warning(
                         "Request attempt %d/%d failed: %s. Retrying in %.1fs...",
                         attempt + 1,
@@ -224,9 +229,7 @@ class BaseAPIClient(ABC):
         raise last_exception
 
     @abstractmethod
-    def _parse_response(
-        self, raw_json: Dict[str, Any], **kwargs
-    ):
+    def _parse_response(self, raw_json: Dict[str, Any], **kwargs):
         """Transform raw API JSON into StandardObservation(s).
 
         Subclasses must implement this to handle their specific
@@ -298,9 +301,7 @@ class BaseAPIClient(ABC):
         if not self._validate_response(raw_json):
             from src.data.exceptions import APIValidationError
 
-            raise APIValidationError(
-                f"Response validation failed for {endpoint}"
-            )
+            raise APIValidationError(f"Response validation failed for {endpoint}")
 
         observations = self._parse_response(raw_json, **kwargs)
 

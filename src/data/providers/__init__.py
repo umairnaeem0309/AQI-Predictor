@@ -15,8 +15,8 @@ Providers do NOT contain:
 """
 
 from src.data.providers.base_provider import BaseHistoricalProvider
-from src.data.providers.open_meteo_weather import OpenMeteoWeatherProvider
 from src.data.providers.open_meteo_air_quality import OpenMeteoAirQualityProvider
+from src.data.providers.open_meteo_weather import OpenMeteoWeatherProvider
 
 __all__ = [
     "BaseHistoricalProvider",

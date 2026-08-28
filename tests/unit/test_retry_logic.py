@@ -10,21 +10,21 @@ Tests cover:
 """
 
 import time
+
 import pytest
 import responses
 from requests.exceptions import Timeout as RequestsTimeout
 
 from src.data.base_client import BaseAPIClient
 from src.data.exceptions import (
-    APITimeoutError,
-    APINetworkError,
     APIAuthenticationError,
+    APINetworkError,
     APIRateLimitError,
-    APIServerError,
     APIRequestError,
+    APIServerError,
+    APITimeoutError,
     APIValidationError,
 )
-
 
 # =============================================================================
 # Concrete Test Client

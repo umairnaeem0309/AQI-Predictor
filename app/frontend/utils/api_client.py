@@ -7,31 +7,33 @@ Supports mock mode for development.
 
 import os
 import time
-from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 import requests
 
 
 class APIClientError(Exception):
     """API client error."""
+
     pass
 
 
 class APIConnectionError(APIClientError):
     """API connection error."""
+
     pass
 
 
 class APIClient:
     """
     API client for AQI Predictor backend.
-    
+
     Modes:
     - production: Calls real FastAPI backend
     - mock: Returns mock data for development
     """
-    
+
     def __init__(
         self,
         base_url: str = "http://localhost:8000",
@@ -41,7 +43,7 @@ class APIClient:
     ):
         """
         Initialize API client.
-        
+
         Args:
             base_url: FastAPI backend URL
             api_key: API key for authentication
@@ -52,38 +54,39 @@ class APIClient:
         self.api_key = api_key
         self.mock_mode = mock_mode
         self.timeout = timeout
-    
+
     @classmethod
     def from_env(cls) -> "APIClient":
         """Create client from environment variables."""
         # Check for Streamlit secrets first
         try:
             import streamlit as st
+
             api_key = st.secrets.get("API_KEY", os.getenv("API_KEY"))
         except (ImportError, FileNotFoundError):
             api_key = os.getenv("API_KEY")
-        
+
         mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
-        
+
         return cls(
             base_url=os.getenv("API_BASE_URL", "http://localhost:8000"),
             api_key=api_key,
             mock_mode=mock_mode,
         )
-    
+
     def get_prediction(self, city: str) -> Dict[str, Any]:
         """
         Get prediction for a city.
-        
+
         Args:
             city: City name
-            
+
         Returns:
             Prediction response dictionary
         """
         if self.mock_mode:
             return self._mock_prediction(city)
-        
+
         try:
             response = requests.post(
                 f"{self.base_url}/prediction",
@@ -99,17 +102,17 @@ class APIClient:
             raise APIConnectionError("API request timed out")
         except requests.exceptions.RequestException as e:
             raise APIClientError(f"API error: {e}")
-    
+
     def get_health(self) -> Dict[str, Any]:
         """
         Get health status.
-        
+
         Returns:
             Health response dictionary
         """
         if self.mock_mode:
             return self._mock_health()
-        
+
         try:
             response = requests.get(
                 f"{self.base_url}/health",
@@ -121,17 +124,17 @@ class APIClient:
             raise APIConnectionError("Cannot connect to API server")
         except requests.exceptions.RequestException as e:
             raise APIClientError(f"API error: {e}")
-    
+
     def get_model_info(self) -> Dict[str, Any]:
         """
         Get model information.
-        
+
         Returns:
             Model info response dictionary
         """
         if self.mock_mode:
             return self._mock_model_info()
-        
+
         try:
             response = requests.get(
                 f"{self.base_url}/model-info",
@@ -144,8 +147,10 @@ class APIClient:
             raise APIConnectionError("Cannot connect to API server")
         except requests.exceptions.RequestException as e:
             raise APIClientError(f"API error: {e}")
-    
-    def get_historical_data(self, city: str, start_date: str = None, end_date: str = None, limit: int = 500) -> Dict[str, Any]:
+
+    def get_historical_data(
+        self, city: str, start_date: str = None, end_date: str = None, limit: int = 500
+    ) -> Dict[str, Any]:
         """
         Get historical AQI data for a city.
 
@@ -258,7 +263,9 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             raise APIClientError(f"API error: {e}")
 
-    def get_shap_explanation(self, features: Dict[str, float], target: str = "target_aqi_24h") -> Dict[str, Any]:
+    def get_shap_explanation(
+        self, features: Dict[str, float], target: str = "target_aqi_24h"
+    ) -> Dict[str, Any]:
         """
         Get SHAP explanation for a prediction.
 
@@ -419,13 +426,14 @@ class APIClient:
             return True
         except APIClientError:
             return False
-    
+
     def _mock_prediction(self, city: str) -> Dict[str, Any]:
         """Return mock prediction data."""
         import random
+
         base_aqi = {"Karachi": 140, "Lahore": 160, "Islamabad": 90}
         base = base_aqi.get(city, 120)
-        
+
         return {
             "city": city,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -438,7 +446,7 @@ class APIClient:
             "model_version": "mock-v1.0.0",
             "confidence": None,
         }
-    
+
     def _mock_health(self) -> Dict[str, Any]:
         """Return mock health data."""
         return {
@@ -448,7 +456,7 @@ class APIClient:
             "last_prediction": datetime.now(timezone.utc).isoformat(),
             "version": "1.0.0",
         }
-    
+
     def _mock_model_info(self) -> Dict[str, Any]:
         """Return mock model info."""
         return {

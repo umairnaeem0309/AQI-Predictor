@@ -26,8 +26,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
-from sklearn.linear_model import Ridge
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Ridge
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 
@@ -62,8 +62,7 @@ def validate_training_data(metadata: DatasetMetadata) -> None:
     # Check dataset type first — synthetic data is never allowed
     if metadata.dataset_type == DatasetType.SYNTHETIC_TEST:
         raise ValueError(
-            f"Cannot train on synthetic test data. "
-            f"Dataset type: {metadata.dataset_type.value}"
+            f"Cannot train on synthetic test data. " f"Dataset type: {metadata.dataset_type.value}"
         )
 
     # Check approved_for_training
@@ -120,13 +119,20 @@ def load_training_data(
 
     logger.info(
         "Loaded training data: X_train=%s, y_train=%s, X_val=%s, y_val=%s",
-        X_train.shape, y_train.shape, X_val.shape, y_val.shape,
+        X_train.shape,
+        y_train.shape,
+        X_val.shape,
+        y_val.shape,
     )
 
     return X_train, y_train, X_val, y_val
 
 
-def get_model(model_name: str, params: Optional[Dict[str, Any]] = None, random_seed: int = DEFAULT_RANDOM_SEED) -> BaseEstimator:
+def get_model(
+    model_name: str,
+    params: Optional[Dict[str, Any]] = None,
+    random_seed: int = DEFAULT_RANDOM_SEED,
+) -> BaseEstimator:
     """Get a model instance by name.
 
     All models are wrapped in MultiOutputRegressor for multi-output
@@ -162,6 +168,7 @@ def get_model(model_name: str, params: Optional[Dict[str, Any]] = None, random_s
     elif model_name == "xgboost":
         try:
             import xgboost as xgb
+
             model = xgb.XGBRegressor(
                 n_estimators=params.get("n_estimators", 200),
                 max_depth=params.get("max_depth", 6),
@@ -228,7 +235,9 @@ def _train_lstm(
 
     logger.info(
         "LSTM: n_features=%d, n_targets=%d, seq_len=%d",
-        n_features, n_targets, sequence_length,
+        n_features,
+        n_targets,
+        sequence_length,
     )
 
     model = LSTMModel(
@@ -243,8 +252,10 @@ def _train_lstm(
 
     start_time = time.time()
     history = model.fit(
-        X_train_num, y_train_arr,
-        X_val_num, y_val_arr,
+        X_train_num,
+        y_train_arr,
+        X_val_num,
+        y_val_arr,
         epochs=epochs,
         batch_size=batch_size,
         verbose=0,
@@ -259,44 +270,47 @@ def _train_lstm(
     # (n_rows - seq_len + 1, n_targets) due to sequence creation
     # We need to align predictions with actual targets
     n_pred = len(y_pred)
-    y_val_aligned = y_val_arr[sequence_length - 1:sequence_length - 1 + n_pred]
+    y_val_aligned = y_val_arr[sequence_length - 1 : sequence_length - 1 + n_pred]
 
     # Evaluate using the aligned arrays
     from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
     metrics_per_horizon = []
-    horizon_labels = ['24h', '48h', '72h']
+    horizon_labels = ["24h", "48h", "72h"]
     for i, h in enumerate(horizon_labels):
         mae = mean_absolute_error(y_val_aligned[:, i], y_pred[:, i])
         rmse = np.sqrt(mean_squared_error(y_val_aligned[:, i], y_pred[:, i]))
         r2 = r2_score(y_val_aligned[:, i], y_pred[:, i])
-        metrics_per_horizon.append({
-            'horizon': h,
-            'mae': round(mae, 4),
-            'rmse': round(rmse, 4),
-            'r2': round(r2, 4),
-        })
+        metrics_per_horizon.append(
+            {
+                "horizon": h,
+                "mae": round(mae, 4),
+                "rmse": round(rmse, 4),
+                "r2": round(r2, 4),
+            }
+        )
 
     overall_mae = mean_absolute_error(y_val_aligned.flatten(), y_pred.flatten())
     overall_rmse = np.sqrt(mean_squared_error(y_val_aligned.flatten(), y_pred.flatten()))
     overall_r2 = r2_score(y_val_aligned.flatten(), y_pred.flatten())
 
     metrics = {
-        'overall_mae': round(overall_mae, 4),
-        'overall_rmse': round(overall_rmse, 4),
-        'overall_r2': round(overall_r2, 4),
-        'per_horizon': metrics_per_horizon,
+        "overall_mae": round(overall_mae, 4),
+        "overall_rmse": round(overall_rmse, 4),
+        "overall_r2": round(overall_r2, 4),
+        "per_horizon": metrics_per_horizon,
     }
 
     return {
-        'model': model,
-        'model_name': 'lstm',
-        'metrics': metrics,
-        'training_time': training_time,
-        'feature_importance': {},
-        'feature_columns': X_train.select_dtypes(include=[np.number]).columns.tolist(),
-        'random_seed': random_seed,
-        'params': params,
-        'epochs_trained': history.get('epochs_trained', 0),
+        "model": model,
+        "model_name": "lstm",
+        "metrics": metrics,
+        "training_time": training_time,
+        "feature_importance": {},
+        "feature_columns": X_train.select_dtypes(include=[np.number]).columns.tolist(),
+        "random_seed": random_seed,
+        "params": params,
+        "epochs_trained": history.get("epochs_trained", 0),
     }
 
 
@@ -414,8 +428,10 @@ def run_training_pipeline(
         try:
             result = train_model(
                 model_name,
-                X_train, y_train,
-                X_val, y_val,
+                X_train,
+                y_train,
+                X_val,
+                y_val,
                 random_seed=random_seed,
             )
             result["dataset_version"] = dataset_metadata.dataset_version

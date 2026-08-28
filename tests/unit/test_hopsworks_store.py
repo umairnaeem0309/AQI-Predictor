@@ -6,14 +6,14 @@ These tests verify the store's logic without making real API calls.
 """
 
 import os
-import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
-import pandas as pd
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, PropertyMock, patch
 
-from src.feature_store.hopsworks_store import HopsworksStore, ConfigurationError
+import pandas as pd
+import pytest
+
+from src.feature_store.hopsworks_store import ConfigurationError, HopsworksStore
 from src.feature_store.schemas import DatasetMetadata, DatasetType
-
 
 # =============================================================================
 # Test Fixtures
@@ -23,23 +23,28 @@ from src.feature_store.schemas import DatasetMetadata, DatasetType
 @pytest.fixture
 def mock_env():
     """Set up mock environment variables."""
-    with patch.dict(os.environ, {
-        "HOPSWORKS_HOST": "eu-west.cloud.hopsworks.ai",
-        "HOPSWORKS_API_KEY": "test-api-key",
-        "HOPSWORKS_PROJECT": "test-project",
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "HOPSWORKS_HOST": "eu-west.cloud.hopsworks.ai",
+            "HOPSWORKS_API_KEY": "test-api-key",
+            "HOPSWORKS_PROJECT": "test-project",
+        },
+    ):
         yield
 
 
 @pytest.fixture
 def sample_features():
     """Sample feature DataFrame."""
-    return pd.DataFrame({
-        "location_id": ["karachi"] * 3,
-        "timestamp": pd.date_range("2026-08-01", periods=3, freq="h", tz="UTC"),
-        "temperature": [30.0, 31.0, 32.0],
-        "aqi": [100, 105, 110],
-    })
+    return pd.DataFrame(
+        {
+            "location_id": ["karachi"] * 3,
+            "timestamp": pd.date_range("2026-08-01", periods=3, freq="h", tz="UTC"),
+            "temperature": [30.0, 31.0, 32.0],
+            "aqi": [100, 105, 110],
+        }
+    )
 
 
 @pytest.fixture
@@ -184,8 +189,10 @@ class TestHopsworksFallback:
         with patch.dict("sys.modules", {"hopsworks": mock_hops}):
 
             from src.feature_store import get_feature_store
+
             store = get_feature_store()
 
             # Should get LocalStore as fallback
             from src.feature_store.local_store import LocalStore
+
             assert isinstance(store, LocalStore)

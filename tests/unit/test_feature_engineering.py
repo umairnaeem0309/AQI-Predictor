@@ -11,23 +11,23 @@ Tests cover:
 - Feature metadata
 """
 
+from datetime import datetime, timedelta, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timedelta, timezone
 
 from src.features.feature_engineering import (
-    add_time_features,
+    FEATURE_VERSION,
+    US_EPA_AQI_MAX,
+    add_derived_features,
     add_lag_features,
     add_rolling_features,
-    add_derived_features,
+    add_time_features,
     cap_outliers,
     engineer_features,
     get_feature_metadata,
-    FEATURE_VERSION,
-    US_EPA_AQI_MAX,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -41,24 +41,26 @@ def hourly_observation_data():
     timestamps = [base_time + timedelta(hours=i) for i in range(96)]
 
     np.random.seed(42)
-    return pd.DataFrame({
-        "timestamp": timestamps,
-        "location_id": ["karachi"] * 96,
-        "city_name": ["Karachi"] * 96,
-        "temperature": 30 + np.random.randn(96) * 3,
-        "humidity": 60 + np.random.randn(96) * 10,
-        "wind_speed": 3 + np.random.rand(96) * 4,
-        "pressure": 1010 + np.random.randn(96) * 5,
-        "aqi": 100 + np.cumsum(np.random.randn(96) * 5),
-        "pm25": 40 + np.random.rand(96) * 30,
-        "pm10": 60 + np.random.rand(96) * 40,
-        "co": 200 + np.random.rand(96) * 100,
-        "no2": 20 + np.random.rand(96) * 20,
-        "so2": 10 + np.random.rand(96) * 10,
-        "o3": 40 + np.random.rand(96) * 30,
-        "weather_condition": ["clear"] * 96,
-        "data_source": ["openweather"] * 96,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "location_id": ["karachi"] * 96,
+            "city_name": ["Karachi"] * 96,
+            "temperature": 30 + np.random.randn(96) * 3,
+            "humidity": 60 + np.random.randn(96) * 10,
+            "wind_speed": 3 + np.random.rand(96) * 4,
+            "pressure": 1010 + np.random.randn(96) * 5,
+            "aqi": 100 + np.cumsum(np.random.randn(96) * 5),
+            "pm25": 40 + np.random.rand(96) * 30,
+            "pm10": 60 + np.random.rand(96) * 40,
+            "co": 200 + np.random.rand(96) * 100,
+            "no2": 20 + np.random.rand(96) * 20,
+            "so2": 10 + np.random.rand(96) * 10,
+            "o3": 40 + np.random.rand(96) * 30,
+            "weather_condition": ["clear"] * 96,
+            "data_source": ["openweather"] * 96,
+        }
+    )
 
 
 @pytest.fixture
@@ -70,16 +72,18 @@ def multi_city_data():
     rows = []
     for city in ["karachi", "lahore"]:
         for ts in timestamps:
-            rows.append({
-                "timestamp": ts,
-                "location_id": city,
-                "city_name": city.title(),
-                "temperature": 30 + np.random.randn() * 3,
-                "humidity": 60 + np.random.randn() * 10,
-                "aqi": 100 + np.random.randn() * 20,
-                "pm25": 40 + np.random.rand() * 30,
-                "data_source": "openweather",
-            })
+            rows.append(
+                {
+                    "timestamp": ts,
+                    "location_id": city,
+                    "city_name": city.title(),
+                    "temperature": 30 + np.random.randn() * 3,
+                    "humidity": 60 + np.random.randn() * 10,
+                    "aqi": 100 + np.random.randn() * 20,
+                    "pm25": 40 + np.random.rand() * 30,
+                    "data_source": "openweather",
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -119,7 +123,7 @@ class TestTimeFeatures:
         assert "is_weekend" in df.columns
         # Aug 1 (Sat=5) → is_weekend=1, Aug 2 (Sun=6) → is_weekend=1
         # Aug 3 (Mon=0) → is_weekend=0
-        assert df["is_weekend"].iloc[0] == 1   # Saturday
+        assert df["is_weekend"].iloc[0] == 1  # Saturday
         assert df["is_weekend"].iloc[24] == 1  # Sunday (index 24 = Aug 2 00:00)
         assert df["is_weekend"].iloc[48] == 0  # Monday (index 48 = Aug 3 00:00)
 
@@ -243,7 +247,7 @@ class TestRollingFeatures:
         )
         # closed='left' excludes current period, so index 0 has no data to its left.
         # Index 1 has only index 0 → valid (min_periods=1).
-        assert pd.isna(df["aqi_rolling_mean_24h"].iloc[0])   # No history left of index 0
+        assert pd.isna(df["aqi_rolling_mean_24h"].iloc[0])  # No history left of index 0
         assert not pd.isna(df["aqi_rolling_mean_24h"].iloc[1])  # Has 1 hour of history
 
 
@@ -273,13 +277,15 @@ class TestDerivedFeatures:
 
     def test_ratio_zero_division(self):
         """Ratio features handle zero division gracefully."""
-        df = pd.DataFrame({
-            "pm25": [50.0, 30.0],
-            "pm10": [0.0, 60.0],
-            "no2": [20.0, 0.0],
-            "so2": [10.0, 10.0],
-            "o3": [40.0, 40.0],
-        })
+        df = pd.DataFrame(
+            {
+                "pm25": [50.0, 30.0],
+                "pm10": [0.0, 60.0],
+                "no2": [20.0, 0.0],
+                "so2": [10.0, 10.0],
+                "o3": [40.0, 40.0],
+            }
+        )
         df = add_derived_features(df)
         assert pd.isna(df["pm25_pm10_ratio"].iloc[0])  # pm10=0 → division by zero → NaN
         assert df["no2_so2_ratio"].iloc[1] == 0.0  # no2=0, so2=10 → 0/10 = 0.0, NOT NaN
@@ -287,7 +293,9 @@ class TestDerivedFeatures:
     def test_temp_humidity_interaction(self, hourly_observation_data):
         """Temperature-humidity interaction is correctly computed."""
         df = add_derived_features(hourly_observation_data)
-        expected = hourly_observation_data["temperature"] * hourly_observation_data["humidity"] / 100
+        expected = (
+            hourly_observation_data["temperature"] * hourly_observation_data["humidity"] / 100
+        )
         mask = df["temp_humidity_interaction"].notna()
         assert abs(df.loc[mask, "temp_humidity_interaction"].iloc[0] - expected.iloc[0]) < 1e-10
 
@@ -302,10 +310,12 @@ class TestOutlierCapping:
 
     def test_aqi_capped_at_500(self):
         """AQI values above 500 are capped in feature columns."""
-        df = pd.DataFrame({
-            "aqi": [600, 400, 300],
-            "aqi_lag_1h": [550, 350, 250],
-        })
+        df = pd.DataFrame(
+            {
+                "aqi": [600, 400, 300],
+                "aqi_lag_1h": [550, 350, 250],
+            }
+        )
         df = cap_outliers(df)
         assert df["aqi"].iloc[0] == 500
         assert df["aqi_lag_1h"].iloc[0] == 500
@@ -313,10 +323,12 @@ class TestOutlierCapping:
 
     def test_humidity_out_of_bounds(self):
         """Humidity values outside [0, 100] are set to NaN."""
-        df = pd.DataFrame({
-            "humidity": [50, -10, 110, 75],
-            "humidity_lag_1h": [60, -5, 105, 80],
-        })
+        df = pd.DataFrame(
+            {
+                "humidity": [50, -10, 110, 75],
+                "humidity_lag_1h": [60, -5, 105, 80],
+            }
+        )
         df = cap_outliers(df)
         assert df["humidity"].iloc[0] == 50
         assert pd.isna(df["humidity"].iloc[1])
@@ -385,16 +397,18 @@ class TestFullPipeline:
 
     def test_single_row(self):
         """Pipeline handles single-row DataFrame."""
-        df = pd.DataFrame({
-            "timestamp": [datetime(2026, 8, 1, 0, 0, 0, tzinfo=timezone.utc)],
-            "location_id": ["karachi"],
-            "city_name": ["Karachi"],
-            "aqi": [100],
-            "temperature": [30.0],
-            "humidity": [60.0],
-            "pm25": [40.0],
-            "data_source": ["openweather"],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [datetime(2026, 8, 1, 0, 0, 0, tzinfo=timezone.utc)],
+                "location_id": ["karachi"],
+                "city_name": ["Karachi"],
+                "aqi": [100],
+                "temperature": [30.0],
+                "humidity": [60.0],
+                "pm25": [40.0],
+                "data_source": ["openweather"],
+            }
+        )
         result = engineer_features(df)
         assert len(result) == 1
         assert "hour" in result.columns

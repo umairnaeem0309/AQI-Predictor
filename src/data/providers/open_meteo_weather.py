@@ -176,7 +176,8 @@ class OpenMeteoWeatherProvider(BaseHistoricalProvider):
                 data[internal_name] = [None] * n
                 logger.debug(
                     "Variable %s not available in response for %s",
-                    api_name, city_name,
+                    api_name,
+                    city_name,
                 )
 
         df = pd.DataFrame(data)
@@ -191,7 +192,9 @@ class OpenMeteoWeatherProvider(BaseHistoricalProvider):
         # No conversion needed when wind_speed_unit='ms'
 
         logger.debug(
-            "Parsed %d weather records for %s", len(df), city_name,
+            "Parsed %d weather records for %s",
+            len(df),
+            city_name,
         )
 
         return df

@@ -11,7 +11,7 @@ provides them in the format FeatureService expects.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
@@ -28,8 +28,11 @@ class LiveFeatureAdapter:
     them in the format expected by the prediction pipeline.
     """
 
-    def __init__(self, features_path: str = "data/processed/test_features.csv",
-                 metadata_path: str = "models/production/model_metadata.json"):
+    def __init__(
+        self,
+        features_path: str = "data/processed/test_features.csv",
+        metadata_path: str = "models/production/model_metadata.json",
+    ):
         """
         Initialize the adapter.
 
@@ -47,7 +50,11 @@ class LiveFeatureAdapter:
         if self._features_df is None:
             try:
                 self._features_df = pd.read_csv(self.features_path)
-                logger.info("Loaded %d feature rows from %s", len(self._features_df), self.features_path)
+                logger.info(
+                    "Loaded %d feature rows from %s",
+                    len(self._features_df),
+                    self.features_path,
+                )
             except Exception as e:
                 logger.error("Failed to load features: %s", e)
                 raise
@@ -56,13 +63,18 @@ class LiveFeatureAdapter:
         if self._model_features is None:
             try:
                 from pathlib import Path
+
                 meta_path = Path(self.metadata_path)
                 if meta_path.exists():
                     import json
+
                     with open(meta_path) as f:
                         meta = json.load(f)
                     self._model_features = meta.get("feature_columns", [])
-                    logger.info("Loaded %d model features from metadata", len(self._model_features))
+                    logger.info(
+                        "Loaded %d model features from metadata",
+                        len(self._model_features),
+                    )
             except Exception as e:
                 logger.warning("Could not load model metadata: %s", e)
 
@@ -96,9 +108,17 @@ class LiveFeatureAdapter:
                     features[col] = float(val) if pd.notna(val) else 0.0
         else:
             # Fallback: exclude non-feature columns
-            exclude_cols = {"timestamp", "location_id", "city_name", "data_source",
-                           "aqi_category", "aqi_standard", "aqi_method",
-                           "aqi_method_version", "aqi_source"}
+            exclude_cols = {
+                "timestamp",
+                "location_id",
+                "city_name",
+                "data_source",
+                "aqi_category",
+                "aqi_standard",
+                "aqi_method",
+                "aqi_method_version",
+                "aqi_source",
+            }
             for col in self._features_df.columns:
                 if col not in exclude_cols:
                     val = latest[col]

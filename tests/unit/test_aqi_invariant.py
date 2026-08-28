@@ -7,12 +7,14 @@ The selected AQI must always equal:
 When only one sub-index is valid, AQI must equal that valid sub-index.
 When neither is valid, AQI must be None and is_training_valid must be False.
 """
+
 import pytest
+
 from src.utils.epa_aqi import (
-    calculate_pm25_aqi,
-    calculate_pm10_aqi,
-    calculate_nowcast_aqi,
     calculate_nowcast,
+    calculate_nowcast_aqi,
+    calculate_pm10_aqi,
+    calculate_pm25_aqi,
 )
 
 
@@ -122,9 +124,7 @@ class TestAQIInvariant:
 
         pm25_nowcast = 39.0789549341939
         pm10_nowcast = 102.83527559055118
-        aqi, dominant, individual = calculate_individual_aqi(
-            pm25=pm25_nowcast, pm10=pm10_nowcast
-        )
+        aqi, dominant, individual = calculate_individual_aqi(pm25=pm25_nowcast, pm10=pm10_nowcast)
 
         assert aqi is not None
         assert aqi == max(individual.values())
@@ -137,8 +137,9 @@ class TestPersistedRecordInvariant:
 
     def test_master_csv_invariant(self):
         """Every row in master CSV with NowCast must satisfy the invariant."""
-        import pandas as pd
         from pathlib import Path
+
+        import pandas as pd
 
         csv_path = Path("data/raw/real/master_observations.csv")
         if not csv_path.exists():
@@ -165,12 +166,12 @@ class TestPersistedRecordInvariant:
                     f"dominant={dom} != expected={expected_dom}"
                 )
             elif pd.notna(pm25_sub):
-                assert aqi == int(pm25_sub), (
-                    f"Row {row['timestamp']}: aqi={aqi} != pm25_sub={pm25_sub}"
-                )
+                assert aqi == int(
+                    pm25_sub
+                ), f"Row {row['timestamp']}: aqi={aqi} != pm25_sub={pm25_sub}"
                 assert dom == "pm25"
             elif pd.notna(pm10_sub):
-                assert aqi == int(pm10_sub), (
-                    f"Row {row['timestamp']}: aqi={aqi} != pm10_sub={pm10_sub}"
-                )
+                assert aqi == int(
+                    pm10_sub
+                ), f"Row {row['timestamp']}: aqi={aqi} != pm10_sub={pm10_sub}"
                 assert dom == "pm10"

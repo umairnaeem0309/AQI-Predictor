@@ -5,23 +5,23 @@ Tests the complete flow: synthetic data generation → feature engineering
 → target generation → train/val/test split → metadata.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timedelta, timezone
 
-from src.data.historical_backfill import (
-    generate_mock_historical_dataset,
-    verify_api_access,
-    collect_sample_data,
-)
 from src.data.dataset_builder import (
-    build_dataset,
     add_source_quality_metadata,
+    build_dataset,
     generate_targets,
 )
+from src.data.historical_backfill import (
+    collect_sample_data,
+    generate_mock_historical_dataset,
+    verify_api_access,
+)
 from src.data.schemas import CityConfig
-
 
 # =============================================================================
 # Test Fixtures
@@ -66,6 +66,7 @@ class TestBackfillPipelineEndToEnd:
             city_configs=city_configs,
         )
         from src.data.validators import full_validation
+
         report = full_validation(df)
         assert report.status.value in ("pass", "warning")
 
@@ -169,10 +170,19 @@ class TestBackfillPipelineEndToEnd:
         result = build_dataset(df, save=False)
         meta = result["metadata"]
         required_keys = [
-            "dataset_version", "feature_version", "schema_version",
-            "generation_timestamp", "total_records", "train_records",
-            "val_records", "test_records", "feature_count", "target_count",
-            "cities", "leakage_errors", "quality_report",
+            "dataset_version",
+            "feature_version",
+            "schema_version",
+            "generation_timestamp",
+            "total_records",
+            "train_records",
+            "val_records",
+            "test_records",
+            "feature_count",
+            "target_count",
+            "cities",
+            "leakage_errors",
+            "quality_report",
         ]
         for key in required_keys:
             assert key in meta, f"Missing metadata key: {key}"

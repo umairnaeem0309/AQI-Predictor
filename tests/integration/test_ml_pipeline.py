@@ -5,21 +5,17 @@ Tests the complete flow: data validation → training → evaluation → MLflow 
 Verifies reproducibility with fixed random seeds.
 """
 
-import numpy as np
-import pandas as pd
-import pytest
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.models.training import (
-    validate_training_data,
-    get_model,
-    train_model,
-)
-from src.models.evaluation import evaluate_model, compare_models
-from src.feature_store.schemas import DatasetMetadata, DatasetType
+import numpy as np
+import pandas as pd
+import pytest
 
+from src.feature_store.schemas import DatasetMetadata, DatasetType
+from src.models.evaluation import compare_models, evaluate_model
+from src.models.training import get_model, train_model, validate_training_data
 
 # =============================================================================
 # Test Fixtures
@@ -51,23 +47,31 @@ def training_dataset():
     """Complete training dataset for integration tests."""
     np.random.seed(42)
     n = 500
-    X = pd.DataFrame({
-        "aqi_lag_1h": np.random.randn(n) * 20 + 100,
-        "aqi_lag_6h": np.random.randn(n) * 25 + 100,
-        "aqi_lag_24h": np.random.randn(n) * 30 + 100,
-        "temperature": np.random.randn(n) * 5 + 30,
-        "humidity": np.random.randn(n) * 10 + 60,
-        "pm25": np.random.rand(n) * 30 + 30,
-        "pm10": np.random.rand(n) * 40 + 50,
-        "hour": np.random.randint(0, 24, n),
-        "day_of_week": np.random.randint(0, 7, n),
-    })
+    X = pd.DataFrame(
+        {
+            "aqi_lag_1h": np.random.randn(n) * 20 + 100,
+            "aqi_lag_6h": np.random.randn(n) * 25 + 100,
+            "aqi_lag_24h": np.random.randn(n) * 30 + 100,
+            "temperature": np.random.randn(n) * 5 + 30,
+            "humidity": np.random.randn(n) * 10 + 60,
+            "pm25": np.random.rand(n) * 30 + 30,
+            "pm10": np.random.rand(n) * 40 + 50,
+            "hour": np.random.randint(0, 24, n),
+            "day_of_week": np.random.randint(0, 7, n),
+        }
+    )
     # Targets with realistic relationship to features
-    y = pd.DataFrame({
-        "target_aqi_24h": X["aqi_lag_1h"] * 0.8 + X["temperature"] * 0.5 + np.random.randn(n) * 5,
-        "target_aqi_48h": X["aqi_lag_24h"] * 0.6 + X["pm25"] * 0.3 + np.random.randn(n) * 10,
-        "target_aqi_72h": X["aqi_lag_24h"] * 0.5 + X["humidity"] * 0.2 + np.random.randn(n) * 15,
-    })
+    y = pd.DataFrame(
+        {
+            "target_aqi_24h": X["aqi_lag_1h"] * 0.8
+            + X["temperature"] * 0.5
+            + np.random.randn(n) * 5,
+            "target_aqi_48h": X["aqi_lag_24h"] * 0.6 + X["pm25"] * 0.3 + np.random.randn(n) * 10,
+            "target_aqi_72h": X["aqi_lag_24h"] * 0.5
+            + X["humidity"] * 0.2
+            + np.random.randn(n) * 15,
+        }
+    )
     return X, y
 
 
@@ -103,7 +107,11 @@ class TestMLPipelineEndToEnd:
         X_val, y_val = X[400:], y[400:]
 
         result = train_model(
-            "random_forest", X_train, y_train, X_val, y_val,
+            "random_forest",
+            X_train,
+            y_train,
+            X_val,
+            y_val,
             params={"n_estimators": 20, "max_depth": 5},
         )
         assert result["model"] is not None
@@ -118,7 +126,11 @@ class TestMLPipelineEndToEnd:
         results = []
         for model_name in ["ridge", "random_forest"]:
             result = train_model(
-                model_name, X_train, y_train, X_val, y_val,
+                model_name,
+                X_train,
+                y_train,
+                X_val,
+                y_val,
                 params={"n_estimators": 10} if model_name == "random_forest" else None,
             )
             results.append(result)
@@ -147,10 +159,24 @@ class TestMLPipelineEndToEnd:
         X_train, y_train = X[:400], y[:400]
         X_val, y_val = X[400:], y[400:]
 
-        result1 = train_model("random_forest", X_train, y_train, X_val, y_val,
-                             params={"n_estimators": 10}, random_seed=42)
-        result2 = train_model("random_forest", X_train, y_train, X_val, y_val,
-                             params={"n_estimators": 10}, random_seed=99)
+        result1 = train_model(
+            "random_forest",
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+            params={"n_estimators": 10},
+            random_seed=42,
+        )
+        result2 = train_model(
+            "random_forest",
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+            params={"n_estimators": 10},
+            random_seed=99,
+        )
 
         # Random Forest is sensitive to seed
         assert result1["metrics"]["mae_avg"] != result2["metrics"]["mae_avg"]

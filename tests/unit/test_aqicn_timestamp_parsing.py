@@ -7,8 +7,10 @@ Verifies correct UTC conversion for:
 - UTC (+00:00)
 - The exact AQICN payload formats observed in production
 """
+
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
 
 from src.data.aqicn_client import _parse_aqicn_timestamp
 

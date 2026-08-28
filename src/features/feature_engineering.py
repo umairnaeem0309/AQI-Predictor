@@ -61,10 +61,18 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     # Season mapping (Northern Hemisphere — Pakistan)
     # Winter: Dec-Feb, Spring: Mar-May, Summer: Jun-Aug, Fall: Sep-Nov
     season_map = {
-        12: 0, 1: 0, 2: 0,   # Winter
-        3: 1, 4: 1, 5: 1,    # Spring
-        6: 2, 7: 2, 8: 2,    # Summer
-        9: 3, 10: 3, 11: 3,  # Fall
+        12: 0,
+        1: 0,
+        2: 0,  # Winter
+        3: 1,
+        4: 1,
+        5: 1,  # Spring
+        6: 2,
+        7: 2,
+        8: 2,  # Summer
+        9: 3,
+        10: 3,
+        11: 3,  # Fall
     }
     df["season"] = df["month"].map(season_map)
 
@@ -72,7 +80,9 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
     df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
 
-    logger.debug("Added time features: hour, day_of_week, month, season, is_weekend, hour_sin, hour_cos")
+    logger.debug(
+        "Added time features: hour, day_of_week, month, season, is_weekend, hour_sin, hour_cos"
+    )
     return df
 
 
@@ -164,8 +174,12 @@ def add_rolling_features(
     if windows is None:
         windows = {
             "aqi": [
-                ("6h", "mean"), ("12h", "mean"), ("24h", "mean"),
-                ("24h", "std"), ("24h", "min"), ("24h", "max"),
+                ("6h", "mean"),
+                ("12h", "mean"),
+                ("24h", "mean"),
+                ("24h", "std"),
+                ("24h", "min"),
+                ("24h", "max"),
             ],
             "pm25": [("6h", "mean"), ("24h", "mean")],
             "temperature": [("24h", "mean")],
@@ -259,19 +273,13 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     # --- Pollutant ratios ---
     if "pm25" in df.columns and "pm10" in df.columns:
         # Avoid division by zero
-        df["pm25_pm10_ratio"] = np.where(
-            df["pm10"] > 0, df["pm25"] / df["pm10"], np.nan
-        )
+        df["pm25_pm10_ratio"] = np.where(df["pm10"] > 0, df["pm25"] / df["pm10"], np.nan)
 
     if "no2" in df.columns and "so2" in df.columns:
-        df["no2_so2_ratio"] = np.where(
-            df["so2"] > 0, df["no2"] / df["so2"], np.nan
-        )
+        df["no2_so2_ratio"] = np.where(df["so2"] > 0, df["no2"] / df["so2"], np.nan)
 
     if "o3" in df.columns and "no2" in df.columns:
-        df["o3_no2_ratio"] = np.where(
-            df["no2"] > 0, df["o3"] / df["no2"], np.nan
-        )
+        df["o3_no2_ratio"] = np.where(df["no2"] > 0, df["o3"] / df["no2"], np.nan)
 
     # --- Weather interactions ---
     if "temperature" in df.columns and "humidity" in df.columns:

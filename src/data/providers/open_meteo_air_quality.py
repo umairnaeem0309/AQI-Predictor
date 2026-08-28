@@ -67,9 +67,9 @@ class OpenMeteoAirQualityProvider(BaseHistoricalProvider):
         "nitrogen_dioxide",
         "sulphur_dioxide",
         "ozone",
-        "us_aqi",       # For validation only — project uses own EPA calc
+        "us_aqi",  # For validation only — project uses own EPA calc
         "us_aqi_pm2_5",  # For validation
-        "us_aqi_pm10",   # For validation
+        "us_aqi_pm10",  # For validation
     ]
 
     def _get_variable_mapping(self) -> Dict[str, str]:
@@ -165,7 +165,8 @@ class OpenMeteoAirQualityProvider(BaseHistoricalProvider):
                 data[internal_name] = [None] * n
                 logger.debug(
                     "Variable %s not available in response for %s",
-                    api_name, city_name,
+                    api_name,
+                    city_name,
                 )
 
         # Store Open-Meteo US AQI values for validation reference
@@ -194,7 +195,9 @@ class OpenMeteoAirQualityProvider(BaseHistoricalProvider):
         df["provider"] = "open-meteo"
 
         logger.debug(
-            "Parsed %d air quality records for %s", len(df), city_name,
+            "Parsed %d air quality records for %s",
+            len(df),
+            city_name,
         )
 
         return df

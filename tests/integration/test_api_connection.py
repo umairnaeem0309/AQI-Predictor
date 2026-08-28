@@ -13,10 +13,10 @@ that lack secrets.
 """
 
 import os
+
 import pytest
 
 from src.config import get_api_key
-
 
 # =============================================================================
 # Credential Check Fixtures

@@ -4,11 +4,12 @@ Tests for monitoring routes.
 
 import json
 import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 
 class TestDriftDetection:
@@ -16,6 +17,7 @@ class TestDriftDetection:
 
     def test_drift_detector_init(self):
         from src.monitoring.drift_detection import DriftDetector
+
         try:
             detector = DriftDetector()
             assert detector.psi_threshold == 0.1
@@ -25,6 +27,7 @@ class TestDriftDetection:
 
     def test_drift_result_dataclass(self):
         from src.monitoring.drift_detection import DriftResult
+
         result = DriftResult(
             column_name="pm25",
             drift_detected=False,
@@ -39,6 +42,7 @@ class TestDriftDetection:
 
     def test_drift_report_dataclass(self):
         from src.monitoring.drift_detection import DriftReport
+
         report = DriftReport(
             report_id="test_001",
             dataset_type="real_api_data",
@@ -56,6 +60,7 @@ class TestDriftDetection:
 
     def test_detect_drift_no_drift(self):
         from src.monitoring.drift_detection import DriftDetector
+
         try:
             detector = DriftDetector()
         except ImportError:
@@ -74,21 +79,26 @@ class TestDriftDetection:
 
     def test_detect_drift_with_drift(self):
         from src.monitoring.drift_detection import DriftDetector
+
         try:
             detector = DriftDetector()
         except ImportError:
             pytest.skip("Evidently not installed")
 
         rng = np.random.RandomState(42)
-        ref = pd.DataFrame({
-            "pm25": rng.normal(50, 10, 500),
-            "pm10": rng.normal(70, 15, 500),
-        })
+        ref = pd.DataFrame(
+            {
+                "pm25": rng.normal(50, 10, 500),
+                "pm10": rng.normal(70, 15, 500),
+            }
+        )
         # Current = very different distribution
-        curr = pd.DataFrame({
-            "pm25": rng.normal(200, 30, 200),
-            "pm10": rng.normal(250, 40, 200),
-        })
+        curr = pd.DataFrame(
+            {
+                "pm25": rng.normal(200, 30, 200),
+                "pm10": rng.normal(250, 40, 200),
+            }
+        )
 
         report = detector.detect_drift(ref, curr, dataset_type="real_api_data")
         assert report.overall_drift_detected is True
@@ -99,18 +109,22 @@ class TestPerformanceMonitor:
 
     def test_performance_monitor_init(self):
         from src.monitoring.performance import PerformanceMonitor
+
         monitor = PerformanceMonitor()
         assert monitor.mae_threshold == 0.2
 
     def test_calculate_rolling_metrics(self):
         from src.monitoring.performance import PerformanceMonitor
+
         monitor = PerformanceMonitor()
 
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2026-08-01", periods=100, freq="h"),
-            "aqi_24h": np.random.uniform(50, 200, 100),
-            "actual_24h": np.random.uniform(50, 200, 100),
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2026-08-01", periods=100, freq="h"),
+                "aqi_24h": np.random.uniform(50, 200, 100),
+                "actual_24h": np.random.uniform(50, 200, 100),
+            }
+        )
 
         metrics = monitor.calculate_rolling_metrics(df, window="30d")
         assert "mae" in metrics
@@ -119,6 +133,7 @@ class TestPerformanceMonitor:
 
     def test_detect_degradation_no_degradation(self):
         from src.monitoring.performance import PerformanceMonitor
+
         monitor = PerformanceMonitor()
 
         current = {"mae": 20.0, "rmse": 30.0, "r2": 0.65}
@@ -129,6 +144,7 @@ class TestPerformanceMonitor:
 
     def test_detect_degradation_with_degradation(self):
         from src.monitoring.performance import PerformanceMonitor
+
         monitor = PerformanceMonitor()
 
         current = {"mae": 30.0, "rmse": 45.0, "r2": 0.40}
@@ -143,24 +159,28 @@ class TestAPIClientMonitoring:
 
     def test_drift_report_mock(self):
         from app.frontend.utils.api_client import APIClient
+
         client = APIClient(mock_mode=True)
         result = client.get_drift_report()
         assert "drift_detected" in result
 
     def test_performance_mock(self):
         from app.frontend.utils.api_client import APIClient
+
         client = APIClient(mock_mode=True)
         result = client.get_performance()
         assert "status" in result
 
     def test_alerts_mock(self):
         from app.frontend.utils.api_client import APIClient
+
         client = APIClient(mock_mode=True)
         result = client.get_alerts()
         assert "alerts" in result
 
     def test_system_health_mock(self):
         from app.frontend.utils.api_client import APIClient
+
         client = APIClient(mock_mode=True)
         result = client.get_system_health()
         assert "overall_status" in result
@@ -171,6 +191,7 @@ class TestMonitoringHelpers:
 
     def test_get_aqi_category(self):
         from app.routes.monitoring import _get_aqi_category
+
         assert _get_aqi_category(25) == "Good"
         assert _get_aqi_category(75) == "Moderate"
         assert _get_aqi_category(120) == "Unhealthy for Sensitive Groups"
@@ -180,6 +201,7 @@ class TestMonitoringHelpers:
 
     def test_get_recommendation(self):
         from app.routes.monitoring import _get_recommendation
+
         assert "satisfactory" in _get_recommendation(30).lower()
         assert "avoid" in _get_recommendation(250).lower()
         assert "emergency" in _get_recommendation(350).lower()
