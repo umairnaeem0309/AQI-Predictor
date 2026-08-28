@@ -81,22 +81,32 @@ async def get_feature_importance(
     try:
         model_service = get_model_service()
         model = model_service.get_model()
+        model_info = model_service.get_model_info()
 
-        # Get feature importances from XGBoost
-        # Model may be wrapped in MultiOutputRegressor
+        # Get feature importances - works for both tree and linear models
         if hasattr(model, "estimators_"):
             # MultiOutputRegressor: average importances across targets
             importances = None
             for est in model.estimators_:
                 if hasattr(est, "feature_importances_"):
+                    # Tree-based model
                     if importances is None:
                         importances = est.feature_importances_.copy()
                     else:
                         importances += est.feature_importances_
+                elif hasattr(est, "coef_"):
+                    # Linear model (Ridge): use absolute coefficients
+                    coefs = np.abs(est.coef_)
+                    if importances is None:
+                        importances = coefs.copy()
+                    else:
+                        importances += coefs
             if importances is not None:
                 importances /= len(model.estimators_)
         elif hasattr(model, "feature_importances_"):
             importances = model.feature_importances_
+        elif hasattr(model, "coef_"):
+            importances = np.abs(model.coef_)
         else:
             raise HTTPException(status_code=500, detail="Model does not support feature importance")
 
@@ -156,7 +166,7 @@ async def get_feature_importance(
             category_importance[cat] = round(cat_total, 4)
 
         return {
-            "model_name": "xgboost_aqi_predictor",
+            "model_name": model_info.get("model_name", "unknown"),
             "total_features": len(importance_list),
             "top_n": top_n,
             "features": top_features,
@@ -190,8 +200,8 @@ async def get_model_summary(
                 meta = json.load(f)
 
         return {
-            "model_name": model_info.get("model_name", "xgboost_aqi_predictor"),
-            "model_type": "XGBoost (MultiOutputRegressor)",
+            "model_name": model_info.get("model_name", "unknown"),
+            "model_type": model_info.get("model_key", "unknown") + " (MultiOutputRegressor)",
             "parameters": meta.get("model_params", {}),
             "metrics": model_info.get("metrics", {}),
             "feature_count": len(meta.get("feature_columns", [])),
@@ -277,9 +287,21 @@ async def get_shap_explanation(
         else:
             estimator = model
 
-        # Compute SHAP values using TreeExplainer
-        explainer = shap.TreeExplainer(estimator)
-        shap_values = explainer.shap_values(X)
+        # Compute SHAP values using appropriate explainer
+        if hasattr(estimator, "feature_importances_"):
+            # Tree-based model (XGBoost, Random Forest)
+            explainer = shap.TreeExplainer(estimator)
+            shap_values = explainer.shap_values(X)
+        else:
+            # Linear model (Ridge) or other
+            try:
+                explainer = shap.LinearExplainer(estimator, np.zeros((10, X.shape[1])))
+                shap_values = explainer.shap_values(X)
+            except Exception:
+                # Fallback: use KernelExplainer with a small background
+                background = np.zeros((5, X.shape[1]))
+                explainer = shap.KernelExplainer(estimator.predict, background)
+                shap_values = explainer.shap_values(X, nsamples=100)
 
         # shap_values shape: (1, n_features) or (n_features,)
         if isinstance(shap_values, np.ndarray) and shap_values.ndim > 1:
@@ -289,15 +311,15 @@ async def get_shap_explanation(
         else:
             sv = np.array(shap_values)
 
-        base_value = (
-            float(explainer.expected_value)
-            if np.isscalar(explainer.expected_value)
-            else (
-                float(explainer.expected_value[0])
-                if hasattr(explainer.expected_value, "__len__")
-                else float(explainer.expected_value)
-            )
-        )
+        # Get base value (expected value)
+        try:
+            ev = explainer.expected_value
+            if isinstance(ev, (list, np.ndarray)):
+                base_value = float(ev[0]) if len(ev) > 0 else 0.0
+            else:
+                base_value = float(ev)
+        except Exception:
+            base_value = 0.0
 
         prediction = float(base_value + np.sum(sv))
 
@@ -381,6 +403,7 @@ async def get_global_shap_importance(
 
         model_service = get_model_service()
         model = model_service.get_model()
+        model_info = model_service.get_model_info()
 
         feature_names = _get_feature_names()
         if not feature_names:
@@ -398,7 +421,7 @@ async def get_global_shap_importance(
                 "n_samples": 0,
                 "total_features": 0,
                 "features": [],
-                "message": "Training dataset not available in this environment. SHAP requires train_features.csv.",
+                "message": "Training dataset not available in this environment.",
             }
 
         df = pd.read_csv(data_path)
@@ -426,8 +449,17 @@ async def get_global_shap_importance(
         else:
             estimator = model
 
-        explainer = shap.TreeExplainer(estimator, data=X_bg)
-        shap_values = explainer.shap_values(X_bg)
+        # Use appropriate explainer
+        if hasattr(estimator, "feature_importances_"):
+            explainer = shap.TreeExplainer(estimator, data=X_bg)
+            shap_values = explainer.shap_values(X_bg)
+        else:
+            try:
+                explainer = shap.LinearExplainer(estimator, X_bg)
+                shap_values = explainer.shap_values(X_bg)
+            except Exception:
+                explainer = shap.KernelExplainer(estimator.predict, X_bg[:10])
+                shap_values = explainer.shap_values(X_bg[:20], nsamples=50)
 
         if isinstance(shap_values, np.ndarray) and shap_values.ndim > 1:
             mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
@@ -444,7 +476,7 @@ async def get_global_shap_importance(
         importance_list.sort(key=lambda x: x["mean_abs_shap"], reverse=True)
 
         return {
-            "model_name": "xgboost_aqi_predictor",
+            "model_name": model_info.get("model_name", "unknown"),
             "method": "TreeExplainer mean |SHAP|",
             "n_samples": sample_size,
             "total_features": len(importance_list),

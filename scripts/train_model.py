@@ -393,10 +393,48 @@ def train_all_models(df, feature_columns):
     except Exception as e:
         logger.warning(f"LSTM training failed: {e}")
 
-    # --- Select Best Model ---
-    best_key = min(results, key=lambda k: results[k]["val_metrics"]["mae"])
+    # --- Select Best Model (composite score) ---
+    # Score = weighted combination of MAE, RMSE, R2 across all horizons
+    # Lower is better for MAE/RMSE, higher is better for R2
+    # Normalize: MAE and RMSE are already 'lower=better'
+    # R2: convert to (1 - R2) so lower is better
+    # Weights: MAE 40%, RMSE 30%, R2 30%
+    horizon_names = ["24h", "48h", "72h"]
+
+    def compute_composite_score(metrics):
+        """Compute a composite score from validation metrics.
+        Lower is better."""
+        mae_scores = [metrics.get(f"mae_{h}", metrics["mae"]) for h in horizon_names]
+        rmse_scores = [metrics.get(f"rmse_{h}", metrics["rmse"]) for h in horizon_names]
+        r2_scores = [metrics.get(f"r2_{h}", metrics["r2"]) for h in horizon_names]
+
+        avg_mae = np.mean(mae_scores)
+        avg_rmse = np.mean(rmse_scores)
+        avg_r2 = np.mean(r2_scores)
+
+        # Normalize to [0, 1] range using min-max across models
+        # For now, use raw weighted sum (models are on same scale)
+        score = 0.4 * avg_mae + 0.3 * avg_rmse + 0.3 * (1 - avg_r2) * 100
+        return score
+
+    composite_scores = {}
+    for k, v in results.items():
+        score = compute_composite_score(v["val_metrics"])
+        composite_scores[k] = score
+        logger.info(
+            f"  {v['name']}: composite={score:.2f} "
+            f"(MAE={v['val_metrics']['mae']:.2f}, RMSE={v['val_metrics']['rmse']:.2f}, R2={v['val_metrics']['r2']:.4f})"
+        )
+
+    best_key = min(composite_scores, key=composite_scores.get)
     best = results[best_key]
-    logger.info(f"\n🏆 BEST MODEL: {best['name']} (MAE={best['val_metrics']['mae']:.2f})")
+    logger.info(
+        f"\n🏆 BEST MODEL: {best['name']} (composite={composite_scores[best_key]:.2f})"
+    )
+    logger.info(
+        f"   Val MAE={best['val_metrics']['mae']:.2f}, "
+        f"RMSE={best['val_metrics']['rmse']:.2f}, R2={best['val_metrics']['r2']:.4f}"
+    )
 
     # Compute residuals for confidence intervals
     best_pred = best["val_metrics"].get("_predictions")
@@ -501,7 +539,7 @@ def register_in_mlflow(result, force=False, min_improvement=0.0):
 
     # Register in MLflow
     mlflow.set_experiment("aqi_predictor_production")
-    run_name = f"xgboost_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}"
+    run_name = f"{result['model_key']}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}"
 
     with mlflow.start_run(run_name=run_name) as run:
         # Tags
@@ -572,22 +610,38 @@ def save_model_locally(result, run_id=None):
         pickle.dump(result["model"], f)
     logger.info(f"Model saved to {model_path}")
 
-    # Also save as generic production model for API
-    production_path = MODELS_DIR / "xgboost_model.pkl"
+    # Save as production model for API
+    production_path = MODELS_DIR / "best_model.pkl"
     with open(production_path, "wb") as f:
         pickle.dump(result["model"], f)
     logger.info(f"Production model saved to {production_path}")
+
+    # Build model comparison for metadata
+    model_comparison = {}
+    for k, v in result["all_results"].items():
+        model_comparison[k] = {
+            "name": v["name"],
+            "val_mae": v["val_metrics"]["mae"],
+            "val_rmse": v["val_metrics"]["rmse"],
+            "val_r2": v["val_metrics"]["r2"],
+            "test_mae": v["test_metrics"]["mae"],
+            "test_rmse": v["test_metrics"]["rmse"],
+            "test_r2": v["test_metrics"]["r2"],
+            "train_time": v["train_time"],
+        }
 
     # Save metadata
     metadata = {
         "model_version": f"v{datetime.now(timezone.utc).strftime('%Y%m%d')}",
         "model_name": result["model_name"],
+        "model_key": result["model_key"],
         "training_date": datetime.now(timezone.utc).isoformat(),
         "dataset_type": "real_api_data",
         "data_provider": "open-meteo",
         "feature_version": "2.0",
         "feature_columns": result["feature_columns"],
         "target_columns": ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"],
+        "model_comparison": model_comparison,
         "metrics": {
             "val": result["val_metrics"],
             "test": result["test_metrics"],
@@ -596,11 +650,6 @@ def save_model_locally(result, run_id=None):
                 "rmse": result["test_metrics"]["rmse"],
                 "r2": result["test_metrics"]["r2"],
             },
-        },
-        "model_params": {
-            "n_estimators": 200,
-            "max_depth": 6,
-            "learning_rate": 0.1,
         },
         "train_time": result["train_time"],
         "train_rows": result["train_rows"],

@@ -15,7 +15,7 @@ def validate_model_artifacts():
     checks = []
 
     # Check model file
-    model_path = Path("models/production/xgboost_model.pkl")
+    model_path = Path("models/production/best_model.pkl")
     if model_path.exists():
         size_mb = model_path.stat().st_size / (1024 * 1024)
         checks.append(("Model artifact", True, f"{size_mb:.1f} MB"))

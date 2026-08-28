@@ -119,7 +119,7 @@ class ModelService:
         import pickle
         from pathlib import Path
 
-        model_path = Path("models/production/xgboost_model.pkl")
+        model_path = Path("models/production/best_model.pkl")
         meta_path = Path("models/production/model_metadata.json")
 
         if not model_path.exists():
@@ -237,7 +237,7 @@ class ModelService:
         overall = metrics.get("overall", {})
 
         return {
-            "model_name": "xgboost_aqi_predictor",
+            "model_name": info.get("model_name", "unknown"),
             "model_version": info.get("model_version", "v1.0.0"),
             "status": "production",
             "approval_status": "approved",
