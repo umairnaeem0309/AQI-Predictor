@@ -93,5 +93,7 @@ scripts/validate_*.py
 scripts/check_*.py
 scripts/show_*.py
 scripts/merge_*.py
+!scripts/validate_production.py
+!scripts/pre_deploy_checks.py
 data/predictions/
 data/collection_health.json
