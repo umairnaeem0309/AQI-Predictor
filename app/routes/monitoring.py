@@ -42,12 +42,17 @@ def _get_aqi_category(aqi: float) -> str:
 
 def _load_processed_data() -> Optional[pd.DataFrame]:
     """Load processed dataset for drift analysis."""
-    data_path = os.path.join("data", "processed", "raw_observations.csv")
-    if os.path.exists(data_path):
-        try:
-            return pd.read_csv(data_path)
-        except Exception as e:
-            logger.warning(f"Failed to load processed data: {e}")
+    # Prefer feature-engineered dataset (has all 71 model features)
+    candidates = [
+        os.path.join("data", "processed", "train_features.csv"),
+        os.path.join("data", "processed", "raw_observations.csv"),
+    ]
+    for data_path in candidates:
+        if os.path.exists(data_path):
+            try:
+                return pd.read_csv(data_path)
+            except Exception as e:
+                logger.warning(f"Failed to load {data_path}: {e}")
     return None
 
 
@@ -100,7 +105,7 @@ async def get_drift_report(
 
         # Parse results
         drifted_columns = []
-        total_columns = 0
+        total_columns = len(feature_cols)
         drift_count = 0
 
         for metric in report_dict.get("metrics", []):
@@ -120,7 +125,7 @@ async def get_drift_report(
                 elif isinstance(score, (int, float)) and score > 0.1:
                     drifted_columns.append({"column": col_name, "drifted": True, "score": float(score)})
 
-        drift_percentage = (drift_count / total_columns * 100) if total_columns > 0 else 0
+        drift_percentage = (len(drifted_columns) / total_columns * 100) if total_columns > 0 else 0
 
         return {
             "status": "completed",
