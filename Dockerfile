@@ -48,12 +48,15 @@ COPY .env.example .env
 # Note: data/processed/ excluded from image for smaller size
 # Data routes gracefully handle missing historical dataset
 
-# Expose FastAPI port
+# Default port (Render overrides this with its own PORT env var)
+ENV PORT=8000
+
+# Expose default port
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Default command: run FastAPI via uvicorn
-CMD ["python", "-m", "uvicorn", "app.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use shell form so $PORT is expanded at runtime
+CMD python -m uvicorn app.backend.main:app --host 0.0.0.0 --port ${PORT}
