@@ -105,7 +105,46 @@ class ModelService:
             logger.warning(f"MLflow Registry load failed: {e}")
         
         # Fallback to local pickle
-        return self.load_local_model()
+        return self._load_local_pickle()
+
+    def _load_local_pickle(self) -> Tuple[Any, Dict]:
+        """
+        Load model from local pickle file.
+
+        Returns:
+            Tuple of (model, model_info)
+        """
+        import pickle
+        from pathlib import Path
+
+        model_path = Path("models/production/xgboost_model.pkl")
+        meta_path = Path("models/production/model_metadata.json")
+
+        if not model_path.exists():
+            raise ModelNotLoadedError(f"Model file not found: {model_path}")
+
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+
+        model_info = {}
+        if meta_path.exists():
+            with open(meta_path) as f:
+                model_info = json.load(f)
+
+        self._model = model
+        self._model_info = model_info
+
+        logger.info(f"Loaded local model from {model_path}")
+        return model, model_info
+
+    def load_local_model(self) -> Tuple[Any, Dict]:
+        """
+        Load model from local pickle file (public interface).
+
+        Returns:
+            Tuple of (model, model_info)
+        """
+        return self._load_local_pickle()
 
     def load_production_model(self) -> Tuple[Any, Dict]:
         """
