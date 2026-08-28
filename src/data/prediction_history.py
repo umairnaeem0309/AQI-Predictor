@@ -8,7 +8,7 @@ Provides query, store, and cleanup for past predictions.
 import json
 import logging
 import sqlite3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -156,9 +156,7 @@ class PredictionHistoryStore:
             params.append(city)
 
         with sqlite3.connect(str(self.db_path)) as conn:
-            total = conn.execute(
-                f"SELECT COUNT(*) FROM predictions {where}", params
-            ).fetchone()[0]
+            total = conn.execute(f"SELECT COUNT(*) FROM predictions {where}", params).fetchone()[0]
 
             if total == 0:
                 return {"total": 0, "cities": [], "date_range": None}
@@ -171,12 +169,16 @@ class PredictionHistoryStore:
             ]
 
             date_range = conn.execute(
-                f"SELECT MIN(timestamp), MAX(timestamp) FROM predictions {where}", params
+                f"SELECT MIN(timestamp), MAX(timestamp) FROM predictions {where}",
+                params,
             ).fetchone()
 
             avg_aqi = conn.execute(
-                f"SELECT AVG(aqi_24h) FROM predictions {where} AND aqi_24h IS NOT NULL" if city
-                else "SELECT AVG(aqi_24h) FROM predictions WHERE aqi_24h IS NOT NULL",
+                (
+                    f"SELECT AVG(aqi_24h) FROM predictions {where} AND aqi_24h IS NOT NULL"
+                    if city
+                    else "SELECT AVG(aqi_24h) FROM predictions WHERE aqi_24h IS NOT NULL"
+                ),
                 params,
             ).fetchone()[0]
 
@@ -203,8 +205,6 @@ class PredictionHistoryStore:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
         with sqlite3.connect(str(self.db_path)) as conn:
-            cursor = conn.execute(
-                "DELETE FROM predictions WHERE timestamp < ?", (cutoff,)
-            )
+            cursor = conn.execute("DELETE FROM predictions WHERE timestamp < ?", (cutoff,))
             conn.commit()
             return cursor.rowcount

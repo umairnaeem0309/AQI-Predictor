@@ -2,17 +2,17 @@
 Tests for model lifecycle — state transitions, synthetic blocking, and artifact logging.
 """
 
-import pytest
 from datetime import datetime, timezone
 
-from src.models.lifecycle import (
-    ModelState,
-    ModelLifecycle,
-    LifecycleTransitionError,
-    LifecycleBlockError,
-    VALID_TRANSITIONS,
-)
+import pytest
 
+from src.models.lifecycle import (
+    VALID_TRANSITIONS,
+    LifecycleBlockError,
+    LifecycleTransitionError,
+    ModelLifecycle,
+    ModelState,
+)
 
 # =============================================================================
 # Test State Transitions
@@ -192,6 +192,7 @@ class TestArtifactStructure:
         # Verify these are mentioned in registry.py log_artifacts
         pytest.importorskip("duckdb", reason="duckdb required for ModelRegistry import")
         from src.models.registry import ModelRegistry
+
         # The method exists and accepts these parameters
         registry = ModelRegistry()
         assert hasattr(registry, "log_artifacts")

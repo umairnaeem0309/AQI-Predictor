@@ -4,18 +4,18 @@ Monitoring Route
 Provides data drift detection, performance monitoring, and system health endpoints.
 """
 
+import json
 import logging
 import os
-import json
-from typing import Dict, Any, Optional
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.backend.dependencies import verify_api_key
-from app.services.model_service import get_model_service, ModelNotLoadedError
+from app.services.model_service import ModelNotLoadedError, get_model_service
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,10 @@ async def get_drift_report(
         feature_cols = [c for c in numeric_cols if c not in exclude]
 
         if len(feature_cols) < 3:
-            raise HTTPException(status_code=400, detail="Insufficient numeric features for drift analysis")
+            raise HTTPException(
+                status_code=400,
+                detail="Insufficient numeric features for drift analysis",
+            )
 
         # Split: reference = first 80%, current = last 20%
         split_idx = int(len(df) * 0.8)
@@ -130,7 +133,9 @@ async def get_drift_report(
                 if isinstance(score, bool) and score:
                     drifted_columns.append({"column": col_name, "drifted": True})
                 elif isinstance(score, (int, float)) and score > 0.1:
-                    drifted_columns.append({"column": col_name, "drifted": True, "score": float(score)})
+                    drifted_columns.append(
+                        {"column": col_name, "drifted": True, "score": float(score)}
+                    )
 
         drift_percentage = (len(drifted_columns) / total_columns * 100) if total_columns > 0 else 0
 
@@ -206,7 +211,9 @@ async def get_alerts(
     Returns alerts for any city where predicted AQI exceeds thresholds.
     """
     try:
-        from src.data.providers.open_meteo_air_quality import OpenMeteoAirQualityProvider
+        from src.data.providers.open_meteo_air_quality import (
+            OpenMeteoAirQualityProvider,
+        )
 
         alerts = []
         cities = {
@@ -253,16 +260,18 @@ async def get_alerts(
                         alert_level = "caution"
 
                     if alert_level != "none":
-                        alerts.append({
-                            "city": city.title(),
-                            "aqi": aqi,
-                            "pm25": pm25,
-                            "pm10": pm10,
-                            "category": category,
-                            "alert_level": alert_level,
-                            "recommendation": _get_recommendation(aqi),
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                        })
+                        alerts.append(
+                            {
+                                "city": city.title(),
+                                "aqi": aqi,
+                                "pm25": pm25,
+                                "pm10": pm10,
+                                "category": category,
+                                "alert_level": alert_level,
+                                "recommendation": _get_recommendation(aqi),
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            }
+                        )
 
             except Exception as e:
                 logger.warning(f"Failed to fetch data for {city}: {e}")

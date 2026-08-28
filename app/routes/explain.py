@@ -4,17 +4,17 @@ Explainability Route
 Provides model feature importance, SHAP values, and prediction explanations.
 """
 
+import json
 import logging
 import os
-import json
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.backend.dependencies import verify_api_key
-from app.services.model_service import get_model_service, ModelNotLoadedError
+from app.services.model_service import ModelNotLoadedError, get_model_service
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +23,14 @@ router = APIRouter(prefix="/explain", tags=["explain"])
 
 class PredictionExplanationRequest(BaseModel):
     """Request for SHAP prediction explanation."""
+
     features: Dict[str, float] = Field(..., description="Feature values for the prediction")
     target: str = Field(default="target_aqi_24h", description="Target to explain")
 
 
 class PredictionExplanationResponse(BaseModel):
     """Response for SHAP prediction explanation."""
+
     base_value: float
     shap_values: List[Dict[str, Any]]
     feature_names: List[str]
@@ -82,18 +84,18 @@ async def get_feature_importance(
 
         # Get feature importances from XGBoost
         # Model may be wrapped in MultiOutputRegressor
-        if hasattr(model, 'estimators_'):
+        if hasattr(model, "estimators_"):
             # MultiOutputRegressor: average importances across targets
             importances = None
             for est in model.estimators_:
-                if hasattr(est, 'feature_importances_'):
+                if hasattr(est, "feature_importances_"):
                     if importances is None:
                         importances = est.feature_importances_.copy()
                     else:
                         importances += est.feature_importances_
             if importances is not None:
                 importances /= len(model.estimators_)
-        elif hasattr(model, 'feature_importances_'):
+        elif hasattr(model, "feature_importances_"):
             importances = model.feature_importances_
         else:
             raise HTTPException(status_code=500, detail="Model does not support feature importance")
@@ -112,21 +114,44 @@ async def get_feature_importance(
 
         # Categorize features
         categories = {
-            "weather": ["temperature", "humidity", "pressure", "wind_speed", "wind_direction", "cloud_cover", "precipitation"],
+            "weather": [
+                "temperature",
+                "humidity",
+                "pressure",
+                "wind_speed",
+                "wind_direction",
+                "cloud_cover",
+                "precipitation",
+            ],
             "pollution": ["pm25", "pm10", "co", "no2", "so2", "o3"],
             "lag": [f for f in feature_names if "lag" in f],
             "rolling": [f for f in feature_names if "rolling" in f],
-            "time": ["hour", "day_of_week", "month", "is_weekend", "season", "hour_sin", "hour_cos"],
-            "interaction": [f for f in feature_names if "ratio" in f or "interaction" in f or "deviation" in f or "change_rate" in f or "trend" in f or "cooling" in f],
+            "time": [
+                "hour",
+                "day_of_week",
+                "month",
+                "is_weekend",
+                "season",
+                "hour_sin",
+                "hour_cos",
+            ],
+            "interaction": [
+                f
+                for f in feature_names
+                if "ratio" in f
+                or "interaction" in f
+                or "deviation" in f
+                or "change_rate" in f
+                or "trend" in f
+                or "cooling" in f
+            ],
         }
 
         # Count importance by category
         category_importance = {}
         for cat, cat_features in categories.items():
             cat_total = sum(
-                imp["importance"]
-                for imp in importance_list
-                if imp["feature"] in cat_features
+                imp["importance"] for imp in importance_list if imp["feature"] in cat_features
             )
             category_importance[cat] = round(cat_total, 4)
 
@@ -217,6 +242,7 @@ async def get_shap_explanation(
 
         # Compute training means for filling missing features
         import pandas as pd
+
         train_means = {}
         for candidate in [
             os.path.join("data", "processed", "train_features.csv"),
@@ -246,7 +272,7 @@ async def get_shap_explanation(
         # Get the correct estimator for the requested target
         target_idx = _get_target_index(request.target)
 
-        if hasattr(model, 'estimators_'):
+        if hasattr(model, "estimators_"):
             estimator = model.estimators_[target_idx]
         else:
             estimator = model
@@ -263,31 +289,51 @@ async def get_shap_explanation(
         else:
             sv = np.array(shap_values)
 
-        base_value = float(explainer.expected_value) if np.isscalar(explainer.expected_value) else float(explainer.expected_value[0]) if hasattr(explainer.expected_value, '__len__') else float(explainer.expected_value)
+        base_value = (
+            float(explainer.expected_value)
+            if np.isscalar(explainer.expected_value)
+            else (
+                float(explainer.expected_value[0])
+                if hasattr(explainer.expected_value, "__len__")
+                else float(explainer.expected_value)
+            )
+        )
 
         prediction = float(base_value + np.sum(sv))
 
         # Build per-feature SHAP list
         shap_list = []
         for fname, val, sv_val in zip(feature_names, feature_values, sv):
-            shap_list.append({
-                "feature": fname,
-                "shap_value": round(float(sv_val), 4),
-                "feature_value": round(float(val), 4),
-            })
+            shap_list.append(
+                {
+                    "feature": fname,
+                    "shap_value": round(float(sv_val), 4),
+                    "feature_value": round(float(val), 4),
+                }
+            )
 
         # Sort by absolute SHAP value
         shap_list.sort(key=lambda x: abs(x["shap_value"]), reverse=True)
 
         # Split into positive and negative
         top_positive = [
-            {"feature": s["feature"], "shap_value": s["shap_value"], "feature_value": s["feature_value"]}
-            for s in shap_list if s["shap_value"] > 0
+            {
+                "feature": s["feature"],
+                "shap_value": s["shap_value"],
+                "feature_value": s["feature_value"],
+            }
+            for s in shap_list
+            if s["shap_value"] > 0
         ][:10]
 
         top_negative = [
-            {"feature": s["feature"], "shap_value": s["shap_value"], "feature_value": s["feature_value"]}
-            for s in shap_list if s["shap_value"] < 0
+            {
+                "feature": s["feature"],
+                "shap_value": s["shap_value"],
+                "feature_value": s["feature_value"],
+            }
+            for s in shap_list
+            if s["shap_value"] < 0
         ][:10]
 
         return PredictionExplanationResponse(
@@ -330,8 +376,8 @@ async def get_global_shap_importance(
     built-in feature_importances_ (which uses split-based gain).
     """
     try:
-        import shap
         import pandas as pd
+        import shap
 
         model_service = get_model_service()
         model = model_service.get_model()
@@ -375,7 +421,7 @@ async def get_global_shap_importance(
 
         # Get target estimator (default 24h)
         target_idx = 0
-        if hasattr(model, 'estimators_'):
+        if hasattr(model, "estimators_"):
             estimator = model.estimators_[target_idx]
         else:
             estimator = model

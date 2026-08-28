@@ -5,11 +5,12 @@ Health check endpoint.
 """
 
 import logging
+
 from fastapi import APIRouter
 
 from app.schemas.responses import HealthResponse
-from app.services.model_service import get_model_service
 from app.services.feature_service import get_feature_service
+from app.services.model_service import get_model_service
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ router = APIRouter(tags=["health"])
 async def health_check():
     """
     Check service health.
-    
+
     Returns:
     - **status**: Service status (healthy/unhealthy)
     - **model_loaded**: Whether model is loaded
@@ -36,7 +37,7 @@ async def health_check():
     try:
         model_service = get_model_service()
         feature_service = get_feature_service()
-        
+
         return HealthResponse(
             status="healthy",
             model_loaded=model_service.is_loaded(),

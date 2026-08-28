@@ -140,9 +140,7 @@ def validate_credentials(required: Optional[List[str]] = None) -> Dict[str, bool
             masked = key[:3] + "***" + key[-3:] if len(key) > 6 else "***"
             logger.info("Credentials loaded for %s: key=%s", service, masked)
         else:
-            logger.warning(
-                "No credentials for %s — that source will be unavailable", service
-            )
+            logger.warning("No credentials for %s — that source will be unavailable", service)
 
     return availability
 

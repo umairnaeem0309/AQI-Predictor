@@ -8,19 +8,18 @@ Tests:
 - End-to-end pipeline with mocked API responses
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.data.historical_ingestion import (
-    merge_weather_and_air_quality,
     calculate_aqi_targets,
+    merge_weather_and_air_quality,
     validate_dataset,
 )
-
 
 # ============================================================================
 # Fixtures
@@ -31,54 +30,52 @@ from src.data.historical_ingestion import (
 def sample_weather_df():
     """Sample weather DataFrame matching Open-Meteo output format."""
     n_hours = 100
-    timestamps = pd.date_range(
-        start="2023-06-01", periods=n_hours, freq="h", tz="UTC"
-    )
+    timestamps = pd.date_range(start="2023-06-01", periods=n_hours, freq="h", tz="UTC")
     np.random.seed(42)
-    return pd.DataFrame({
-        "timestamp": timestamps,
-        "location_id": "karachi",
-        "city_name": "Karachi",
-        "temperature": 30 + np.random.randn(n_hours) * 3,
-        "humidity": 65 + np.random.randn(n_hours) * 10,
-        "pressure": 1012 + np.random.randn(n_hours) * 2,
-        "wind_speed": 3 + np.random.rand(n_hours) * 5,
-        "wind_direction": np.random.uniform(0, 360, n_hours),
-        "cloud_cover": np.clip(50 + np.random.randn(n_hours) * 20, 0, 100),
-        "precipitation": np.random.exponential(0.1, n_hours),
-        "data_source": "open_meteo_weather",
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "location_id": "karachi",
+            "city_name": "Karachi",
+            "temperature": 30 + np.random.randn(n_hours) * 3,
+            "humidity": 65 + np.random.randn(n_hours) * 10,
+            "pressure": 1012 + np.random.randn(n_hours) * 2,
+            "wind_speed": 3 + np.random.rand(n_hours) * 5,
+            "wind_direction": np.random.uniform(0, 360, n_hours),
+            "cloud_cover": np.clip(50 + np.random.randn(n_hours) * 20, 0, 100),
+            "precipitation": np.random.exponential(0.1, n_hours),
+            "data_source": "open_meteo_weather",
+        }
+    )
 
 
 @pytest.fixture
 def sample_aq_df():
     """Sample air quality DataFrame matching Open-Meteo output format."""
     n_hours = 100
-    timestamps = pd.date_range(
-        start="2023-06-01", periods=n_hours, freq="h", tz="UTC"
-    )
+    timestamps = pd.date_range(start="2023-06-01", periods=n_hours, freq="h", tz="UTC")
     np.random.seed(42)
-    return pd.DataFrame({
-        "timestamp": timestamps,
-        "location_id": "karachi",
-        "pm25": 25 + np.random.rand(n_hours) * 30,
-        "pm10": 40 + np.random.rand(n_hours) * 40,
-        "co": 400 + np.random.rand(n_hours) * 200,
-        "no2": 25 + np.random.rand(n_hours) * 20,
-        "so2": 10 + np.random.rand(n_hours) * 10,
-        "o3": 40 + np.random.rand(n_hours) * 30,
-        "us_aqi_open_meteo": 70 + np.random.randint(0, 40, n_hours),
-        "data_source": "open_meteo_air_quality",
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "location_id": "karachi",
+            "pm25": 25 + np.random.rand(n_hours) * 30,
+            "pm10": 40 + np.random.rand(n_hours) * 40,
+            "co": 400 + np.random.rand(n_hours) * 200,
+            "no2": 25 + np.random.rand(n_hours) * 20,
+            "so2": 10 + np.random.rand(n_hours) * 10,
+            "o3": 40 + np.random.rand(n_hours) * 30,
+            "us_aqi_open_meteo": 70 + np.random.randint(0, 40, n_hours),
+            "data_source": "open_meteo_air_quality",
+        }
+    )
 
 
 @pytest.fixture
 def sample_multi_city_weather():
     """Weather data for multiple cities."""
     n_hours = 48
-    timestamps = pd.date_range(
-        start="2023-06-01", periods=n_hours, freq="h", tz="UTC"
-    )
+    timestamps = pd.date_range(start="2023-06-01", periods=n_hours, freq="h", tz="UTC")
     frames = []
     for city_id, city_name, base_temp in [
         ("karachi", "Karachi", 30),
@@ -86,16 +83,20 @@ def sample_multi_city_weather():
         ("islamabad", "Islamabad", 28),
     ]:
         np.random.seed(hash(city_id) % 2**31)
-        frames.append(pd.DataFrame({
-            "timestamp": timestamps,
-            "location_id": city_id,
-            "city_name": city_name,
-            "temperature": base_temp + np.random.randn(n_hours) * 3,
-            "humidity": 60 + np.random.randn(n_hours) * 10,
-            "pressure": 1012 + np.random.randn(n_hours) * 2,
-            "wind_speed": 3 + np.random.rand(n_hours) * 4,
-            "data_source": "open_meteo_weather",
-        }))
+        frames.append(
+            pd.DataFrame(
+                {
+                    "timestamp": timestamps,
+                    "location_id": city_id,
+                    "city_name": city_name,
+                    "temperature": base_temp + np.random.randn(n_hours) * 3,
+                    "humidity": 60 + np.random.randn(n_hours) * 10,
+                    "pressure": 1012 + np.random.randn(n_hours) * 2,
+                    "wind_speed": 3 + np.random.rand(n_hours) * 4,
+                    "data_source": "open_meteo_weather",
+                }
+            )
+        )
     return pd.concat(frames, ignore_index=True)
 
 
@@ -152,16 +153,20 @@ class TestMergeWeatherAndAirQuality:
 
     def test_merge_outer_join_fills_missing(self):
         """Outer join fills missing values with NaN."""
-        weather = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01T00:00", "2023-01-01T01:00"], utc=True),
-            "location_id": ["karachi", "karachi"],
-            "temperature": [25.0, 26.0],
-        })
-        aq = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01T01:00", "2023-01-01T02:00"], utc=True),
-            "location_id": ["karachi", "karachi"],
-            "pm25": [30.0, 35.0],
-        })
+        weather = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01T00:00", "2023-01-01T01:00"], utc=True),
+                "location_id": ["karachi", "karachi"],
+                "temperature": [25.0, 26.0],
+            }
+        )
+        aq = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01T01:00", "2023-01-01T02:00"], utc=True),
+                "location_id": ["karachi", "karachi"],
+                "pm25": [30.0, 35.0],
+            }
+        )
         merged = merge_weather_and_air_quality(weather, aq)
         assert len(merged) == 3  # 3 unique timestamps
         # First row: weather only → pm25 should be NaN
@@ -225,34 +230,40 @@ class TestCalculateAQITargets:
 
     def test_aqi_high_pm25_selects_pm25(self):
         """When PM2.5 AQI > PM10 AQI, dominant is pm25."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01T00:00"], utc=True),
-            "location_id": ["karachi"],
-            "pm25": [150.0],  # Very high PM2.5 → high AQI
-            "pm10": [30.0],   # Low PM10 → low AQI
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01T00:00"], utc=True),
+                "location_id": ["karachi"],
+                "pm25": [150.0],  # Very high PM2.5 → high AQI
+                "pm10": [30.0],  # Low PM10 → low AQI
+            }
+        )
         result = calculate_aqi_targets(df)
         assert result.iloc[0]["aqi_dominant_pollutant"] == "pm25"
 
     def test_aqi_high_pm10_selects_pm10(self):
         """When PM10 AQI > PM2.5 AQI, dominant is pm10."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01T00:00"], utc=True),
-            "location_id": ["karachi"],
-            "pm25": [10.0],   # Low PM2.5
-            "pm10": [200.0],  # High PM10 → high AQI
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01T00:00"], utc=True),
+                "location_id": ["karachi"],
+                "pm25": [10.0],  # Low PM2.5
+                "pm10": [200.0],  # High PM10 → high AQI
+            }
+        )
         result = calculate_aqi_targets(df)
         assert result.iloc[0]["aqi_dominant_pollutant"] == "pm10"
 
     def test_aqi_missing_pollutants(self):
         """Missing pollutant values result in None AQI."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01T00:00"], utc=True),
-            "location_id": ["karachi"],
-            "pm25": [None],
-            "pm10": [None],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01T00:00"], utc=True),
+                "location_id": ["karachi"],
+                "pm25": [None],
+                "pm10": [None],
+            }
+        )
         result = calculate_aqi_targets(df)
         assert result.iloc[0]["aqi"] is None
         assert result.iloc[0]["aqi_dominant_pollutant"] is None
@@ -287,55 +298,65 @@ class TestValidateDataset:
 
     def test_validation_catches_negative_pollutants(self):
         """Negative pollutant values are flagged."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
-            "location_id": ["karachi"],
-            "pm25": [-5.0],
-            "pm10": [30.0],
-            "aqi": [50],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
+                "location_id": ["karachi"],
+                "pm25": [-5.0],
+                "pm10": [30.0],
+                "aqi": [50],
+            }
+        )
         report = validate_dataset(df)
         assert any("Negative" in issue for issue in report["quality_issues"])
 
     def test_validation_catches_extreme_temperature(self):
         """Extreme temperature values are flagged."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
-            "location_id": ["karachi"],
-            "temperature": [999.0],
-            "aqi": [50],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
+                "location_id": ["karachi"],
+                "temperature": [999.0],
+                "aqi": [50],
+            }
+        )
         report = validate_dataset(df)
         assert any("Extreme temperature" in issue for issue in report["quality_issues"])
 
     def test_validation_catches_invalid_humidity(self):
         """Humidity outside 0-100 is flagged."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
-            "location_id": ["karachi"],
-            "humidity": [150.0],
-            "aqi": [50],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
+                "location_id": ["karachi"],
+                "humidity": [150.0],
+                "aqi": [50],
+            }
+        )
         report = validate_dataset(df)
         assert any("humidity" in issue.lower() for issue in report["quality_issues"])
 
     def test_validation_catches_duplicates(self):
         """Duplicate (timestamp, location_id) pairs are flagged."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01", "2023-01-01"], utc=True),
-            "location_id": ["karachi", "karachi"],
-            "aqi": [50, 60],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01", "2023-01-01"], utc=True),
+                "location_id": ["karachi", "karachi"],
+                "aqi": [50, 60],
+            }
+        )
         report = validate_dataset(df)
         assert any("Duplicate" in issue for issue in report["quality_issues"])
 
     def test_validation_catches_out_of_range_aqi(self):
         """AQI outside 0-500 is flagged."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
-            "location_id": ["karachi"],
-            "aqi": [600],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2023-01-01"], utc=True),
+                "location_id": ["karachi"],
+                "aqi": [600],
+            }
+        )
         report = validate_dataset(df)
         assert any("500" in issue for issue in report["quality_issues"])
 
@@ -369,9 +390,11 @@ class TestIngestionPipeline:
 
         # Mock weather response
         n_hours = 48
-        timestamps = pd.date_range(
-            start="2023-06-01", periods=n_hours, freq="h", tz="UTC"
-        ).strftime("%Y-%m-%dT%H:%M").tolist()
+        timestamps = (
+            pd.date_range(start="2023-06-01", periods=n_hours, freq="h", tz="UTC")
+            .strftime("%Y-%m-%dT%H:%M")
+            .tolist()
+        )
 
         mock_weather_fetch.return_value = {
             "hourly": {

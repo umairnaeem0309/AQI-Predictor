@@ -2,28 +2,28 @@
 Tests for model selection — ranking, approval, registry safety, and rollback.
 """
 
-import numpy as np
-import pytest
 from unittest.mock import MagicMock
 
-from src.models.selection import (
-    SelectionWeights,
-    ModelApprovalStatus,
-    ModelEvaluation,
-    normalize_score,
-    compute_performance_score,
-    compute_engineering_score,
-    compute_combined_score,
-    rank_models,
-    check_minimum_thresholds,
-    generate_tradeoff_documentation,
-)
+import numpy as np
+import pytest
+
 from src.models.registry import (
+    ModelRegistry,
     generate_model_name,
     validate_for_production,
-    ModelRegistry,
 )
-
+from src.models.selection import (
+    ModelApprovalStatus,
+    ModelEvaluation,
+    SelectionWeights,
+    check_minimum_thresholds,
+    compute_combined_score,
+    compute_engineering_score,
+    compute_performance_score,
+    generate_tradeoff_documentation,
+    normalize_score,
+    rank_models,
+)
 
 # =============================================================================
 # Test Fixtures
@@ -232,32 +232,24 @@ class TestRegistrySafety:
 
     def test_synthetic_rejected(self):
         """Synthetic data rejected from production."""
-        eligible, failures = validate_for_production(
-            "synthetic_test_data", True, "approved"
-        )
+        eligible, failures = validate_for_production("synthetic_test_data", True, "approved")
         assert eligible is False
         assert any("synthetic" in f.lower() for f in failures)
 
     def test_unapproved_rejected(self):
         """Unapproved data rejected from production."""
-        eligible, failures = validate_for_production(
-            "real_training_data", False, "approved"
-        )
+        eligible, failures = validate_for_production("real_training_data", False, "approved")
         assert eligible is False
         assert any("approved" in f.lower() for f in failures)
 
     def test_not_approved_status_rejected(self):
         """Non-approved status rejected from production."""
-        eligible, failures = validate_for_production(
-            "real_training_data", True, "candidate"
-        )
+        eligible, failures = validate_for_production("real_training_data", True, "candidate")
         assert eligible is False
 
     def test_real_approved_accepted(self):
         """Real approved data accepted for production."""
-        eligible, failures = validate_for_production(
-            "real_training_data", True, "approved"
-        )
+        eligible, failures = validate_for_production("real_training_data", True, "approved")
         assert eligible is True
         assert len(failures) == 0
 

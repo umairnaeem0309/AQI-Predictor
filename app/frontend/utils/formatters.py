@@ -11,16 +11,16 @@ from typing import Optional
 def format_timestamp(timestamp_str: Optional[str]) -> str:
     """
     Format timestamp for display.
-    
+
     Args:
         timestamp_str: ISO timestamp string
-        
+
     Returns:
         Formatted timestamp
     """
     if not timestamp_str:
         return "N/A"
-    
+
     try:
         dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -31,21 +31,21 @@ def format_timestamp(timestamp_str: Optional[str]) -> str:
 def format_time_ago(timestamp_str: Optional[str]) -> str:
     """
     Format timestamp as time ago.
-    
+
     Args:
         timestamp_str: ISO timestamp string
-        
+
     Returns:
         Time ago string
     """
     if not timestamp_str:
         return "Never"
-    
+
     try:
         dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
         diff = now - dt
-        
+
         seconds = int(diff.total_seconds())
         if seconds < 60:
             return f"{seconds} seconds ago"
@@ -65,10 +65,10 @@ def format_time_ago(timestamp_str: Optional[str]) -> str:
 def format_aqi(aqi_value: int) -> str:
     """
     Format AQI value for display.
-    
+
     Args:
         aqi_value: AQI value
-        
+
     Returns:
         Formatted AQI string
     """
@@ -78,11 +78,11 @@ def format_aqi(aqi_value: int) -> str:
 def format_metric(value: Optional[float], decimals: int = 2) -> str:
     """
     Format metric value.
-    
+
     Args:
         value: Metric value
         decimals: Number of decimal places
-        
+
     Returns:
         Formatted metric string
     """
@@ -94,10 +94,10 @@ def format_metric(value: Optional[float], decimals: int = 2) -> str:
 def format_percentage(value: Optional[float]) -> str:
     """
     Format percentage value.
-    
+
     Args:
         value: Percentage value (0-100)
-        
+
     Returns:
         Formatted percentage string
     """

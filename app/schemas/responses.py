@@ -4,14 +4,15 @@ Response Schemas
 Pydantic models for API responses.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel, Field
 
 
 class PredictionResponse(BaseModel):
     """Response model for prediction endpoint."""
-    
+
     city: str = Field(..., description="City name")
     timestamp: str = Field(..., description="Prediction timestamp (UTC)")
     aqi_24h: int = Field(..., description="Predicted AQI for 24 hours")
@@ -25,7 +26,7 @@ class PredictionResponse(BaseModel):
         default=None,
         description="Prediction confidence intervals (level, method, per-horizon bounds)",
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -45,13 +46,13 @@ class PredictionResponse(BaseModel):
 
 class FeatureResponse(BaseModel):
     """Response model for feature retrieval endpoint."""
-    
+
     city: str = Field(..., description="City name")
     timestamp: str = Field(..., description="Feature timestamp (UTC)")
     features: Dict[str, Any] = Field(..., description="Feature values")
     feature_count: int = Field(..., description="Number of features returned")
     feature_version: str = Field(..., description="Feature version")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -70,7 +71,7 @@ class FeatureResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response model for health check endpoint."""
-    
+
     status: str = Field(..., description="Service status")
     model_loaded: bool = Field(..., description="Whether model is loaded")
     feature_store_connected: bool = Field(..., description="Feature store connection status")
@@ -79,7 +80,7 @@ class HealthResponse(BaseModel):
         description="Timestamp of last prediction",
     )
     version: str = Field(..., description="API version")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -94,7 +95,7 @@ class HealthResponse(BaseModel):
 
 class ModelInfoResponse(BaseModel):
     """Response model for model info endpoint."""
-    
+
     model_name: str = Field(..., description="Model name")
     model_version: str = Field(..., description="Model version")
     status: str = Field(..., description="Model lifecycle status")
@@ -103,7 +104,7 @@ class ModelInfoResponse(BaseModel):
     dataset_type: str = Field(..., description="Dataset type used for training")
     feature_version: str = Field(..., description="Feature version")
     metrics: Dict[str, float] = Field(..., description="Model metrics")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -121,10 +122,10 @@ class ModelInfoResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Error response model."""
-    
+
     detail: str = Field(..., description="Error message")
     type: str = Field(..., description="Error type")
-    
+
     class Config:
         json_schema_extra = {
             "example": {

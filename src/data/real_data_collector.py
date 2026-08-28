@@ -5,18 +5,18 @@ Collects real data from APIs using the APIManager orchestrator.
 Tracks API usage metrics and audit trails.
 """
 
-import os
 import json
 import logging
+import os
 import time
-from datetime import datetime, timezone, timedelta
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from src.config import load_environment, get_api_key
+from src.config import get_api_key, load_environment
 from src.data.api_manager import APIManager
 from src.data.schemas import CityConfig
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CollectionRound:
     """Record of one collection round across all cities."""
+
     round_id: str
     timestamp: str
     cities_attempted: int
@@ -54,7 +55,9 @@ class RealDataCollector:
     CITIES = {
         "karachi": CityConfig(id="karachi", name="Karachi", latitude=24.8607, longitude=67.0011),
         "lahore": CityConfig(id="lahore", name="Lahore", latitude=31.5204, longitude=74.3587),
-        "islamabad": CityConfig(id="islamabad", name="Islamabad", latitude=33.6844, longitude=73.0479),
+        "islamabad": CityConfig(
+            id="islamabad", name="Islamabad", latitude=33.6844, longitude=73.0479
+        ),
     }
 
     def __init__(
@@ -73,6 +76,7 @@ class RealDataCollector:
 
         # Initialize NowCast history manager
         from src.data.nowcast_history import NowCastHistoryManager
+
         self.nowcast_history = NowCastHistoryManager(
             history_path=self.output_dir / "nowcast_history.json"
         )
@@ -86,7 +90,8 @@ class RealDataCollector:
                 if count > 0:
                     logger.info(
                         "Loaded %d NowCast history entries for %s from CSV",
-                        count, city_id,
+                        count,
+                        city_id,
                     )
 
         # Initialize APIManager with NowCast history
@@ -132,11 +137,7 @@ class RealDataCollector:
         if cities is None:
             city_configs = list(self.CITIES.values())
         else:
-            city_configs = [
-                self.CITIES[c.lower()]
-                for c in cities
-                if c.lower() in self.CITIES
-            ]
+            city_configs = [self.CITIES[c.lower()] for c in cities if c.lower() in self.CITIES]
 
         if not city_configs:
             raise ValueError(f"No valid cities in: {cities}")
@@ -150,10 +151,7 @@ class RealDataCollector:
         failed_cities = []
         if not df.empty and "location_id" in df.columns:
             collected_cities = set(df["location_id"].unique())
-        failed_cities = [
-            c.id for c in city_configs
-            if c.id not in collected_cities
-        ]
+        failed_cities = [c.id for c in city_configs if c.id not in collected_cities]
 
         # Source summary
         source_summary = {}

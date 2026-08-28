@@ -11,10 +11,10 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.backend.dependencies import verify_api_key, check_rate_limit
+from app.backend.dependencies import check_rate_limit, verify_api_key
 from app.schemas.requests import validate_city
-from app.services.prediction_service import get_prediction_service, PredictionError
 from app.services.model_service import ModelNotLoadedError
+from app.services.prediction_service import PredictionError, get_prediction_service
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/batch", tags=["batch"])
 
 class BatchPredictionRequest(BaseModel):
     """Request for batch predictions."""
+
     cities: List[str] = Field(
         ...,
         min_length=1,
@@ -33,6 +34,7 @@ class BatchPredictionRequest(BaseModel):
 
 class BatchPredictionResponse(BaseModel):
     """Response for batch predictions."""
+
     predictions: list
     total_cities: int
     successful: int
@@ -70,33 +72,41 @@ async def batch_predict(
             predictions.append(result)
             successful += 1
         except ValueError as e:
-            predictions.append({
-                "city": city_name,
-                "error": str(e),
-                "aqi_24h": None,
-            })
+            predictions.append(
+                {
+                    "city": city_name,
+                    "error": str(e),
+                    "aqi_24h": None,
+                }
+            )
             failed += 1
         except PredictionError as e:
-            predictions.append({
-                "city": city_name,
-                "error": str(e),
-                "aqi_24h": None,
-            })
+            predictions.append(
+                {
+                    "city": city_name,
+                    "error": str(e),
+                    "aqi_24h": None,
+                }
+            )
             failed += 1
         except ModelNotLoadedError as e:
-            predictions.append({
-                "city": city_name,
-                "error": "Model not loaded",
-                "aqi_24h": None,
-            })
+            predictions.append(
+                {
+                    "city": city_name,
+                    "error": "Model not loaded",
+                    "aqi_24h": None,
+                }
+            )
             failed += 1
         except Exception as e:
             logger.error(f"Batch prediction error for {city_name}: {e}")
-            predictions.append({
-                "city": city_name,
-                "error": "Internal error",
-                "aqi_24h": None,
-            })
+            predictions.append(
+                {
+                    "city": city_name,
+                    "error": "Internal error",
+                    "aqi_24h": None,
+                }
+            )
             failed += 1
 
     elapsed_ms = (time.time() - start_time) * 1000

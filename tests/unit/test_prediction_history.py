@@ -3,8 +3,8 @@ Tests for prediction history store.
 """
 
 import os
-import tempfile
 import sqlite3
+import tempfile
 from datetime import datetime, timezone
 
 import pytest
@@ -43,9 +43,7 @@ class TestPredictionHistoryStore:
     def test_init_creates_tables(self, store):
         """Test that tables are created."""
         with sqlite3.connect(str(store.db_path)) as conn:
-            tables = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             table_names = [t[0] for t in tables]
             assert "predictions" in table_names
 
@@ -180,6 +178,7 @@ class TestAPIClientHistory:
 
     def test_history_mock(self):
         from app.frontend.utils.api_client import APIClient
+
         client = APIClient(mock_mode=True)
         # No history mock yet — just verify the client works
         assert client.mock_mode is True

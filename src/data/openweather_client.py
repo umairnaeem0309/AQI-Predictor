@@ -21,14 +21,14 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from src.data.base_client import BaseAPIClient
+from src.data.exceptions import APIValidationError
 from src.data.schemas import (
     CityConfig,
+    DataSource,
     OpenWeatherPollutionResponse,
     OpenWeatherWeatherResponse,
     StandardObservation,
-    DataSource,
 )
-from src.data.exceptions import APIValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -363,9 +363,7 @@ class OpenWeatherClient(BaseAPIClient):
             "units": "metric",
         }
         weather_json = self._retry_request("weather", weather_params)
-        weather_obs = self._parse_weather_response(
-            weather_json, city_id, city_config.name
-        )
+        weather_obs = self._parse_weather_response(weather_json, city_id, city_config.name)
 
         # Fetch pollution data
         pollution_obs = None

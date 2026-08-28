@@ -13,31 +13,32 @@ Tests cover:
 
 Reference: EPA-454/B-24-002 (May 2024)
 """
-import pytest
+
 import math
 
+import pytest
+
 from src.utils.epa_aqi import (
-    calculate_pm25_aqi,
-    calculate_pm10_aqi,
-    calculate_o3_aqi,
-    calculate_no2_aqi,
-    calculate_so2_aqi,
+    AQI_CALCULATION_VERSION,
+    PM10_BREAKPOINTS,
+    PM25_BREAKPOINTS,
+    calculate_aqi_from_concentration,
     calculate_co_aqi,
     calculate_individual_aqi,
-    calculate_aqi_from_concentration,
+    calculate_no2_aqi,
     calculate_nowcast,
     calculate_nowcast_aqi,
-    ug_m3_to_ppm,
-    ug_m3_to_ppb,
-    truncate_pm25,
-    truncate_pm10,
-    truncate_o3_ppm,
-    PM25_BREAKPOINTS,
-    PM10_BREAKPOINTS,
-    AQI_CALCULATION_VERSION,
+    calculate_o3_aqi,
+    calculate_pm10_aqi,
+    calculate_pm25_aqi,
+    calculate_so2_aqi,
     get_aqi_metadata,
+    truncate_o3_ppm,
+    truncate_pm10,
+    truncate_pm25,
+    ug_m3_to_ppb,
+    ug_m3_to_ppm,
 )
-
 
 # ============================================================================
 # PM2.5 Tests (Updated May 2024 breakpoints)
@@ -277,7 +278,20 @@ class TestNowCast:
     def test_increasing_pollution(self):
         """Increasing pollution -> NowCast weights recent hours more."""
         # Steady increase from 10 to 30
-        hourly = [10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0]
+        hourly = [
+            10.0,
+            12.0,
+            14.0,
+            16.0,
+            18.0,
+            20.0,
+            22.0,
+            24.0,
+            26.0,
+            28.0,
+            30.0,
+            32.0,
+        ]
         result = calculate_nowcast(hourly)
         assert result is not None
         # NowCast should be within the range
@@ -293,14 +307,40 @@ class TestNowCast:
 
     def test_missing_recent_hour(self):
         """Missing most recent hour -> NowCast returns None."""
-        hourly = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, None]
+        hourly = [
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            None,
+        ]
         result = calculate_nowcast(hourly)
         assert result is None
 
     def test_missing_second_hour(self):
         """Missing second most recent hour -> NowCast still works if recent valid."""
         # EPA requires c1 and c2 valid, but implementation may handle gracefully
-        hourly = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, None, 20.0]
+        hourly = [
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            20.0,
+            None,
+            20.0,
+        ]
         result = calculate_nowcast(hourly)
         # May return None or a valid result depending on implementation
         assert result is None or result == 20.0
@@ -325,7 +365,20 @@ class TestNowCast:
 
     def test_missing_middle_hours(self):
         """Missing middle hours -> NowCast may or may not work."""
-        hourly = [10.0, None, None, 20.0, None, 25.0, 30.0, None, None, None, None, 35.0]
+        hourly = [
+            10.0,
+            None,
+            None,
+            20.0,
+            None,
+            25.0,
+            30.0,
+            None,
+            None,
+            None,
+            None,
+            35.0,
+        ]
         result = calculate_nowcast(hourly)
         # Depends on implementation - may return None if too few valid recent hours
         assert result is None or (result is not None and 10.0 <= result <= 35.0)

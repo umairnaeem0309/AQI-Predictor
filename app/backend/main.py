@@ -12,16 +12,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.backend.config import default_config
-from app.routes import prediction, health, model, data, explain, monitoring, history, batch
+from app.routes import (
+    batch,
+    data,
+    explain,
+    health,
+    history,
+    model,
+    monitoring,
+    prediction,
+)
+from app.services.feature_service import FeatureService, init_feature_service
 from app.services.model_service import (
-    init_model_service,
-    ModelService,
-    SyntheticModelRejectedError,
     ModelApprovalError,
     ModelNotLoadedError,
+    ModelService,
+    SyntheticModelRejectedError,
+    init_model_service,
 )
-from app.services.feature_service import init_feature_service, FeatureService
-from app.services.prediction_service import init_prediction_service, PredictionService
+from app.services.prediction_service import PredictionService, init_prediction_service
 from src.monitoring.prediction_logger import PredictionLogger
 
 logger = logging.getLogger(__name__)
@@ -31,46 +40,46 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
-    
+
     Startup:
     - Initialize services
     - Load production model (with safety validation)
-    
+
     Shutdown:
     - Cleanup resources
     """
     # Startup
     logger.info("Starting AQI Predictor API...")
-    
+
     try:
         # Initialize feature service
         feature_service = init_feature_service(
             fallback_enabled=default_config.feature_store_local_fallback_enabled,
         )
-        
+
         # Initialize model service
         model_service = init_model_service(registry=None)
-        
+
         # Initialize prediction logger
         prediction_logger = PredictionLogger(
             log_dir="data/predictions",
             enable_security_checks=True,
         )
-        
+
         # Initialize prediction service
         prediction_service = init_prediction_service(
             model_service=model_service,
             feature_service=feature_service,
             prediction_logger=prediction_logger,
         )
-        
+
         # Store services in app state
         app.state.model_service = model_service
         app.state.feature_service = feature_service
         app.state.prediction_service = prediction_service
-        
+
         logger.info("Services initialized successfully")
-        
+
         # Load production model from local file
         try:
             model_service.load_local_model()
@@ -78,13 +87,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Could not load local model: {e}")
             logger.info("API will start without model - health check only")
-        
+
     except Exception as e:
         logger.error(f"Startup error: {e}")
         # Don't raise - allow app to start for health checks
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down AQI Predictor API...")
 
@@ -98,7 +107,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
-    
+
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
@@ -106,7 +115,7 @@ def create_app() -> FastAPI:
         allow_methods=default_config.cors_methods or ["GET", "POST"],
         allow_headers=["*"],
     )
-    
+
     # Exception handlers
     @app.exception_handler(SyntheticModelRejectedError)
     async def handle_synthetic_rejected(request: Request, exc: SyntheticModelRejectedError):
@@ -114,21 +123,21 @@ def create_app() -> FastAPI:
             status_code=403,
             content={"detail": str(exc), "type": "SyntheticModelRejectedError"},
         )
-    
+
     @app.exception_handler(ModelApprovalError)
     async def handle_approval_error(request: Request, exc: ModelApprovalError):
         return JSONResponse(
             status_code=403,
             content={"detail": str(exc), "type": "ModelApprovalError"},
         )
-    
+
     @app.exception_handler(ModelNotLoadedError)
     async def handle_model_not_loaded(request: Request, exc: ModelNotLoadedError):
         return JSONResponse(
             status_code=503,
             content={"detail": str(exc), "type": "ModelNotLoadedError"},
         )
-    
+
     # Include routes
     app.include_router(prediction.router)
     app.include_router(health.router)
@@ -138,7 +147,7 @@ def create_app() -> FastAPI:
     app.include_router(monitoring.router)
     app.include_router(history.router)
     app.include_router(batch.router)
-    
+
     return app
 
 

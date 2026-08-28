@@ -5,11 +5,12 @@ Model information endpoint.
 """
 
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.backend.dependencies import verify_api_key
-from app.schemas.responses import ModelInfoResponse, ErrorResponse
-from app.services.model_service import get_model_service, ModelNotLoadedError
+from app.schemas.responses import ErrorResponse, ModelInfoResponse
+from app.services.model_service import ModelNotLoadedError, get_model_service
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ async def get_model_info(
     """
     try:
         # Try app.state first (set during lifespan), fallback to global
-        model_service = getattr(request.app.state, 'model_service', None)
+        model_service = getattr(request.app.state, "model_service", None)
         if model_service is None:
             model_service = get_model_service()
         model_info = model_service.get_model_info()

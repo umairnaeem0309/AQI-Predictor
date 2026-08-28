@@ -2,17 +2,18 @@
 Tests for data schemas — Pydantic model validation.
 """
 
-import pytest
 from datetime import datetime, timezone
 
+import pytest
+
 from src.data.schemas import (
+    AQICNResponse,
     CityConfig,
     DataQualityReport,
-    OpenWeatherWeatherResponse,
-    OpenWeatherPollutionResponse,
-    AQICNResponse,
-    StandardObservation,
     DataSource,
+    OpenWeatherPollutionResponse,
+    OpenWeatherWeatherResponse,
+    StandardObservation,
     ValidationStatus,
 )
 

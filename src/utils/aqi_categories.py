@@ -7,7 +7,6 @@ Domain utility module - not API service.
 
 from typing import Tuple
 
-
 # US EPA AQI Breakpoints for PM2.5 (µg/m³, 24-hour average)
 # Source: https://www.airnow.gov/aqi/aqi-basics/
 US_EPA_AQI_BREAKPOINTS = {
@@ -43,23 +42,23 @@ AQI_CATEGORY_COLORS = {
 def get_aqi_category(aqi_value: int) -> Tuple[str, str]:
     """
     Get AQI category from AQI value.
-    
+
     Args:
         aqi_value: AQI value (0-500)
-        
+
     Returns:
         Tuple of (category_key, category_name)
-        
+
     Raises:
         ValueError: If AQI value is out of range
     """
     if aqi_value < 0 or aqi_value > 500:
         raise ValueError(f"AQI value must be between 0 and 500, got {aqi_value}")
-    
+
     for category_key, bounds in US_EPA_AQI_BREAKPOINTS.items():
         if bounds["aqi_min"] <= aqi_value <= bounds["aqi_max"]:
             return category_key, AQI_CATEGORY_NAMES[category_key]
-    
+
     # Fallback for values > 500
     return "hazardous", AQI_CATEGORY_NAMES["hazardous"]
 
@@ -67,10 +66,10 @@ def get_aqi_category(aqi_value: int) -> Tuple[str, str]:
 def get_aqi_color(aqi_value: int) -> str:
     """
     Get AQI color from AQI value.
-    
+
     Args:
         aqi_value: AQI value (0-500)
-        
+
     Returns:
         Hex color string
     """
@@ -81,15 +80,15 @@ def get_aqi_color(aqi_value: int) -> str:
 def get_aqi_category_range(category_key: str) -> Tuple[int, int]:
     """
     Get AQI range for a category.
-    
+
     Args:
         category_key: Category key (good, moderate, etc.)
-        
+
     Returns:
         Tuple of (min_aqi, max_aqi)
     """
     if category_key not in US_EPA_AQI_BREAKPOINTS:
         raise ValueError(f"Invalid category: {category_key}")
-    
+
     bounds = US_EPA_AQI_BREAKPOINTS[category_key]
     return bounds["aqi_min"], bounds["aqi_max"]

@@ -31,16 +31,17 @@ logger = logging.getLogger(__name__)
 def _check_tensorflow():
     """Check if TensorFlow is available."""
     try:
-        import tensorflow as tf
         # Suppress TF warnings
         import os
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-        tf.get_logger().setLevel('ERROR')
+
+        import tensorflow as tf
+
+        os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+        tf.get_logger().setLevel("ERROR")
         return tf
     except ImportError:
         raise ImportError(
-            "TensorFlow is required for LSTM model. "
-            "Install with: pip install tensorflow-cpu"
+            "TensorFlow is required for LSTM model. " "Install with: pip install tensorflow-cpu"
         )
 
 
@@ -96,18 +97,20 @@ class LSTMModel:
         tf.random.set_seed(self.random_seed)
         np.random.seed(self.random_seed)
 
-        from tensorflow.keras.models import Sequential
         from tensorflow.keras.layers import LSTM, Dense, Dropout
+        from tensorflow.keras.models import Sequential
         from tensorflow.keras.optimizers import Adam
 
         model = Sequential()
 
         # First LSTM layer
-        model.add(LSTM(
-            units=self.lstm_units[0],
-            return_sequences=len(self.lstm_units) > 1,
-            input_shape=(self.sequence_length, self.n_features),
-        ))
+        model.add(
+            LSTM(
+                units=self.lstm_units[0],
+                return_sequences=len(self.lstm_units) > 1,
+                input_shape=(self.sequence_length, self.n_features),
+            )
+        )
         model.add(Dropout(self.dropout_rate))
 
         # Additional LSTM layers
@@ -122,14 +125,15 @@ class LSTMModel:
         # Compile
         model.compile(
             optimizer=Adam(learning_rate=self.learning_rate),
-            loss='mse',
-            metrics=['mae'],
+            loss="mse",
+            metrics=["mae"],
         )
 
         self.model = model
         logger.info(
             "LSTM model built: %d params, layers=%s",
-            model.count_params(), self.lstm_units,
+            model.count_params(),
+            self.lstm_units,
         )
         return model
 
@@ -156,7 +160,8 @@ class LSTMModel:
         if n_rows < self.sequence_length:
             logger.warning(
                 "Not enough rows (%d) for sequence length (%d)",
-                n_rows, self.sequence_length,
+                n_rows,
+                self.sequence_length,
             )
             return np.array([]), np.array([]) if y is not None else None
 
@@ -164,11 +169,11 @@ class LSTMModel:
         X_seq = np.zeros((n_sequences, self.sequence_length, self.n_features))
 
         for i in range(n_sequences):
-            X_seq[i] = X[i:i + self.sequence_length]
+            X_seq[i] = X[i : i + self.sequence_length]
 
         if y is not None:
             # Target is at the end of the sequence
-            y_seq = y[self.sequence_length - 1:]
+            y_seq = y[self.sequence_length - 1 :]
             return X_seq, y_seq
 
         return X_seq, None
@@ -209,7 +214,8 @@ class LSTMModel:
 
         logger.info(
             "LSTM training: sequences=%d, shape=%s",
-            len(X_train_seq), X_train_seq.shape,
+            len(X_train_seq),
+            X_train_seq.shape,
         )
 
         # Validation data
@@ -225,16 +231,20 @@ class LSTMModel:
 
         # Early stopping
         from tensorflow.keras.callbacks import EarlyStopping
-        callbacks.append(EarlyStopping(
-            monitor='val_loss' if validation_data else 'loss',
-            patience=10,
-            restore_best_weights=True,
-            verbose=0,
-        ))
+
+        callbacks.append(
+            EarlyStopping(
+                monitor="val_loss" if validation_data else "loss",
+                patience=10,
+                restore_best_weights=True,
+                verbose=0,
+            )
+        )
 
         # Train
         history = self.model.fit(
-            X_train_seq, y_train_seq,
+            X_train_seq,
+            y_train_seq,
             validation_data=validation_data,
             epochs=epochs,
             batch_size=batch_size,
@@ -243,14 +253,14 @@ class LSTMModel:
         )
 
         self._is_fitted = True
-        logger.info("LSTM training complete: %d epochs", len(history.history['loss']))
+        logger.info("LSTM training complete: %d epochs", len(history.history["loss"]))
 
         return {
-            'loss': history.history['loss'],
-            'val_loss': history.history.get('val_loss', []),
-            'mae': history.history['mae'],
-            'val_mae': history.history.get('val_mae', []),
-            'epochs_trained': len(history.history['loss']),
+            "loss": history.history["loss"],
+            "val_loss": history.history.get("val_loss", []),
+            "mae": history.history["mae"],
+            "val_mae": history.history.get("val_mae", []),
+            "epochs_trained": len(history.history["loss"]),
         }
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -286,14 +296,14 @@ class LSTMModel:
 
         # Save config
         config = {
-            'sequence_length': self.sequence_length,
-            'n_features': self.n_features,
-            'n_targets': self.n_targets,
-            'lstm_units': self.lstm_units,
-            'dropout_rate': self.dropout_rate,
-            'learning_rate': self.learning_rate,
-            'random_seed': self.random_seed,
-            'is_fitted': self._is_fitted,
+            "sequence_length": self.sequence_length,
+            "n_features": self.n_features,
+            "n_targets": self.n_targets,
+            "lstm_units": self.lstm_units,
+            "dropout_rate": self.dropout_rate,
+            "learning_rate": self.learning_rate,
+            "random_seed": self.random_seed,
+            "is_fitted": self._is_fitted,
         }
         with open(path / "config.pkl", "wb") as f:
             pickle.dump(config, f)
@@ -301,7 +311,7 @@ class LSTMModel:
         logger.info("LSTM model saved to %s", path)
 
     @classmethod
-    def load(cls, path: Path) -> 'LSTMModel':
+    def load(cls, path: Path) -> "LSTMModel":
         """Load model from disk.
 
         Args:
@@ -317,19 +327,17 @@ class LSTMModel:
             config = pickle.load(f)
 
         instance = cls(
-            sequence_length=config['sequence_length'],
-            n_features=config['n_features'],
-            n_targets=config['n_targets'],
-            lstm_units=config['lstm_units'],
-            dropout_rate=config['dropout_rate'],
-            learning_rate=config['learning_rate'],
-            random_seed=config['random_seed'],
+            sequence_length=config["sequence_length"],
+            n_features=config["n_features"],
+            n_targets=config["n_targets"],
+            lstm_units=config["lstm_units"],
+            dropout_rate=config["dropout_rate"],
+            learning_rate=config["learning_rate"],
+            random_seed=config["random_seed"],
         )
 
-        instance.model = tf.keras.models.load_model(
-            str(path / "lstm_model.keras")
-        )
-        instance._is_fitted = config['is_fitted']
+        instance.model = tf.keras.models.load_model(str(path / "lstm_model.keras"))
+        instance._is_fitted = config["is_fitted"]
 
         logger.info("LSTM model loaded from %s", path)
         return instance
@@ -337,12 +345,12 @@ class LSTMModel:
     def get_params(self) -> Dict[str, Any]:
         """Get model parameters for logging."""
         return {
-            'sequence_length': self.sequence_length,
-            'n_features': self.n_features,
-            'n_targets': self.n_targets,
-            'lstm_units': self.lstm_units,
-            'dropout_rate': self.dropout_rate,
-            'learning_rate': self.learning_rate,
-            'random_seed': self.random_seed,
-            'total_params': self.model.count_params() if self.model else 0,
+            "sequence_length": self.sequence_length,
+            "n_features": self.n_features,
+            "n_targets": self.n_targets,
+            "lstm_units": self.lstm_units,
+            "dropout_rate": self.dropout_rate,
+            "learning_rate": self.learning_rate,
+            "random_seed": self.random_seed,
+            "total_params": self.model.count_params() if self.model else 0,
         }

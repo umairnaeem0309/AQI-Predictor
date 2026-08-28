@@ -7,8 +7,8 @@ Reads from local CSV files (no external calls).
 
 import logging
 import os
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -79,10 +79,22 @@ async def get_historical_data(
 
         # Select relevant columns
         display_cols = [
-            "timestamp", "temperature", "humidity", "pressure",
-            "wind_speed", "cloud_cover", "precipitation",
-            "pm25", "pm10", "co", "no2", "so2", "o3",
-            "aqi", "aqi_category", "aqi_dominant_pollutant",
+            "timestamp",
+            "temperature",
+            "humidity",
+            "pressure",
+            "wind_speed",
+            "cloud_cover",
+            "precipitation",
+            "pm25",
+            "pm10",
+            "co",
+            "no2",
+            "so2",
+            "o3",
+            "aqi",
+            "aqi_category",
+            "aqi_dominant_pollutant",
         ]
         cols = [c for c in display_cols if c in df.columns]
         result_df = df[cols]
@@ -189,7 +201,10 @@ async def compare_cities(
     try:
         csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
         if not os.path.exists(csv_path):
-            return {"data": {"karachi": [], "lahore": [], "islamabad": []}, "message": "Dataset not available"}
+            return {
+                "data": {"karachi": [], "lahore": [], "islamabad": []},
+                "message": "Dataset not available",
+            }
 
         df = pd.read_csv(csv_path)
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
@@ -205,7 +220,9 @@ async def compare_cities(
             city_df = df[df["location_id"] == city].sort_values("timestamp").tail(limit)
             city_data = city_df[["timestamp", "aqi", "pm25", "pm10"]].to_dict(orient="records")
             for r in city_data:
-                r["timestamp"] = r["timestamp"].isoformat() if pd.notna(r.get("timestamp")) else None
+                r["timestamp"] = (
+                    r["timestamp"].isoformat() if pd.notna(r.get("timestamp")) else None
+                )
             result[city] = city_data
 
         return {"data": result}

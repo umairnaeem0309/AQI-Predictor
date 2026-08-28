@@ -23,7 +23,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 logger = logging.getLogger(__name__)
 
 TARGET_COLUMNS = ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]
-HORIZON_LABELS = {"target_aqi_24h": "24h", "target_aqi_48h": "48h", "target_aqi_72h": "72h"}
+HORIZON_LABELS = {
+    "target_aqi_24h": "24h",
+    "target_aqi_48h": "48h",
+    "target_aqi_72h": "72h",
+}
 
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
@@ -177,24 +181,28 @@ def generate_evaluation_report(
     ]
 
     for _, row in comparison_df.iterrows():
-        report_lines.extend([
-            "",
-            f"Model: {row['model']}",
-            f"  MAE  — 24h: {row['mae_24h']:.2f}, 48h: {row['mae_48h']:.2f}, 72h: {row['mae_72h']:.2f}, Avg: {row['mae_avg']:.2f}",
-            f"  RMSE — 24h: {row['rmse_24h']:.2f}, 48h: {row['rmse_48h']:.2f}, 72h: {row['rmse_72h']:.2f}, Avg: {row['rmse_avg']:.2f}",
-            f"  R²   — 24h: {row['r2_24h']:.4f}, 48h: {row['r2_48h']:.4f}, 72h: {row['r2_72h']:.4f}, Avg: {row['r2_avg']:.4f}",
-            f"  Training time: {row['training_time']:.2f}s",
-            f"  Features: {row['feature_count']}",
-            f"  Reportable: {row['is_reportable']}",
-        ])
+        report_lines.extend(
+            [
+                "",
+                f"Model: {row['model']}",
+                f"  MAE  — 24h: {row['mae_24h']:.2f}, 48h: {row['mae_48h']:.2f}, 72h: {row['mae_72h']:.2f}, Avg: {row['mae_avg']:.2f}",
+                f"  RMSE — 24h: {row['rmse_24h']:.2f}, 48h: {row['rmse_48h']:.2f}, 72h: {row['rmse_72h']:.2f}, Avg: {row['rmse_avg']:.2f}",
+                f"  R²   — 24h: {row['r2_24h']:.4f}, 48h: {row['r2_48h']:.4f}, 72h: {row['r2_72h']:.4f}, Avg: {row['r2_avg']:.4f}",
+                f"  Training time: {row['training_time']:.2f}s",
+                f"  Features: {row['feature_count']}",
+                f"  Reportable: {row['is_reportable']}",
+            ]
+        )
 
-    report_lines.extend([
-        "",
-        "-" * 70,
-        "NOTE: Production model selection happens in Phase 8.",
-        "This report is for comparison only.",
-        "-" * 70,
-    ])
+    report_lines.extend(
+        [
+            "",
+            "-" * 70,
+            "NOTE: Production model selection happens in Phase 8.",
+            "This report is for comparison only.",
+            "-" * 70,
+        ]
+    )
 
     report = "\n".join(report_lines)
 

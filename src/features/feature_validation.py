@@ -68,7 +68,9 @@ def check_no_future_leakage(
 
                         # Also verify lag values match historical base values
                         for i in range(lag_hours, len(lag_values)):
-                            if not pd.isna(lag_values[i]) and not pd.isna(base_values[i - lag_hours]):
+                            if not pd.isna(lag_values[i]) and not pd.isna(
+                                base_values[i - lag_hours]
+                            ):
                                 expected = base_values[i - lag_hours]
                                 if not pd.isna(expected) and lag_values[i] != expected:
                                     errors.append(
@@ -218,7 +220,15 @@ def get_feature_availability() -> Dict[str, str]:
     availability = {}
 
     # Time features — available immediately
-    for feat in ["hour", "day_of_week", "month", "season", "is_weekend", "hour_sin", "hour_cos"]:
+    for feat in [
+        "hour",
+        "day_of_week",
+        "month",
+        "season",
+        "is_weekend",
+        "hour_sin",
+        "hour_cos",
+    ]:
         availability[feat] = "t (immediately available)"
 
     # Lag features — available at t (using historical data)
@@ -233,27 +243,50 @@ def get_feature_availability() -> Dict[str, str]:
 
     # Rolling features — available at t (using historical window)
     rolling_features = [
-        "aqi_rolling_mean_6h", "aqi_rolling_mean_12h", "aqi_rolling_mean_24h",
-        "aqi_rolling_std_24h", "aqi_rolling_min_24h", "aqi_rolling_max_24h",
-        "pm25_rolling_mean_6h", "pm25_rolling_mean_24h",
-        "temperature_rolling_mean_24h", "humidity_rolling_mean_24h",
+        "aqi_rolling_mean_6h",
+        "aqi_rolling_mean_12h",
+        "aqi_rolling_mean_24h",
+        "aqi_rolling_std_24h",
+        "aqi_rolling_min_24h",
+        "aqi_rolling_max_24h",
+        "pm25_rolling_mean_6h",
+        "pm25_rolling_mean_24h",
+        "temperature_rolling_mean_24h",
+        "humidity_rolling_mean_24h",
     ]
     for feat in rolling_features:
         availability[feat] = "t (uses window ending at t-1, available at prediction time)"
 
     # Derived features — available at t (depend on lag/rolling)
     derived_features = [
-        "aqi_change_rate_1h", "aqi_change_rate_6h", "aqi_change_rate_24h",
-        "aqi_trend_24h", "pm25_pm10_ratio", "no2_so2_ratio",
-        "o3_no2_ratio", "temp_humidity_interaction",
-        "wind_cooling_effect", "aqi_deviation_from_24h_avg",
+        "aqi_change_rate_1h",
+        "aqi_change_rate_6h",
+        "aqi_change_rate_24h",
+        "aqi_trend_24h",
+        "pm25_pm10_ratio",
+        "no2_so2_ratio",
+        "o3_no2_ratio",
+        "temp_humidity_interaction",
+        "wind_cooling_effect",
+        "aqi_deviation_from_24h_avg",
     ]
     for feat in derived_features:
         availability[feat] = "t (depends on lag/rolling features, available at prediction time)"
 
     # Current values — available at t
-    current_features = ["aqi", "pm25", "pm10", "co", "no2", "so2", "o3",
-                        "temperature", "humidity", "wind_speed", "pressure"]
+    current_features = [
+        "aqi",
+        "pm25",
+        "pm10",
+        "co",
+        "no2",
+        "so2",
+        "o3",
+        "temperature",
+        "humidity",
+        "wind_speed",
+        "pressure",
+    ]
     for feat in current_features:
         availability[feat] = "t (current observation, available at prediction time)"
 
@@ -275,8 +308,16 @@ def full_feature_validation(
     """
     if feature_columns is None:
         feature_columns = [
-            c for c in df.columns
-            if c not in ["timestamp", "location_id", "city_name", "data_source", "raw_response_time"]
+            c
+            for c in df.columns
+            if c
+            not in [
+                "timestamp",
+                "location_id",
+                "city_name",
+                "data_source",
+                "raw_response_time",
+            ]
         ]
 
     # Leakage check
@@ -299,7 +340,7 @@ def full_feature_validation(
             completeness[col] = {
                 "total": total,
                 "missing": int(missing),
-                "completeness_pct": round((1 - missing / total) * 100, 1) if total > 0 else 0,
+                "completeness_pct": (round((1 - missing / total) * 100, 1) if total > 0 else 0),
             }
 
     results = {

@@ -80,21 +80,16 @@ def validate_for_production(
 
     if dataset_type == DatasetType.SYNTHETIC_TEST.value:
         failures.append(
-            f"Cannot promote synthetic test data to production. "
-            f"Dataset type: {dataset_type}"
+            f"Cannot promote synthetic test data to production. " f"Dataset type: {dataset_type}"
         )
 
     if not approved_for_training:
         failures.append(
-            f"Dataset not approved for training. "
-            f"approved_for_training={approved_for_training}"
+            f"Dataset not approved for training. " f"approved_for_training={approved_for_training}"
         )
 
     if approval_status != ModelApprovalStatus.APPROVED.value:
-        failures.append(
-            f"Model not approved for production. "
-            f"Status: {approval_status}"
-        )
+        failures.append(f"Model not approved for production. " f"Status: {approval_status}")
 
     eligible = len(failures) == 0
     return eligible, failures
@@ -131,6 +126,7 @@ class ModelRegistry:
         if self._client is None:
             try:
                 import mlflow
+
                 self._client = mlflow.tracking.MlflowClient()
             except ImportError:
                 logger.warning("MLflow not installed")
@@ -172,7 +168,10 @@ class ModelRegistry:
                 mlflow.set_tag("model_name", model_name)
                 mlflow.set_tag("dataset_version", dataset_metadata.get("version", ""))
                 mlflow.set_tag("dataset_type", dataset_metadata.get("type", ""))
-                mlflow.set_tag("approved_for_training", str(dataset_metadata.get("approved", False)))
+                mlflow.set_tag(
+                    "approved_for_training",
+                    str(dataset_metadata.get("approved", False)),
+                )
                 mlflow.set_tag("approval_status", ModelApprovalStatus.CANDIDATE.value)
                 mlflow.set_tag("registration_timestamp", datetime.now(timezone.utc).isoformat())
 
@@ -236,6 +235,7 @@ class ModelRegistry:
 
         try:
             import mlflow
+
             client = self._get_client()
             if client is None:
                 return False
@@ -283,9 +283,7 @@ class ModelRegistry:
                 return False
 
             # Get current production model
-            versions = client.get_latest_versions(
-                self.experiment_name, stages=["Production"]
-            )
+            versions = client.get_latest_versions(self.experiment_name, stages=["Production"])
 
             if versions:
                 current_version = versions[0]
@@ -330,9 +328,7 @@ class ModelRegistry:
             if client is None:
                 return None
 
-            versions = client.get_latest_versions(
-                self.experiment_name, stages=["Production"]
-            )
+            versions = client.get_latest_versions(self.experiment_name, stages=["Production"])
 
             if versions:
                 v = versions[0]
@@ -541,9 +537,7 @@ class ModelRegistry:
             if client is None:
                 return None
 
-            versions = client.get_latest_versions(
-                self.experiment_name, stages=["Production"]
-            )
+            versions = client.get_latest_versions(self.experiment_name, stages=["Production"])
 
             if not versions:
                 logger.warning("No production model found")
@@ -568,7 +562,11 @@ class ModelRegistry:
             # Load model
             model_uri = f"runs:/{prod_version.run_id}/model"
             model = mlflow.pyfunc.load_model(model_uri)
-            logger.info("Loaded production model: %s v%s", prod_version.name, prod_version.version)
+            logger.info(
+                "Loaded production model: %s v%s",
+                prod_version.name,
+                prod_version.version,
+            )
             return model
 
         except Exception as e:
@@ -674,8 +672,9 @@ class ModelRegistry:
             Drift baseline dictionary or None.
         """
         try:
-            import mlflow
             import tempfile
+
+            import mlflow
 
             client = self._get_client()
             if client is None:

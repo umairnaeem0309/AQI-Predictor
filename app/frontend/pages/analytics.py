@@ -1,4 +1,7 @@
-import os, sys; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 """
 Analytics Page
 
@@ -6,19 +9,19 @@ Historical trends and pollutant analysis.
 Uses API client for data.
 """
 
-import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
 from plotly.subplots import make_subplots
 
-from app.frontend.utils.api_client import APIClient, APIClientError
-from app.frontend.utils.aqi_theme import get_city_color, get_dashboard_css
 from app.frontend.components.metrics import (
     render_error_state,
-    render_warning_state,
     render_info_card,
+    render_warning_state,
 )
+from app.frontend.utils.api_client import APIClient, APIClientError
+from app.frontend.utils.aqi_theme import get_city_color, get_dashboard_css
 
 # Valid cities
 VALID_CITIES = ["Karachi", "Lahore", "Islamabad"]
@@ -104,9 +107,21 @@ def render_analytics(api_client: APIClient):
 
             # Add AQI category bands
             fig.add_hrect(y0=0, y1=50, fillcolor="green", opacity=0.1, annotation_text="Good")
-            fig.add_hrect(y0=51, y1=100, fillcolor="yellow", opacity=0.1, annotation_text="Moderate")
+            fig.add_hrect(
+                y0=51,
+                y1=100,
+                fillcolor="yellow",
+                opacity=0.1,
+                annotation_text="Moderate",
+            )
             fig.add_hrect(y0=101, y1=150, fillcolor="orange", opacity=0.1, annotation_text="USG")
-            fig.add_hrect(y0=151, y1=200, fillcolor="red", opacity=0.1, annotation_text="Unhealthy")
+            fig.add_hrect(
+                y0=151,
+                y1=200,
+                fillcolor="red",
+                opacity=0.1,
+                annotation_text="Unhealthy",
+            )
 
             fig.update_layout(height=400)
             st.plotly_chart(fig, use_container_width=True)
@@ -143,7 +158,9 @@ def render_analytics(api_client: APIClient):
         available_weather = [c for c in weather_cols if c in df.columns]
 
         if available_weather and "aqi" in df.columns:
-            selected_weather = st.selectbox("Compare with", available_weather, key="weather_compare")
+            selected_weather = st.selectbox(
+                "Compare with", available_weather, key="weather_compare"
+            )
 
             fig = px.scatter(
                 df,
@@ -165,12 +182,14 @@ def render_analytics(api_client: APIClient):
                 city_stats = api_client.get_statistics(city=city)
                 stats_data = city_stats.get("statistics", {})
                 if "aqi" in stats_data:
-                    compare_data.append({
-                        "City": city.title(),
-                        "Avg AQI": stats_data["aqi"]["mean"],
-                        "Max AQI": stats_data["aqi"]["max"],
-                        "Avg PM2.5": stats_data.get("pm25", {}).get("mean", 0),
-                    })
+                    compare_data.append(
+                        {
+                            "City": city.title(),
+                            "Avg AQI": stats_data["aqi"]["mean"],
+                            "Max AQI": stats_data["aqi"]["max"],
+                            "Avg PM2.5": stats_data.get("pm25", {}).get("mean", 0),
+                        }
+                    )
             except Exception:
                 pass
 

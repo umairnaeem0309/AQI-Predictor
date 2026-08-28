@@ -7,15 +7,14 @@ Tests:
 - BaseHistoricalProvider: chunked fetching, rate limiting, error handling
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
-from src.data.providers.open_meteo_weather import OpenMeteoWeatherProvider
 from src.data.providers.open_meteo_air_quality import OpenMeteoAirQualityProvider
-
+from src.data.providers.open_meteo_weather import OpenMeteoWeatherProvider
 
 # ============================================================================
 # Sample API Responses
@@ -126,9 +125,7 @@ class TestOpenMeteoWeatherProvider:
     def test_parse_response_basic(self):
         """Basic response parsing produces correct DataFrame."""
         provider = OpenMeteoWeatherProvider()
-        df = provider._parse_response(
-            SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi"
-        )
+        df = provider._parse_response(SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi")
 
         assert not df.empty
         assert len(df) == 3
@@ -143,9 +140,7 @@ class TestOpenMeteoWeatherProvider:
     def test_parse_response_values(self):
         """Parsed values match the sample response."""
         provider = OpenMeteoWeatherProvider()
-        df = provider._parse_response(
-            SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi"
-        )
+        df = provider._parse_response(SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi")
 
         # Check first row values
         assert df.iloc[0]["temperature"] == 18.5
@@ -159,9 +154,7 @@ class TestOpenMeteoWeatherProvider:
     def test_parse_response_timestamps_utc(self):
         """Parsed timestamps are UTC-aware datetime."""
         provider = OpenMeteoWeatherProvider()
-        df = provider._parse_response(
-            SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi"
-        )
+        df = provider._parse_response(SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi")
 
         assert pd.api.types.is_datetime64_any_dtype(df["timestamp"])
         # All timestamps should be UTC
@@ -171,9 +164,7 @@ class TestOpenMeteoWeatherProvider:
     def test_parse_response_metadata(self):
         """Response includes provider metadata columns."""
         provider = OpenMeteoWeatherProvider()
-        df = provider._parse_response(
-            SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi"
-        )
+        df = provider._parse_response(SAMPLE_WEATHER_RESPONSE, "karachi", "Karachi")
 
         assert "data_source" in df.columns
         assert (df["data_source"] == "open_meteo_weather").all()
@@ -240,9 +231,7 @@ class TestOpenMeteoAirQualityProvider:
     def test_parse_response_basic(self):
         """Basic response parsing produces correct DataFrame."""
         provider = OpenMeteoAirQualityProvider()
-        df = provider._parse_response(
-            SAMPLE_AQ_RESPONSE, "karachi", "Karachi"
-        )
+        df = provider._parse_response(SAMPLE_AQ_RESPONSE, "karachi", "Karachi")
 
         assert not df.empty
         assert len(df) == 3
@@ -257,9 +246,7 @@ class TestOpenMeteoAirQualityProvider:
     def test_parse_response_values(self):
         """Parsed pollutant values match the sample response."""
         provider = OpenMeteoAirQualityProvider()
-        df = provider._parse_response(
-            SAMPLE_AQ_RESPONSE, "karachi", "Karachi"
-        )
+        df = provider._parse_response(SAMPLE_AQ_RESPONSE, "karachi", "Karachi")
 
         assert df.iloc[0]["pm25"] == 25.3
         assert df.iloc[0]["pm10"] == 45.2
@@ -271,9 +258,7 @@ class TestOpenMeteoAirQualityProvider:
     def test_parse_response_us_aqi_reference(self):
         """US AQI reference values are stored for validation."""
         provider = OpenMeteoAirQualityProvider()
-        df = provider._parse_response(
-            SAMPLE_AQ_RESPONSE, "karachi", "Karachi"
-        )
+        df = provider._parse_response(SAMPLE_AQ_RESPONSE, "karachi", "Karachi")
 
         assert "us_aqi_open_meteo" in df.columns
         assert df.iloc[0]["us_aqi_open_meteo"] == 78
@@ -337,9 +322,12 @@ class TestBaseHistoricalProvider:
         provider = OpenMeteoWeatherProvider()
 
         df = provider.fetch_historical(
-            latitude=24.86, longitude=67.0,
-            location_id="karachi", city_name="Karachi",
-            start_date="2023-01-01", end_date="2023-01-01",
+            latitude=24.86,
+            longitude=67.0,
+            location_id="karachi",
+            city_name="Karachi",
+            start_date="2023-01-01",
+            end_date="2023-01-01",
         )
 
         assert not df.empty

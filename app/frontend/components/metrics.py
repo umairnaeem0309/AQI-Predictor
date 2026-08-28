@@ -1,14 +1,18 @@
-import os, sys; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 """
 Metric Components
 
 Reusable metric display components.
 """
 
-import streamlit as st
-from typing import Optional, Any
+from typing import Any, Optional
 
-from app.frontend.utils.aqi_theme import get_aqi_color, get_aqi_category
+import streamlit as st
+
+from app.frontend.utils.aqi_theme import get_aqi_category, get_aqi_color
 from app.frontend.utils.formatters import format_aqi, format_time_ago
 
 
@@ -20,7 +24,7 @@ def render_aqi_card(
 ):
     """
     Render AQI metric card.
-    
+
     Args:
         label: Card label (e.g., "24h Forecast")
         aqi_value: AQI value
@@ -28,14 +32,14 @@ def render_aqi_card(
         delta: Change from previous value
     """
     color = get_aqi_color(aqi_value)
-    
+
     st.metric(
         label=label,
         value=format_aqi(aqi_value),
         delta=f"{delta:+d}" if delta else None,
         delta_color="inverse" if delta and delta > 0 else "normal",
     )
-    
+
     # Category badge
     st.markdown(
         f'<p style="color:{color};font-weight:bold;">{category}</p>',
@@ -50,7 +54,7 @@ def render_status_card(
 ):
     """
     Render status metric card.
-    
+
     Args:
         label: Card label
         value: Display value
@@ -61,9 +65,9 @@ def render_status_card(
         "warning": "#FB8C00",
         "error": "#E53935",
     }
-    
+
     color = status_colors.get(status, "#757575")
-    
+
     st.markdown(
         f"""
         <div style="padding:10px;border-radius:5px;background:#f8f9fa;">
@@ -82,7 +86,7 @@ def render_info_card(
 ):
     """
     Render info metric card.
-    
+
     Args:
         label: Card label
         value: Display value
@@ -103,7 +107,7 @@ def render_loading_state(message: str = "Loading..."):
 def render_error_state(message: str, error: Optional[Exception] = None):
     """
     Render error state.
-    
+
     Args:
         message: Error message
         error: Optional exception details
@@ -122,7 +126,7 @@ def render_warning_state(message: str):
 def render_unavailable_state(feature: str):
     """
     Render feature unavailable state.
-    
+
     Args:
         feature: Name of unavailable feature
     """

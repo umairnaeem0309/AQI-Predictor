@@ -5,25 +5,22 @@ Tests the complete flow: evaluation → ranking → selection → registry.
 Verifies synthetic safety at every step.
 """
 
+from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timezone
 
+from src.models.registry import generate_model_name, validate_for_production
 from src.models.selection import (
-    SelectionWeights,
     ModelApprovalStatus,
     ModelEvaluation,
-    rank_models,
-    compute_combined_score,
+    SelectionWeights,
     check_minimum_thresholds,
+    compute_combined_score,
     generate_tradeoff_documentation,
+    rank_models,
 )
-from src.models.registry import (
-    generate_model_name,
-    validate_for_production,
-)
-
 
 # =============================================================================
 # Test Fixtures
@@ -167,7 +164,9 @@ class TestSelectionPipelineEndToEnd:
         w = SelectionWeights(performance=0.3, engineering=0.7)
         ranked_eng = rank_models(model_evaluations, weights=w)
         # Ridge should rank higher with heavy engineering weight
-        ridge_rank_default = next(i for i, (e, _) in enumerate(ranked_default) if e.model_name == "ridge")
+        ridge_rank_default = next(
+            i for i, (e, _) in enumerate(ranked_default) if e.model_name == "ridge"
+        )
         ridge_rank_eng = next(i for i, (e, _) in enumerate(ranked_eng) if e.model_name == "ridge")
         assert ridge_rank_eng <= ridge_rank_default
 
@@ -181,9 +180,7 @@ class TestSyntheticDataSafety:
 
     def test_synthetic_rejected_from_production(self, synthetic_evaluation):
         """Synthetic data is rejected from production promotion."""
-        eligible, failures = validate_for_production(
-            "synthetic_test_data", True, "approved"
-        )
+        eligible, failures = validate_for_production("synthetic_test_data", True, "approved")
         assert eligible is False
 
     def test_synthetic_in_ranking(self, model_evaluations, synthetic_evaluation):

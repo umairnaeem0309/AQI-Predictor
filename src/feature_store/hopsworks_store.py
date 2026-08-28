@@ -24,10 +24,10 @@ import pandas as pd
 from src.feature_store.base import FeatureStoreInterface
 from src.feature_store.schemas import (
     DatasetMetadata,
+    DatasetType,
     FeatureGroupMetadata,
     FeatureSchema,
     LineageMetadata,
-    DatasetType,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 class ConfigurationError(Exception):
     """Raised when required configuration is missing."""
+
     pass
 
 
@@ -114,7 +115,7 @@ class HopsworksStore(FeatureStoreInterface):
                 )
                 return
             except Exception as e:
-                delay = self._retry_backoff_base * (2 ** attempt)
+                delay = self._retry_backoff_base * (2**attempt)
                 logger.warning(
                     "Hopsworks connection attempt %d/%d failed: %s. Retrying in %.1fs...",
                     attempt + 1,
@@ -191,9 +192,8 @@ class HopsworksStore(FeatureStoreInterface):
 
         try:
             from src.feature_store.schemas import AQI_FEATURES_SCHEMA
-            fg = self._get_or_create_feature_group(
-                AQI_FEATURES_SCHEMA, feature_group_name, version
-            )
+
+            fg = self._get_or_create_feature_group(AQI_FEATURES_SCHEMA, feature_group_name, version)
 
             # Insert with retry
             for attempt in range(self._max_retries):
@@ -210,7 +210,7 @@ class HopsworksStore(FeatureStoreInterface):
                     )
                     return True
                 except Exception as e:
-                    delay = self._retry_backoff_base * (2 ** attempt)
+                    delay = self._retry_backoff_base * (2**attempt)
                     logger.warning(
                         "Hopsworks insert attempt %d/%d failed: %s",
                         attempt + 1,
@@ -253,9 +253,8 @@ class HopsworksStore(FeatureStoreInterface):
 
         try:
             from src.feature_store.schemas import AQI_TARGETS_SCHEMA
-            fg = self._get_or_create_feature_group(
-                AQI_TARGETS_SCHEMA, target_group_name, version
-            )
+
+            fg = self._get_or_create_feature_group(AQI_TARGETS_SCHEMA, target_group_name, version)
 
             for attempt in range(self._max_retries):
                 try:
@@ -271,7 +270,7 @@ class HopsworksStore(FeatureStoreInterface):
                     )
                     return True
                 except Exception as e:
-                    delay = self._retry_backoff_base * (2 ** attempt)
+                    delay = self._retry_backoff_base * (2**attempt)
                     logger.warning(
                         "Hopsworks target insert attempt %d/%d failed: %s",
                         attempt + 1,

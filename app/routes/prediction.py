@@ -5,13 +5,18 @@ Handles prediction requests and stores them in history.
 """
 
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.backend.dependencies import verify_api_key, check_rate_limit
+from app.backend.dependencies import check_rate_limit, verify_api_key
 from app.schemas.requests import PredictionRequest, validate_city
-from app.schemas.responses import PredictionResponse, ErrorResponse
-from app.services.prediction_service import get_prediction_service, PredictionError, PredictionServiceError
+from app.schemas.responses import ErrorResponse, PredictionResponse
 from app.services.model_service import ModelNotLoadedError
+from app.services.prediction_service import (
+    PredictionError,
+    PredictionServiceError,
+    get_prediction_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,7 @@ def _store_prediction(prediction_data: dict):
     """Store prediction in history (best-effort, non-blocking)."""
     try:
         from src.data.prediction_history import PredictionHistoryStore
+
         store = PredictionHistoryStore()
         store.store_prediction(prediction_data)
     except Exception as e:
@@ -48,17 +54,17 @@ async def predict(
 ):
     """
     Generate AQI prediction for a city.
-    
+
     - **city**: City name (Karachi, Lahore, Islamabad)
     - **include_explanation**: Include SHAP explanation (future feature)
     """
     try:
         # Validate city
         city = validate_city(request.city)
-        
+
         # Get prediction service
         prediction_service = get_prediction_service()
-        
+
         # Generate prediction
         result = prediction_service.predict(
             city=city,
@@ -69,7 +75,7 @@ async def predict(
         _store_prediction(result)
 
         return PredictionResponse(**result)
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except PredictionError as e:

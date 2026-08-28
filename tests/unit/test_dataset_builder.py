@@ -2,20 +2,20 @@
 Tests for dataset builder — target generation, splitting, and metadata.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import datetime, timedelta, timezone
 
 from src.data.dataset_builder import (
     add_source_quality_metadata,
-    generate_targets,
-    validate_no_target_leakage,
-    split_chronological,
-    generate_dataset_version,
     build_dataset,
+    generate_dataset_version,
+    generate_targets,
+    split_chronological,
+    validate_no_target_leakage,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -29,24 +29,26 @@ def hourly_observations():
     timestamps = [base_time + timedelta(hours=i) for i in range(144)]
 
     np.random.seed(42)
-    return pd.DataFrame({
-        "timestamp": timestamps,
-        "location_id": ["karachi"] * 144,
-        "city_name": ["Karachi"] * 144,
-        "temperature": 30 + np.random.randn(144) * 3,
-        "humidity": 60 + np.random.randn(144) * 10,
-        "wind_speed": 3 + np.random.rand(144) * 4,
-        "pressure": 1010 + np.random.randn(144) * 5,
-        "aqi": 100 + np.cumsum(np.random.randn(144) * 3),
-        "pm25": 40 + np.random.rand(144) * 20,
-        "pm10": 60 + np.random.rand(144) * 30,
-        "co": 200 + np.random.rand(144) * 80,
-        "no2": 20 + np.random.rand(144) * 15,
-        "so2": 10 + np.random.rand(144) * 8,
-        "o3": 40 + np.random.rand(144) * 20,
-        "weather_condition": ["clear"] * 144,
-        "data_source": ["openweather"] * 144,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "location_id": ["karachi"] * 144,
+            "city_name": ["Karachi"] * 144,
+            "temperature": 30 + np.random.randn(144) * 3,
+            "humidity": 60 + np.random.randn(144) * 10,
+            "wind_speed": 3 + np.random.rand(144) * 4,
+            "pressure": 1010 + np.random.randn(144) * 5,
+            "aqi": 100 + np.cumsum(np.random.randn(144) * 3),
+            "pm25": 40 + np.random.rand(144) * 20,
+            "pm10": 60 + np.random.rand(144) * 30,
+            "co": 200 + np.random.rand(144) * 80,
+            "no2": 20 + np.random.rand(144) * 15,
+            "so2": 10 + np.random.rand(144) * 8,
+            "o3": 40 + np.random.rand(144) * 20,
+            "weather_condition": ["clear"] * 144,
+            "data_source": ["openweather"] * 144,
+        }
+    )
 
 
 # =============================================================================
@@ -206,9 +208,7 @@ class TestChronologicalSplit:
 
     def test_split_ratios(self, hourly_observations):
         """Custom split ratios are respected."""
-        train, val, test = split_chronological(
-            hourly_observations, train_ratio=0.7, val_ratio=0.2
-        )
+        train, val, test = split_chronological(hourly_observations, train_ratio=0.7, val_ratio=0.2)
         total = len(hourly_observations)
         assert abs(len(train) / total - 0.7) < 0.05
         assert abs(len(val) / total - 0.2) < 0.05
@@ -236,6 +236,7 @@ class TestDatasetVersion:
     def test_unique_versions(self):
         """Versions from different timestamps are unique."""
         import time
+
         v1 = generate_dataset_version()
         time.sleep(1.1)  # Ensure different second for uniqueness
         v2 = generate_dataset_version()

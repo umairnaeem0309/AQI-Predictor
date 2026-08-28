@@ -4,13 +4,14 @@ Request Schemas
 Pydantic models for API request validation.
 """
 
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
-from typing import Optional, List
 
 
 class PredictionRequest(BaseModel):
     """Request model for prediction endpoint."""
-    
+
     city: str = Field(
         ...,
         description="City name for prediction",
@@ -20,7 +21,7 @@ class PredictionRequest(BaseModel):
         default=False,
         description="Include SHAP explanation (future feature)",
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -32,7 +33,7 @@ class PredictionRequest(BaseModel):
 
 class FeatureRequest(BaseModel):
     """Request model for feature retrieval endpoint."""
-    
+
     city: str = Field(
         ...,
         description="City name",
@@ -42,7 +43,7 @@ class FeatureRequest(BaseModel):
         default=None,
         description="Specific feature names to retrieve (all if null)",
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -59,19 +60,17 @@ VALID_CITIES = {"karachi", "lahore", "islamabad"}
 def validate_city(city: str) -> str:
     """
     Validate city name.
-    
+
     Args:
         city: City name to validate
-        
+
     Returns:
         Normalized city name (lowercase)
-        
+
     Raises:
         ValueError: If city is not valid
     """
     normalized = city.lower().strip()
     if normalized not in VALID_CITIES:
-        raise ValueError(
-            f"Invalid city: {city}. Valid cities: {', '.join(sorted(VALID_CITIES))}"
-        )
+        raise ValueError(f"Invalid city: {city}. Valid cities: {', '.join(sorted(VALID_CITIES))}")
     return normalized

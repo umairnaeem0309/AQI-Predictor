@@ -107,7 +107,11 @@ def log_experiment(
             # Feature list artifact
             features_path = Path("feature_list.json")
             with open(features_path, "w") as f:
-                json.dump({"features": feature_columns, "count": len(feature_columns)}, f, indent=2)
+                json.dump(
+                    {"features": feature_columns, "count": len(feature_columns)},
+                    f,
+                    indent=2,
+                )
             mlflow.log_artifact(str(features_path))
             features_path.unlink()
 

@@ -27,7 +27,7 @@ import pandas as pd
 from src.config import PROJECT_ROOT, get_api_key
 from src.data.api_manager import APIManager
 from src.data.schemas import CityConfig, StandardObservation
-from src.data.validators import full_validation, drop_duplicates
+from src.data.validators import drop_duplicates, full_validation
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +140,7 @@ def collect_sample_data(
     """
     if city_configs is None:
         from src.config import load_config
+
         config = load_config()
         city_configs = [CityConfig(**city) for city in config.get("cities", [])]
 
@@ -202,6 +203,7 @@ def generate_mock_historical_dataset(
     """
     if city_configs is None:
         from src.config import load_config
+
         config = load_config()
         city_configs = [CityConfig(**city) for city in config.get("cities", [])]
 
@@ -218,31 +220,47 @@ def generate_mock_historical_dataset(
     city_profiles = {
         "karachi": {
             "city_name": "Karachi",
-            "temp_base": 31, "temp_amp": 4,
-            "humidity_base": 70, "humidity_amp": 10,
-            "aqi_base": 120, "aqi_amp": 30,
-            "pm25_base": 45, "pm25_amp": 15,
-            "pm10_base": 65, "pm10_amp": 20,
+            "temp_base": 31,
+            "temp_amp": 4,
+            "humidity_base": 70,
+            "humidity_amp": 10,
+            "aqi_base": 120,
+            "aqi_amp": 30,
+            "pm25_base": 45,
+            "pm25_amp": 15,
+            "pm10_base": 65,
+            "pm10_amp": 20,
         },
         "lahore": {
             "city_name": "Lahore",
-            "temp_base": 35, "temp_amp": 5,
-            "humidity_base": 55, "humidity_amp": 12,
-            "aqi_base": 180, "aqi_amp": 40,
-            "pm25_base": 80, "pm25_amp": 25,
-            "pm10_base": 110, "pm10_amp": 30,
+            "temp_base": 35,
+            "temp_amp": 5,
+            "humidity_base": 55,
+            "humidity_amp": 12,
+            "aqi_base": 180,
+            "aqi_amp": 40,
+            "pm25_base": 80,
+            "pm25_amp": 25,
+            "pm10_base": 110,
+            "pm10_amp": 30,
         },
         "islamabad": {
             "city_name": "Islamabad",
-            "temp_base": 33, "temp_amp": 5,
-            "humidity_base": 50, "humidity_amp": 15,
-            "aqi_base": 85, "aqi_amp": 25,
-            "pm25_base": 30, "pm25_amp": 12,
-            "pm10_base": 50, "pm10_amp": 18,
+            "temp_base": 33,
+            "temp_amp": 5,
+            "humidity_base": 50,
+            "humidity_amp": 15,
+            "aqi_base": 85,
+            "aqi_amp": 25,
+            "pm25_base": 30,
+            "pm25_amp": 12,
+            "pm10_base": 50,
+            "pm10_amp": 18,
         },
     }
 
     import numpy as np
+
     np.random.seed(42)
 
     rows = []
@@ -262,37 +280,59 @@ def generate_mock_historical_dataset(
             hum_cycle = -np.sin((hour - 5) / 24 * 2 * np.pi)
 
             # AQI daily cycle (peak during rush hours)
-            aqi_cycle = (np.sin((hour - 8) / 24 * 2 * np.pi) +
-                        np.sin((hour - 17) / 24 * 2 * np.pi)) / 2
+            aqi_cycle = (
+                np.sin((hour - 8) / 24 * 2 * np.pi) + np.sin((hour - 17) / 24 * 2 * np.pi)
+            ) / 2
 
             # Weekly pattern (weekdays worse)
             is_weekend = ts.weekday() >= 5
             weekday_factor = 0.85 if is_weekend else 1.0
 
             temp = profile["temp_base"] + temp_cycle * profile["temp_amp"] + np.random.randn() * 1.5
-            humidity = profile["humidity_base"] + hum_cycle * profile["humidity_amp"] + np.random.randn() * 3
-            aqi = max(0, profile["aqi_base"] + aqi_cycle * profile["aqi_amp"] * weekday_factor + np.random.randn() * 8)
-            pm25 = max(0, profile["pm25_base"] + aqi_cycle * profile["pm25_amp"] * weekday_factor + np.random.randn() * 5)
-            pm10 = max(0, profile["pm10_base"] + aqi_cycle * profile["pm10_amp"] * weekday_factor + np.random.randn() * 7)
+            humidity = (
+                profile["humidity_base"]
+                + hum_cycle * profile["humidity_amp"]
+                + np.random.randn() * 3
+            )
+            aqi = max(
+                0,
+                profile["aqi_base"]
+                + aqi_cycle * profile["aqi_amp"] * weekday_factor
+                + np.random.randn() * 8,
+            )
+            pm25 = max(
+                0,
+                profile["pm25_base"]
+                + aqi_cycle * profile["pm25_amp"] * weekday_factor
+                + np.random.randn() * 5,
+            )
+            pm10 = max(
+                0,
+                profile["pm10_base"]
+                + aqi_cycle * profile["pm10_amp"] * weekday_factor
+                + np.random.randn() * 7,
+            )
 
-            rows.append({
-                "timestamp": ts,
-                "location_id": city_config.id,
-                "city_name": profile["city_name"],
-                "temperature": round(temp, 2),
-                "humidity": round(np.clip(humidity, 0, 100), 2),
-                "wind_speed": round(3 + np.random.rand() * 4, 2),
-                "pressure": round(1010 + np.random.randn() * 3, 1),
-                "weather_condition": "clear" if np.random.rand() > 0.3 else "cloudy",
-                "aqi": int(aqi),
-                "pm25": round(pm25, 2),
-                "pm10": round(pm10, 2),
-                "co": round(200 + np.random.rand() * 80, 2),
-                "no2": round(20 + np.random.rand() * 15, 2),
-                "so2": round(10 + np.random.rand() * 8, 2),
-                "o3": round(40 + np.random.rand() * 25, 2),
-                "data_source": "synthetic",
-            })
+            rows.append(
+                {
+                    "timestamp": ts,
+                    "location_id": city_config.id,
+                    "city_name": profile["city_name"],
+                    "temperature": round(temp, 2),
+                    "humidity": round(np.clip(humidity, 0, 100), 2),
+                    "wind_speed": round(3 + np.random.rand() * 4, 2),
+                    "pressure": round(1010 + np.random.randn() * 3, 1),
+                    "weather_condition": ("clear" if np.random.rand() > 0.3 else "cloudy"),
+                    "aqi": int(aqi),
+                    "pm25": round(pm25, 2),
+                    "pm10": round(pm10, 2),
+                    "co": round(200 + np.random.rand() * 80, 2),
+                    "no2": round(20 + np.random.rand() * 15, 2),
+                    "so2": round(10 + np.random.rand() * 8, 2),
+                    "o3": round(40 + np.random.rand() * 25, 2),
+                    "data_source": "synthetic",
+                }
+            )
 
     df = pd.DataFrame(rows)
     logger.info(

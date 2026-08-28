@@ -29,12 +29,12 @@ import numpy as np
 import pandas as pd
 
 from src.config import PROJECT_ROOT, load_config
-from src.data.providers.open_meteo_weather import OpenMeteoWeatherProvider
 from src.data.providers.open_meteo_air_quality import OpenMeteoAirQualityProvider
+from src.data.providers.open_meteo_weather import OpenMeteoWeatherProvider
 from src.utils.epa_aqi import (
-    calculate_pm25_aqi,
-    calculate_pm10_aqi,
     calculate_individual_aqi,
+    calculate_pm10_aqi,
+    calculate_pm25_aqi,
     get_aqi_metadata,
 )
 
@@ -172,14 +172,28 @@ def merge_weather_and_air_quality(
 
     # Columns to take from each source
     weather_cols = [
-        "timestamp", "location_id",
-        "temperature", "humidity", "pressure",
-        "wind_speed", "wind_direction", "cloud_cover", "precipitation",
+        "timestamp",
+        "location_id",
+        "temperature",
+        "humidity",
+        "pressure",
+        "wind_speed",
+        "wind_direction",
+        "cloud_cover",
+        "precipitation",
     ]
     aq_cols = [
-        "timestamp", "location_id",
-        "pm25", "pm10", "co", "no2", "so2", "o3",
-        "us_aqi_open_meteo", "us_aqi_pm25_open_meteo", "us_aqi_pm10_open_meteo",
+        "timestamp",
+        "location_id",
+        "pm25",
+        "pm10",
+        "co",
+        "no2",
+        "so2",
+        "o3",
+        "us_aqi_open_meteo",
+        "us_aqi_pm25_open_meteo",
+        "us_aqi_pm10_open_meteo",
     ]
 
     # Filter to available columns
@@ -199,7 +213,8 @@ def merge_weather_and_air_quality(
 
     # Merge
     merged = pd.merge(
-        w_df, a_df,
+        w_df,
+        a_df,
         on=["timestamp", "location_id"],
         how="outer",
         suffixes=("_weather", "_aq"),
@@ -227,7 +242,8 @@ def merge_weather_and_air_quality(
 
     logger.info(
         "Merged weather + air quality: %d rows, %d columns",
-        len(merged), len(merged.columns),
+        len(merged),
+        len(merged.columns),
     )
 
     return merged
@@ -297,6 +313,7 @@ def calculate_aqi_targets(df: pd.DataFrame) -> pd.DataFrame:
 
     # Add AQI category
     from src.utils.aqi_categories import get_aqi_category
+
     def _get_category_label(aqi_val):
         if aqi_val is None or pd.isna(aqi_val):
             return None
@@ -305,6 +322,7 @@ def calculate_aqi_targets(df: pd.DataFrame) -> pd.DataFrame:
             return label
         except (ValueError, TypeError):
             return None
+
     df["aqi_category"] = df["aqi"].apply(_get_category_label)
 
     # Add metadata
@@ -320,7 +338,10 @@ def calculate_aqi_targets(df: pd.DataFrame) -> pd.DataFrame:
     if len(valid_aqi) > 0:
         logger.info(
             "AQI calculation complete: %d valid rows, min=%d, max=%d, mean=%.1f",
-            len(valid_aqi), valid_aqi.min(), valid_aqi.max(), valid_aqi.mean(),
+            len(valid_aqi),
+            valid_aqi.min(),
+            valid_aqi.max(),
+            valid_aqi.mean(),
         )
     else:
         logger.warning("No valid AQI values calculated")
@@ -348,6 +369,7 @@ def add_aqi_category(df: pd.DataFrame) -> pd.DataFrame:
     from src.utils.aqi_categories import get_aqi_category
 
     df = df.copy()
+
     def _label(aqi_val):
         if aqi_val is None or pd.isna(aqi_val):
             return None
@@ -356,6 +378,7 @@ def add_aqi_category(df: pd.DataFrame) -> pd.DataFrame:
             return label
         except (ValueError, TypeError):
             return None
+
     df["aqi_category"] = df["aqi"].apply(_label)
     return df
 
@@ -383,7 +406,7 @@ def validate_dataset(df: pd.DataFrame) -> Dict[str, Any]:
     report = {
         "status": "PASS",
         "total_rows": len(df),
-        "cities": df["location_id"].unique().tolist() if "location_id" in df.columns else [],
+        "cities": (df["location_id"].unique().tolist() if "location_id" in df.columns else []),
         "date_range": {},
         "missing_data": {},
         "quality_issues": [],
@@ -400,8 +423,17 @@ def validate_dataset(df: pd.DataFrame) -> Dict[str, Any]:
 
     # Missing data per column
     key_columns = [
-        "temperature", "humidity", "pressure", "wind_speed",
-        "pm25", "pm10", "co", "no2", "so2", "o3", "aqi",
+        "temperature",
+        "humidity",
+        "pressure",
+        "wind_speed",
+        "pm25",
+        "pm10",
+        "co",
+        "no2",
+        "so2",
+        "o3",
+        "aqi",
     ]
     for col in key_columns:
         if col in df.columns:
@@ -412,9 +444,7 @@ def validate_dataset(df: pd.DataFrame) -> Dict[str, Any]:
                 "percentage": missing_pct,
             }
             if missing_pct > 50:
-                report["quality_issues"].append(
-                    f"High missing rate for {col}: {missing_pct}%"
-                )
+                report["quality_issues"].append(f"High missing rate for {col}: {missing_pct}%")
 
     # Negative pollutant values
     pollutant_cols = ["pm25", "pm10", "co", "no2", "so2", "o3"]
@@ -422,24 +452,18 @@ def validate_dataset(df: pd.DataFrame) -> Dict[str, Any]:
         if col in df.columns:
             negatives = (df[col] < 0).sum()
             if negatives > 0:
-                report["quality_issues"].append(
-                    f"Negative values in {col}: {negatives} rows"
-                )
+                report["quality_issues"].append(f"Negative values in {col}: {negatives} rows")
 
     # Impossible weather values
     if "temperature" in df.columns:
         extreme_temp = ((df["temperature"] < -60) | (df["temperature"] > 60)).sum()
         if extreme_temp > 0:
-            report["quality_issues"].append(
-                f"Extreme temperature values: {extreme_temp} rows"
-            )
+            report["quality_issues"].append(f"Extreme temperature values: {extreme_temp} rows")
 
     if "humidity" in df.columns:
         invalid_hum = ((df["humidity"] < 0) | (df["humidity"] > 100)).sum()
         if invalid_hum > 0:
-            report["quality_issues"].append(
-                f"Invalid humidity values (0-100): {invalid_hum} rows"
-            )
+            report["quality_issues"].append(f"Invalid humidity values (0-100): {invalid_hum} rows")
 
     # Duplicate timestamps per city
     if "timestamp" in df.columns and "location_id" in df.columns:
@@ -454,9 +478,7 @@ def validate_dataset(df: pd.DataFrame) -> Dict[str, Any]:
         valid_aqi = df["aqi"].dropna()
         out_of_range = ((valid_aqi < 0) | (valid_aqi > 500)).sum()
         if out_of_range > 0:
-            report["quality_issues"].append(
-                f"AQI values outside 0-500 range: {out_of_range} rows"
-            )
+            report["quality_issues"].append(f"AQI values outside 0-500 range: {out_of_range} rows")
 
     # Overall status
     if report["quality_issues"]:
@@ -464,7 +486,9 @@ def validate_dataset(df: pd.DataFrame) -> Dict[str, Any]:
 
     logger.info(
         "Dataset validation: %s — %d rows, %d issues",
-        report["status"], report["total_rows"], len(report["quality_issues"]),
+        report["status"],
+        report["total_rows"],
+        len(report["quality_issues"]),
     )
 
     return report
@@ -505,13 +529,18 @@ def run_historical_ingestion(
 
     logger.info(
         "Starting historical ingestion: %d cities, %s to %s",
-        len(city_configs), start_date, end_date,
+        len(city_configs),
+        start_date,
+        end_date,
     )
 
     # Step 1: Download weather data
     logger.info("Step 1/5: Downloading weather data...")
     weather_df = download_weather_data(
-        city_configs, start_date, end_date, save=save,
+        city_configs,
+        start_date,
+        end_date,
+        save=save,
     )
 
     # Step 2: Download air quality data
@@ -519,7 +548,10 @@ def run_historical_ingestion(
     aq_start = max(start_date, "2022-08-01")
     logger.info("Step 2/5: Downloading air quality data (from %s)...", aq_start)
     aq_df = download_air_quality_data(
-        city_configs, aq_start, end_date, save=save,
+        city_configs,
+        aq_start,
+        end_date,
+        save=save,
     )
 
     # Step 3: Merge
@@ -553,7 +585,8 @@ def run_historical_ingestion(
         "total_rows": len(merged_df),
         "rows_per_city": (
             merged_df["location_id"].value_counts().to_dict()
-            if "location_id" in merged_df.columns else {}
+            if "location_id" in merged_df.columns
+            else {}
         ),
         "columns": merged_df.columns.tolist(),
         "weather_rows": len(weather_df),
@@ -576,7 +609,8 @@ def run_historical_ingestion(
 
     logger.info(
         "Historical ingestion complete: %d total rows, status=%s",
-        len(merged_df), validation.get("status"),
+        len(merged_df),
+        validation.get("status"),
     )
 
     return {

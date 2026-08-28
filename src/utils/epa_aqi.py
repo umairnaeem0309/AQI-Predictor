@@ -21,18 +21,21 @@ IMPORTANT: This calculates a DERIVED EPA-method PM NowCast AQI estimate
 from OpenWeather pollutant concentrations. It is NOT an official EPA/AirNow
 monitor reading.
 """
+
 import math
-from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 # ============================================================================
 # EPA AQI Breakpoint Tables (Current as of May 2024)
 # Source: https://aqs.epa.gov/aqsweb/documents/codetables/aqi_breakpoints.html
 # ============================================================================
 
+
 @dataclass
 class BreakpointRow:
     """A single AQI breakpoint row."""
+
     pollutant: str
     aqi_low: int
     aqi_high: int
@@ -117,6 +120,7 @@ AQI_METHOD = "PM_NOWCAST"
 # Unit Conversion Functions (Standard Conditions: 25°C, 1 atm)
 # ============================================================================
 
+
 def ug_m3_to_ppm(conc_ug_m3: float, molecular_weight: float) -> float:
     """Convert ug/m3 to ppm at standard conditions (25°C, 1 atm).
 
@@ -167,6 +171,7 @@ def ug_m3_to_ppb(conc_ug_m3: float, molecular_weight: float) -> float:
 # EPA Concentration Truncation Rules
 # ============================================================================
 
+
 def truncate_pm25(conc: float) -> float:
     """Truncate PM2.5 to 0.1 ug/m3 (EPA rule)."""
     if conc is None or (isinstance(conc, float) and math.isnan(conc)):
@@ -202,6 +207,7 @@ def truncate_co_ppm(conc_ppm: float) -> float:
 # ============================================================================
 # AQI Calculation (Standard EPA Equation)
 # ============================================================================
+
 
 def calculate_aqi_from_concentration(
     concentration: float,
@@ -354,6 +360,7 @@ def calculate_co_aqi(co_ug_m3: float) -> Optional[int]:
 # NowCast Algorithm (EPA Methodology for PM2.5 and PM10)
 # ============================================================================
 
+
 def calculate_nowcast(
     hourly_concentrations: List[Optional[float]],
     min_hours: int = 2,
@@ -426,7 +433,7 @@ def calculate_nowcast(
     numerator = 0.0
     denominator = 0.0
     for pos, conc in zip(positions, concentrations):
-        weight = w ** pos
+        weight = w**pos
         numerator += weight * conc
         denominator += weight
 
@@ -439,6 +446,7 @@ def calculate_nowcast(
 # ============================================================================
 # Dominant Pollutant & Overall AQI
 # ============================================================================
+
 
 def calculate_individual_aqi(
     pm25: Optional[float] = None,
@@ -508,6 +516,7 @@ def calculate_individual_aqi(
 # NowCast-based AQI (Recommended Target Method)
 # ============================================================================
 
+
 def calculate_nowcast_aqi(
     pm25_hourly: List[Optional[float]],
     pm10_hourly: List[Optional[float]] = None,
@@ -553,8 +562,12 @@ def calculate_nowcast_aqi(
         "pm10_nowcast": pm10_nowcast,
         "individual_aqi": individual,
         "dominant_pollutant": dominant,
-        "hours_used_pm25": sum(1 for c in (pm25_hourly[-12:] if pm25_hourly else []) if c is not None),
-        "hours_used_pm10": sum(1 for c in (pm10_hourly[-12:] if pm10_hourly else []) if c is not None),
+        "hours_used_pm25": sum(
+            1 for c in (pm25_hourly[-12:] if pm25_hourly else []) if c is not None
+        ),
+        "hours_used_pm10": sum(
+            1 for c in (pm10_hourly[-12:] if pm10_hourly else []) if c is not None
+        ),
     }
 
     return aqi, dominant, metadata
@@ -563,6 +576,7 @@ def calculate_nowcast_aqi(
 # ============================================================================
 # Metadata
 # ============================================================================
+
 
 def get_aqi_metadata() -> Dict[str, str]:
     """Get AQI calculation metadata for audit trail.

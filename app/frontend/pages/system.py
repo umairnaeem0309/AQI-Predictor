@@ -1,4 +1,7 @@
-import os, sys; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 """
 System Status Page
 
@@ -6,20 +9,21 @@ Model status, pipeline status, data freshness, monitoring, and alerts.
 All data from backend - no hardcoded values.
 """
 
-import streamlit as st
 import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-from app.frontend.utils.api_client import APIClient, APIClientError
-from app.frontend.utils.formatters import format_timestamp, format_time_ago
-from app.frontend.utils.aqi_theme import get_dashboard_css
+import streamlit as st
+
 from app.frontend.components.metrics import (
-    render_status_card,
-    render_info_card,
     render_error_state,
+    render_info_card,
+    render_status_card,
     render_warning_state,
 )
+from app.frontend.utils.api_client import APIClient, APIClientError
+from app.frontend.utils.aqi_theme import get_dashboard_css
+from app.frontend.utils.formatters import format_time_ago, format_timestamp
 
 
 def render_system(api_client: APIClient):
@@ -169,6 +173,7 @@ def render_system(api_client: APIClient):
         if dataset_exists:
             try:
                 import pandas as pd
+
                 df = pd.read_csv(dataset_path)
                 st.subheader("Dataset Statistics")
                 col1, col2, col3, col4 = st.columns(4)
@@ -179,7 +184,10 @@ def render_system(api_client: APIClient):
                     st.metric("Cities", cities)
                 with col3:
                     if "timestamp" in df.columns:
-                        st.metric("Date Range", f"{df['timestamp'].min()[:10]} → {df['timestamp'].max()[:10]}")
+                        st.metric(
+                            "Date Range",
+                            f"{df['timestamp'].min()[:10]} → {df['timestamp'].max()[:10]}",
+                        )
                     else:
                         st.metric("Date Range", "N/A")
                 with col4:
@@ -212,8 +220,14 @@ def render_system(api_client: APIClient):
                 drift = api_client.get_drift_report()
 
             # Handle unavailable data gracefully
-            if drift.get("status") == "unavailable" or not drift.get("features") and drift.get("total_features", 0) == 0:
-                st.info(f"ℹ️ {drift.get('message', 'Training data not available for drift detection. This is expected in deployed environments.')}")
+            if (
+                drift.get("status") == "unavailable"
+                or not drift.get("features")
+                and drift.get("total_features", 0) == 0
+            ):
+                st.info(
+                    f"ℹ️ {drift.get('message', 'Training data not available for drift detection. This is expected in deployed environments.')}"
+                )
             else:
                 drift_detected = drift.get("drift_detected", False)
                 drifted_count = drift.get("drifted_count", 0)
@@ -233,7 +247,9 @@ def render_system(api_client: APIClient):
                     st.metric("Drift %", f"{drift_pct:.1f}%")
 
                 if drift_detected:
-                    st.warning(f"⚠️ Data drift detected in {drifted_count} features ({drift_pct:.1f}%)")
+                    st.warning(
+                        f"⚠️ Data drift detected in {drifted_count} features ({drift_pct:.1f}%)"
+                    )
                     drifted_cols = drift.get("drifted_columns", [])
                     if drifted_cols:
                         st.markdown("**Drifted columns:**")
@@ -271,7 +287,9 @@ def render_system(api_client: APIClient):
                 for h in ["24h", "48h", "72h"]:
                     if h in metrics:
                         m = metrics[h]
-                        st.markdown(f"**{h} Horizon:** MAE={m.get('mae', 0):.2f} | RMSE={m.get('rmse', 0):.2f} | R²={m.get('r2', 0):.4f}")
+                        st.markdown(
+                            f"**{h} Horizon:** MAE={m.get('mae', 0):.2f} | RMSE={m.get('rmse', 0):.2f} | R²={m.get('r2', 0):.4f}"
+                        )
             else:
                 st.info("No training metrics available.")
 
@@ -320,12 +338,45 @@ def render_system(api_client: APIClient):
         st.subheader("📖 AQI Reference")
 
         import pandas as pd
-        categories = pd.DataFrame([
-            {"AQI Range": "0-50", "Category": "Good", "Color": "🟢", "Health": "Satisfactory"},
-            {"AQI Range": "51-100", "Category": "Moderate", "Color": "🟡", "Health": "Acceptable"},
-            {"AQI Range": "101-150", "Category": "USG", "Color": "🟠", "Health": "Sensitive groups affected"},
-            {"AQI Range": "151-200", "Category": "Unhealthy", "Color": "🔴", "Health": "Everyone affected"},
-            {"AQI Range": "201-300", "Category": "Very Unhealthy", "Color": "🟣", "Health": "Health alert"},
-            {"AQI Range": "301-500", "Category": "Hazardous", "Color": "⚫", "Health": "Emergency"},
-        ])
+
+        categories = pd.DataFrame(
+            [
+                {
+                    "AQI Range": "0-50",
+                    "Category": "Good",
+                    "Color": "🟢",
+                    "Health": "Satisfactory",
+                },
+                {
+                    "AQI Range": "51-100",
+                    "Category": "Moderate",
+                    "Color": "🟡",
+                    "Health": "Acceptable",
+                },
+                {
+                    "AQI Range": "101-150",
+                    "Category": "USG",
+                    "Color": "🟠",
+                    "Health": "Sensitive groups affected",
+                },
+                {
+                    "AQI Range": "151-200",
+                    "Category": "Unhealthy",
+                    "Color": "🔴",
+                    "Health": "Everyone affected",
+                },
+                {
+                    "AQI Range": "201-300",
+                    "Category": "Very Unhealthy",
+                    "Color": "🟣",
+                    "Health": "Health alert",
+                },
+                {
+                    "AQI Range": "301-500",
+                    "Category": "Hazardous",
+                    "Color": "⚫",
+                    "Health": "Emergency",
+                },
+            ]
+        )
         st.dataframe(categories, hide_index=True, use_container_width=True)

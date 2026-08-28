@@ -2,12 +2,13 @@
 Tests for Local Feature Store — DuckDB + Parquet implementation.
 """
 
-import numpy as np
-import pandas as pd
-import pytest
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
 
 from src.feature_store.local_store import LocalStore
 from src.feature_store.schemas import (
@@ -15,7 +16,6 @@ from src.feature_store.schemas import (
     DatasetType,
     get_feature_group_name,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -35,27 +35,31 @@ def temp_store():
 @pytest.fixture
 def sample_features():
     """Sample feature DataFrame."""
-    return pd.DataFrame({
-        "location_id": ["karachi"] * 5,
-        "timestamp": pd.date_range("2026-08-01", periods=5, freq="h", tz="UTC"),
-        "city_name": ["Karachi"] * 5,
-        "temperature": [30.0, 31.0, 32.0, 33.0, 34.0],
-        "humidity": [60.0, 62.0, 64.0, 66.0, 68.0],
-        "aqi": [100, 105, 110, 115, 120],
-        "pm25": [40.0, 42.0, 44.0, 46.0, 48.0],
-    })
+    return pd.DataFrame(
+        {
+            "location_id": ["karachi"] * 5,
+            "timestamp": pd.date_range("2026-08-01", periods=5, freq="h", tz="UTC"),
+            "city_name": ["Karachi"] * 5,
+            "temperature": [30.0, 31.0, 32.0, 33.0, 34.0],
+            "humidity": [60.0, 62.0, 64.0, 66.0, 68.0],
+            "aqi": [100, 105, 110, 115, 120],
+            "pm25": [40.0, 42.0, 44.0, 46.0, 48.0],
+        }
+    )
 
 
 @pytest.fixture
 def sample_targets():
     """Sample target DataFrame."""
-    return pd.DataFrame({
-        "location_id": ["karachi"] * 5,
-        "timestamp": pd.date_range("2026-08-01", periods=5, freq="h", tz="UTC"),
-        "target_aqi_24h": [110, 115, 120, 125, 130],
-        "target_aqi_48h": [120, 125, 130, 135, 140],
-        "target_aqi_72h": [130, 135, 140, 145, 150],
-    })
+    return pd.DataFrame(
+        {
+            "location_id": ["karachi"] * 5,
+            "timestamp": pd.date_range("2026-08-01", periods=5, freq="h", tz="UTC"),
+            "target_aqi_24h": [110, 115, 120, 125, 130],
+            "target_aqi_48h": [120, 125, 130, 135, 140],
+            "target_aqi_72h": [130, 135, 140, 145, 150],
+        }
+    )
 
 
 @pytest.fixture

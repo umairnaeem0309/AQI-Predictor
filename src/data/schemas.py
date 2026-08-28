@@ -15,7 +15,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-
 # =============================================================================
 # OpenWeather Raw Response Schemas
 # =============================================================================
@@ -193,7 +192,8 @@ class StandardObservation(BaseModel):
     # Metadata
     data_source: DataSource = Field(..., description="Source API identifier")
     raw_response_time: Optional[datetime] = Field(
-        None, description="Source provider observation timestamp (before timezone normalization)"
+        None,
+        description="Source provider observation timestamp (before timezone normalization)",
     )
     collected_at: Optional[datetime] = Field(
         None, description="Local collection timestamp (when API call was made)"
@@ -292,8 +292,6 @@ class DataQualityReport(BaseModel):
         default_factory=dict, description="Column -> count of missing values"
     )
     duplicate_count: int = Field(0, description="Number of duplicate records")
-    staleness_hours: Optional[float] = Field(
-        None, description="Age of newest record in hours"
-    )
+    staleness_hours: Optional[float] = Field(None, description="Age of newest record in hours")
     warnings: List[str] = Field(default_factory=list, description="Warning messages")
     errors: List[str] = Field(default_factory=list, description="Error messages")

@@ -2,13 +2,13 @@
 Tests for model evaluation — MAE, RMSE, R² calculations.
 """
 
+from unittest.mock import MagicMock
+
 import numpy as np
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock
 
-from src.models.evaluation import compute_metrics, evaluate_model, compare_models
-
+from src.models.evaluation import compare_models, compute_metrics, evaluate_model
 
 # =============================================================================
 # Test Compute Metrics
@@ -65,11 +65,13 @@ class TestEvaluateModel:
         model.predict.return_value = np.array([[100, 110, 120]] * 50)
 
         X_val = pd.DataFrame({"feat": range(50)})
-        y_val = pd.DataFrame({
-            "target_aqi_24h": range(100, 150),
-            "target_aqi_48h": range(110, 160),
-            "target_aqi_72h": range(120, 170),
-        })
+        y_val = pd.DataFrame(
+            {
+                "target_aqi_24h": range(100, 150),
+                "target_aqi_48h": range(110, 160),
+                "target_aqi_72h": range(120, 170),
+            }
+        )
 
         metrics = evaluate_model(model, X_val, y_val)
         assert "mae_24h" in metrics
@@ -85,11 +87,13 @@ class TestEvaluateModel:
         model.predict.return_value = np.array([[100, 110, 120]] * 50)
 
         X_val = pd.DataFrame({"feat": range(50)})
-        y_val = pd.DataFrame({
-            "target_aqi_24h": [100] * 40 + [np.nan] * 10,
-            "target_aqi_48h": [110] * 40 + [np.nan] * 10,
-            "target_aqi_72h": [120] * 40 + [np.nan] * 10,
-        })
+        y_val = pd.DataFrame(
+            {
+                "target_aqi_24h": [100] * 40 + [np.nan] * 10,
+                "target_aqi_48h": [110] * 40 + [np.nan] * 10,
+                "target_aqi_72h": [120] * 40 + [np.nan] * 10,
+            }
+        )
 
         metrics = evaluate_model(model, X_val, y_val)
         assert not np.isnan(metrics["mae_avg"])
@@ -108,7 +112,14 @@ class TestCompareModels:
         results = [
             {
                 "model_name": "ridge",
-                "metrics": {"mae_24h": 5.0, "rmse_24h": 7.0, "r2_24h": 0.9, "mae_avg": 5.0, "rmse_avg": 7.0, "r2_avg": 0.9},
+                "metrics": {
+                    "mae_24h": 5.0,
+                    "rmse_24h": 7.0,
+                    "r2_24h": 0.9,
+                    "mae_avg": 5.0,
+                    "rmse_avg": 7.0,
+                    "r2_avg": 0.9,
+                },
                 "training_time": 0.1,
                 "feature_columns": ["f1", "f2"],
                 "is_reportable": True,
@@ -124,7 +135,13 @@ class TestCompareModels:
     def test_comparison_excludes_errors(self):
         """Comparison excludes models with errors."""
         results = [
-            {"model_name": "ridge", "metrics": {"mae_avg": 5.0}, "training_time": 0.1, "feature_columns": [], "is_reportable": True},
+            {
+                "model_name": "ridge",
+                "metrics": {"mae_avg": 5.0},
+                "training_time": 0.1,
+                "feature_columns": [],
+                "is_reportable": True,
+            },
             {"model_name": "failed_model", "error": "training failed"},
         ]
         df = compare_models(results)
