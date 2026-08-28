@@ -21,9 +21,9 @@ class PredictionResponse(BaseModel):
     category_48h: str = Field(..., description="AQI category for 48h forecast")
     category_72h: str = Field(..., description="AQI category for 72h forecast")
     model_version: str = Field(..., description="Model version used")
-    confidence: Optional[float] = Field(
+    confidence: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="Prediction confidence (null until uncertainty method implemented)",
+        description="Prediction confidence intervals (level, method, per-horizon bounds)",
     )
     
     class Config:

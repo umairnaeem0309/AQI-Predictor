@@ -1,0 +1,15 @@
+{
+  "mean_residual": 0.34993423184182426,
+  "std_residual": 33.876554341272474,
+  "mae": 23.061656034857656,
+  "rmse": 33.87836164875453,
+  "median_abs_error": 17.03662872314453,
+  "n_samples": 26280,
+  "interval_80_lower": -34.52019729614259,
+  "interval_80_upper": 37.30891647338869,
+  "interval_80_width": 71.82911376953129,
+  "interval_95_lower": -57.020124816894516,
+  "interval_95_upper": 64.14893913269039,
+  "interval_95_width": 121.16906394958491,
+  "per_horizon": {}
+}

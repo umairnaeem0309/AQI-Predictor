@@ -316,6 +316,7 @@ def get_live_prediction(city_id: str, model) -> Dict[str, Any]:
         Dictionary with prediction results.
     """
     from src.utils.aqi_categories import get_aqi_category
+    from src.models.confidence import predict_with_confidence
 
     # Build features
     features = build_features_for_prediction(city_id)
@@ -333,6 +334,23 @@ def get_live_prediction(city_id: str, model) -> Dict[str, Any]:
     _, cat_48h = get_aqi_category(aqi_48h)
     _, cat_72h = get_aqi_category(aqi_72h)
 
+    # Compute confidence intervals
+    try:
+        ci = predict_with_confidence(pred.reshape(1, -1), confidence_level=90)
+        intervals = ci.get("intervals", [])
+        confidence = {
+            "level": 90,
+            "method": ci.get("interval_method", "residual_quantile"),
+            "intervals": {
+                "24h": intervals[0] if len(intervals) > 0 else None,
+                "48h": intervals[1] if len(intervals) > 1 else None,
+                "72h": intervals[2] if len(intervals) > 2 else None,
+            },
+        }
+    except Exception as e:
+        logger.warning(f"Failed to compute confidence intervals: {e}")
+        confidence = None
+
     return {
         "city": CITIES[city_id]["name"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -343,5 +361,5 @@ def get_live_prediction(city_id: str, model) -> Dict[str, Any]:
         "category_48h": cat_48h,
         "category_72h": cat_72h,
         "model_version": "xgboost-live-v1.0",
-        "confidence": None,
+        "confidence": confidence,
     }
