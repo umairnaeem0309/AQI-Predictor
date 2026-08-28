@@ -1,5 +1,6 @@
 # Render Blueprint — AQI Predictor
-# Deploy both backend and frontend as separate services
+# Deploy FastAPI backend only
+# Streamlit dashboard deploys to Streamlit Cloud
 
 services:
   # FastAPI Backend
@@ -16,21 +17,4 @@ services:
         value: "info"
     healthCheckPath: /health
     port: 8000
-    autoDeploy: true
-
-  # Streamlit Dashboard
-  - type: web
-    name: aqi-predictor-dashboard
-    runtime: docker
-    dockerfilePath: ./Dockerfile.frontend
-    envVars:
-      - key: API_BASE_URL
-        fromService:
-          name: aqi-predictor-api
-          property: host
-      - key: API_KEY
-        fromService:
-          name: aqi-predictor-api
-          property: env.API_KEY
-    port: 8501
     autoDeploy: true

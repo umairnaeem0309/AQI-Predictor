@@ -1,0 +1,6 @@
+# Streamlit Cloud - Frontend only
+# Lightweight requirements (no ML libraries needed)
+streamlit>=1.28.0,<1.40.0
+requests>=2.31.0,<2.33.0
+plotly>=5.18.0,<6.0.0
+pandas>=2.0.0,<2.2.0

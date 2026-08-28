@@ -45,8 +45,8 @@ COPY models/ ./models/
 # Copy environment template (actual .env is mounted at runtime)
 COPY .env.example .env
 
-# Copy processed data for feature adapter
-COPY data/processed/ ./data/processed/
+# Note: data/processed/ excluded from image for smaller size
+# Data routes gracefully handle missing historical dataset
 
 # Expose FastAPI port
 EXPOSE 8000
