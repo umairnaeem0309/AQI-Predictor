@@ -17,42 +17,42 @@ sys.path.insert(0, str(project_root))
 def check_mock_mode() -> bool:
     """Check MOCK_MODE is false in production."""
     mock_mode = os.getenv("MOCK_MODE", "false").lower()
-    
+
     if mock_mode == "true":
-        print("❌ CRITICAL: MOCK_MODE is true in production!")
+        print("[FAIL] CRITICAL: MOCK_MODE is true in production!")
         print("   Mock mode must be false for production deployment.")
         return False
-    
-    print("✅ MOCK_MODE is false")
+
+    print("[OK] MOCK_MODE is false")
     return True
 
 
 def check_api_key() -> bool:
     """Check API_KEY is set."""
     api_key = os.getenv("API_KEY")
-    
+
     if not api_key:
-        print("❌ CRITICAL: API_KEY is not set!")
+        print("[FAIL] CRITICAL: API_KEY is not set!")
         print("   API_KEY must be set for production deployment.")
         return False
-    
+
     # Don't log the actual key
-    print("✅ API_KEY is set")
+    print("[OK] API_KEY is set")
     return True
 
 
 def check_hopsworks_host() -> bool:
     """Check HOPSWORKS_HOST is set."""
     hopsworks_host = os.getenv("HOPSWORKS_HOST")
-    
+
     if not hopsworks_host:
-        print("❌ WARNING: HOPSWORKS_HOST is not set!")
+        print("[WARN] WARNING: HOPSWORKS_HOST is not set!")
         print("   Feature store will use local fallback.")
         print("   This may not be suitable for production.")
         # Warning only, not failure
         return True
-    
-    print(f"✅ HOPSWORKS_HOST is set")
+
+    print("[OK] HOPSWORKS_HOST is set")
     return True
 
 
@@ -60,19 +60,19 @@ def check_api_keys() -> bool:
     """Check API keys are set."""
     openweather_key = os.getenv("OPENWEATHER_API_KEY")
     aqicn_key = os.getenv("AQICN_API_KEY")
-    
+
     missing = []
     if not openweather_key:
         missing.append("OPENWEATHER_API_KEY")
     if not aqicn_key:
         missing.append("AQICN_API_KEY")
-    
+
     if missing:
-        print(f"❌ WARNING: Missing API keys: {', '.join(missing)}")
+        print(f"[WARN] WARNING: Missing API keys: {', '.join(missing)}")
         print("   Data collection may fail without API keys.")
         return True  # Warning only
-    
-    print("✅ API keys are set")
+
+    print("[OK] API keys are set")
     return True
 
 
@@ -80,8 +80,8 @@ def check_model_metadata() -> bool:
     """Check model metadata is valid for production."""
     # This would check the actual model metadata
     # For now, just verify the check exists
-    
-    print("✅ Model metadata check passed (placeholder)")
+
+    print("[OK] Model metadata check passed (placeholder)")
     return True
 
 
@@ -89,13 +89,13 @@ def check_feature_store_config() -> bool:
     """Check feature store configuration."""
     feature_store_primary = os.getenv("FEATURE_STORE_PRIMARY", "hopsworks")
     local_fallback = os.getenv("FEATURE_STORE_LOCAL_FALLBACK", "false").lower()
-    
+
     if feature_store_primary == "hopsworks" and local_fallback == "true":
         print("⚠️  WARNING: Local fallback is enabled for feature store.")
         print("   This should be disabled in production.")
         # Warning only
-    
-    print("✅ Feature store configuration checked")
+
+    print("[OK] Feature store configuration checked")
     return True
 
 
@@ -105,7 +105,7 @@ def run_all_checks() -> bool:
     print("Pre-Deployment Safety Checks")
     print("=" * 60)
     print()
-    
+
     checks = [
         ("MOCK_MODE", check_mock_mode),
         ("API_KEY", check_api_key),
@@ -114,21 +114,21 @@ def run_all_checks() -> bool:
         ("Model Metadata", check_model_metadata),
         ("Feature Store Config", check_feature_store_config),
     ]
-    
+
     all_passed = True
     for name, check_func in checks:
         print(f"Checking {name}...")
         if not check_func():
             all_passed = False
         print()
-    
+
     print("=" * 60)
     if all_passed:
-        print("✅ All checks passed. Safe to deploy.")
+        print("[OK] All checks passed. Safe to deploy.")
     else:
-        print("❌ Some checks failed. Deployment blocked.")
+        print("[FAIL] Some checks failed. Deployment blocked.")
     print("=" * 60)
-    
+
     return all_passed
 
 

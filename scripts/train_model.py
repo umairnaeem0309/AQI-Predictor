@@ -47,7 +47,7 @@ METADATA_DIR = PROJECT_ROOT / "models" / "metadata"
 
 def load_features():
     """Load features from the Feature Store.
-    
+
     Priority:
     1. Hopsworks Feature Store (PRIMARY - cloud)
     2. Local Parquet (FALLBACK - backup)
@@ -56,10 +56,10 @@ def load_features():
     # 1. Try Hopsworks first (PRIMARY)
     try:
         from src.feature_store import get_feature_store
-        
+
         store = get_feature_store()
         logger.info(f"Feature Store: {store.__class__.__name__}")
-        
+
         # Try production feature group
         try:
             df = store.get_features("aqi_features_prod", version=1)
@@ -68,7 +68,7 @@ def load_features():
                 return df
         except Exception as e:
             logger.warning(f"Could not load from prod feature group: {e}")
-        
+
         # Try test feature group
         try:
             df = store.get_features("aqi_features_test", version=1)
@@ -77,10 +77,10 @@ def load_features():
                 return df
         except Exception as e:
             logger.warning(f"Could not load from test feature group: {e}")
-            
+
     except Exception as e:
         logger.warning(f"Hopsworks connection failed: {e}")
-    
+
     # 2. Fallback to local Parquet
     features_file = FEATURES_DIR / "hourly_observations.parquet"
     if features_file.exists():
@@ -105,14 +105,16 @@ def load_features():
         targets_df = pd.read_csv(historical_targets)
 
         df = pd.merge(features_df, targets_df, on=["timestamp", "location_id"], how="inner")
-        
+
         target_cols = ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]
         before_drop = len(df)
         df = df.dropna(subset=target_cols)
-        logger.info(f"✅ Loaded {len(df)} records from historical CSV (dropped {before_drop - len(df)} with NaN targets)")
-        
+        logger.info(
+            f"✅ Loaded {len(df)} records from historical CSV (dropped {before_drop - len(df)} with NaN targets)"
+        )
+
         df["_targets_precomputed"] = True
-        
+
         return df
 
     else:
@@ -149,12 +151,8 @@ def prepare_training_data(df):
 
     # Calculate AQI if not present
     if "aqi" not in df.columns or df["aqi"].isna().all():
-        df["pm25_aqi"] = df["pm25"].apply(
-            lambda x: calculate_pm25_aqi(x) if pd.notna(x) else None
-        )
-        df["pm10_aqi"] = df["pm10"].apply(
-            lambda x: calculate_pm10_aqi(x) if pd.notna(x) else None
-        )
+        df["pm25_aqi"] = df["pm25"].apply(lambda x: calculate_pm25_aqi(x) if pd.notna(x) else None)
+        df["pm10_aqi"] = df["pm10"].apply(lambda x: calculate_pm10_aqi(x) if pd.notna(x) else None)
         df["aqi"] = df[["pm25_aqi", "pm10_aqi"]].max(axis=1)
 
     # Add lag features
@@ -176,14 +174,20 @@ def prepare_training_data(df):
         logger.info("Targets already pre-computed, skipping target generation")
         df = df.drop(columns=["_targets_precomputed"])
     else:
-        for horizon, col_name in [(24, "target_aqi_24h"), (48, "target_aqi_48h"), (72, "target_aqi_72h")]:
+        for horizon, col_name in [
+            (24, "target_aqi_24h"),
+            (48, "target_aqi_48h"),
+            (72, "target_aqi_72h"),
+        ]:
             df[col_name] = df.groupby("location_id")["aqi"].shift(-horizon)
 
         # Drop rows with NaN targets
         target_cols = ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]
         before_drop = len(df)
         df = df.dropna(subset=target_cols)
-        logger.info(f"Dropped {before_drop - len(df)} rows with missing targets, {len(df)} remaining")
+        logger.info(
+            f"Dropped {before_drop - len(df)} rows with missing targets, {len(df)} remaining"
+        )
 
     return df
 
@@ -214,7 +218,7 @@ def evaluate_model(model, X_val, y_val, X_test, y_test):
     y_test_pred = model.predict(X_test)
 
     horizon_names = ["24h", "48h", "72h"]
-    
+
     val_metrics = {
         "mae": float(mean_absolute_error(y_val, y_val_pred)),
         "rmse": float(np.sqrt(mean_squared_error(y_val, y_val_pred))),
@@ -231,7 +235,9 @@ def evaluate_model(model, X_val, y_val, X_test, y_test):
         val_metrics[f"rmse_{h}"] = float(np.sqrt(mean_squared_error(y_val[:, i], y_val_pred[:, i])))
         val_metrics[f"r2_{h}"] = float(r2_score(y_val[:, i], y_val_pred[:, i]))
         test_metrics[f"mae_{h}"] = float(mean_absolute_error(y_test[:, i], y_test_pred[:, i]))
-        test_metrics[f"rmse_{h}"] = float(np.sqrt(mean_squared_error(y_test[:, i], y_test_pred[:, i])))
+        test_metrics[f"rmse_{h}"] = float(
+            np.sqrt(mean_squared_error(y_test[:, i], y_test_pred[:, i]))
+        )
         test_metrics[f"r2_{h}"] = float(r2_score(y_test[:, i], y_test_pred[:, i]))
 
     return val_metrics, test_metrics, y_test_pred
@@ -239,13 +245,13 @@ def evaluate_model(model, X_val, y_val, X_test, y_test):
 
 def train_all_models(df, feature_columns):
     """Train ALL models, evaluate, and select the best.
-    
+
     Experiments with:
     - Ridge Regression (Scikit-learn)
     - Random Forest (Scikit-learn)
     - XGBoost (Gradient Boosting)
     - LSTM (Deep Learning)
-    
+
     Returns the best model based on validation MAE.
     """
     from sklearn.ensemble import RandomForestRegressor
@@ -265,10 +271,15 @@ def train_all_models(df, feature_columns):
     ridge_time = time.time() - start
     ridge_val, ridge_test, ridge_pred = evaluate_model(ridge, X_val, y_val, X_test, y_test)
     results["ridge"] = {
-        "model": ridge, "name": "Ridge Regression",
-        "train_time": ridge_time, "val_metrics": ridge_val, "test_metrics": ridge_test,
+        "model": ridge,
+        "name": "Ridge Regression",
+        "train_time": ridge_time,
+        "val_metrics": ridge_val,
+        "test_metrics": ridge_test,
     }
-    logger.info(f"  Ridge: MAE={ridge_val['mae']:.2f}, R²={ridge_val['r2']:.4f} ({ridge_time:.1f}s)")
+    logger.info(
+        f"  Ridge: MAE={ridge_val['mae']:.2f}, R²={ridge_val['r2']:.4f} ({ridge_time:.1f}s)"
+    )
 
     # --- Model 2: Random Forest ---
     logger.info("Training Random Forest...")
@@ -280,8 +291,11 @@ def train_all_models(df, feature_columns):
     rf_time = time.time() - start
     rf_val, rf_test, rf_pred = evaluate_model(rf, X_val, y_val, X_test, y_test)
     results["random_forest"] = {
-        "model": rf, "name": "Random Forest",
-        "train_time": rf_time, "val_metrics": rf_val, "test_metrics": rf_test,
+        "model": rf,
+        "name": "Random Forest",
+        "train_time": rf_time,
+        "val_metrics": rf_val,
+        "test_metrics": rf_test,
     }
     logger.info(f"  RF:     MAE={rf_val['mae']:.2f}, R²={rf_val['r2']:.4f} ({rf_time:.1f}s)")
 
@@ -292,16 +306,24 @@ def train_all_models(df, feature_columns):
 
     xgb = MultiOutputRegressor(
         xg.XGBRegressor(
-            n_estimators=200, max_depth=6, learning_rate=0.1,
-            subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=-1,
+            n_estimators=200,
+            max_depth=6,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42,
+            n_jobs=-1,
         )
     )
     xgb.fit(X_train, y_train)
     xgb_time = time.time() - start
     xgb_val, xgb_test, xgb_pred = evaluate_model(xgb, X_val, y_val, X_test, y_test)
     results["xgboost"] = {
-        "model": xgb, "name": "XGBoost",
-        "train_time": xgb_time, "val_metrics": xgb_val, "test_metrics": xgb_test,
+        "model": xgb,
+        "name": "XGBoost",
+        "train_time": xgb_time,
+        "val_metrics": xgb_val,
+        "test_metrics": xgb_test,
     }
     logger.info(f"  XGB:    MAE={xgb_val['mae']:.2f}, R²={xgb_val['r2']:.4f} ({xgb_time:.1f}s)")
 
@@ -310,37 +332,43 @@ def train_all_models(df, feature_columns):
     start = time.time()
     try:
         import tensorflow as tf
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import LSTM, Dense, Dropout
         from tensorflow.keras.callbacks import EarlyStopping
+        from tensorflow.keras.layers import LSTM, Dense, Dropout
+        from tensorflow.keras.models import Sequential
 
         # Reshape for LSTM: [samples, timesteps, features]
         X_train_lstm = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
         X_val_lstm = X_val.reshape((X_val.shape[0], 1, X_val.shape[1]))
         X_test_lstm = X_test.reshape((X_test.shape[0], 1, X_test.shape[1]))
 
-        lstm_model = Sequential([
-            LSTM(64, input_shape=(1, X_train.shape[1]), return_sequences=True),
-            Dropout(0.2),
-            LSTM(32),
-            Dropout(0.2),
-            Dense(16, activation="relu"),
-            Dense(3),  # 3 targets: 24h, 48h, 72h
-        ])
+        lstm_model = Sequential(
+            [
+                LSTM(64, input_shape=(1, X_train.shape[1]), return_sequences=True),
+                Dropout(0.2),
+                LSTM(32),
+                Dropout(0.2),
+                Dense(16, activation="relu"),
+                Dense(3),  # 3 targets: 24h, 48h, 72h
+            ]
+        )
         lstm_model.compile(optimizer="adam", loss="mse", metrics=["mae"])
 
         early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
         lstm_model.fit(
-            X_train_lstm, y_train,
+            X_train_lstm,
+            y_train,
             validation_data=(X_val_lstm, y_val),
-            epochs=50, batch_size=32,
-            callbacks=[early_stop], verbose=0,
+            epochs=50,
+            batch_size=32,
+            callbacks=[early_stop],
+            verbose=0,
         )
 
         # Wrap for evaluate_model compatibility
         class LSTMWrapper:
             def __init__(self, model):
                 self.model = model
+
             def predict(self, X):
                 if X.ndim == 2:
                     X = X.reshape((X.shape[0], 1, X.shape[1]))
@@ -350,11 +378,16 @@ def train_all_models(df, feature_columns):
         lstm_time = time.time() - start
         lstm_val, lstm_test, lstm_pred = evaluate_model(lstm_wrapped, X_val, y_val, X_test, y_test)
         results["lstm"] = {
-            "model": lstm_wrapped, "name": "LSTM",
-            "train_time": lstm_time, "val_metrics": lstm_val, "test_metrics": lstm_test,
+            "model": lstm_wrapped,
+            "name": "LSTM",
+            "train_time": lstm_time,
+            "val_metrics": lstm_val,
+            "test_metrics": lstm_test,
             "raw_model": lstm_model,
         }
-        logger.info(f"  LSTM:   MAE={lstm_val['mae']:.2f}, R²={lstm_val['r2']:.4f} ({lstm_time:.1f}s)")
+        logger.info(
+            f"  LSTM:   MAE={lstm_val['mae']:.2f}, R²={lstm_val['r2']:.4f} ({lstm_time:.1f}s)"
+        )
     except ImportError:
         logger.warning("TensorFlow not installed — skipping LSTM")
     except Exception as e:
@@ -374,7 +407,7 @@ def train_all_models(df, feature_columns):
         y_test_pred_arr = best["model"].predict(X_test)
     else:
         y_test_pred_arr = best["model"].predict(X_test)
-    
+
     residuals = y_test - y_test_pred_arr
     residual_stats = {
         "mean": residuals.mean(axis=0).tolist(),
@@ -391,14 +424,24 @@ def train_all_models(df, feature_columns):
     logger.info("-" * 70)
     for key, r in sorted(results.items(), key=lambda x: x[1]["val_metrics"]["mae"]):
         m = r["val_metrics"]
-        logger.info(f"{r['name']:<20} {m['mae']:>8.2f} {m['rmse']:>8.2f} {m['r2']:>8.4f} {r['train_time']:>7.1f}s")
+        logger.info(
+            f"{r['name']:<20} {m['mae']:>8.2f} {m['rmse']:>8.2f} {m['r2']:>8.4f} {r['train_time']:>7.1f}s"
+        )
     logger.info("=" * 70)
 
     return {
         "model": best["model"],
         "model_name": best["name"],
         "model_key": best_key,
-        "all_results": {k: {"name": v["name"], "val_metrics": v["val_metrics"], "test_metrics": v["test_metrics"], "train_time": v["train_time"]} for k, v in results.items()},
+        "all_results": {
+            k: {
+                "name": v["name"],
+                "val_metrics": v["val_metrics"],
+                "test_metrics": v["test_metrics"],
+                "train_time": v["train_time"],
+            }
+            for k, v in results.items()
+        },
         "train_time": best["train_time"],
         "val_metrics": best["val_metrics"],
         "test_metrics": best["test_metrics"],
@@ -438,13 +481,17 @@ def register_in_mlflow(result, force=False, min_improvement=0.0):
             curr_mae = result["val_metrics"]["mae"]
 
             improvement = (prev_mae - curr_mae) / prev_mae
-            logger.info(f"Previous MAE: {prev_mae:.2f}, Current: {curr_mae:.2f}, Improvement: {improvement:.4f}")
+            logger.info(
+                f"Previous MAE: {prev_mae:.2f}, Current: {curr_mae:.2f}, Improvement: {improvement:.4f}"
+            )
 
             if improvement > min_improvement:
                 should_register = True
                 logger.info(f"Model improved by {improvement:.2%}, registering...")
             else:
-                logger.info(f"Model did not improve enough (need >{min_improvement:.2%}), skipping registration")
+                logger.info(
+                    f"Model did not improve enough (need >{min_improvement:.2%}), skipping registration"
+                )
         else:
             should_register = True
             logger.info("No previous model found, registering first model...")
@@ -497,7 +544,14 @@ def register_in_mlflow(result, force=False, min_improvement=0.0):
         mlflow.log_dict({"features": result["feature_columns"]}, "feature_list.json")
 
         # Log full comparison as JSON
-        comparison = {k: {"val_mae": v["val_metrics"]["mae"], "test_mae": v["test_metrics"]["mae"], "time": v["train_time"]} for k, v in result["all_results"].items()}
+        comparison = {
+            k: {
+                "val_mae": v["val_metrics"]["mae"],
+                "test_mae": v["test_metrics"]["mae"],
+                "time": v["train_time"],
+            }
+            for k, v in result["all_results"].items()
+        }
         mlflow.log_dict(comparison, "model_comparison.json")
 
         run_id = run.info.run_id
@@ -570,8 +624,15 @@ def save_model_locally(result, run_id=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Train AQI prediction model")
-    parser.add_argument("--force-register", action="store_true", help="Force registration even without improvement")
-    parser.add_argument("--min-improvement", type=float, default=0.01, help="Minimum MAE improvement to register (default: 1%%)")
+    parser.add_argument(
+        "--force-register", action="store_true", help="Force registration even without improvement"
+    )
+    parser.add_argument(
+        "--min-improvement",
+        type=float,
+        default=0.01,
+        help="Minimum MAE improvement to register (default: 1%%)",
+    )
     args = parser.parse_args()
 
     logger.info("=" * 60)
@@ -583,23 +644,36 @@ def main():
         df = load_features()
 
         if len(df) < 100:
-            logger.warning(f"Only {len(df)} training-valid records. Need at least 100. Skipping training.")
+            logger.warning(
+                f"Only {len(df)} training-valid records. Need at least 100. Skipping training."
+            )
             return 1
 
         # 2. Prepare training data
         df = prepare_training_data(df)
 
         if len(df) < 50:
-            logger.warning(f"Only {len(df)} rows after target generation. Need at least 50. Skipping.")
+            logger.warning(
+                f"Only {len(df)} rows after target generation. Need at least 50. Skipping."
+            )
             return 1
 
         # 3. Get feature columns (exclude targets, metadata, and string columns)
         exclude_cols = [
-            "timestamp", "location_id", "city_name", "data_source",
-            "collected_at", "is_training_valid",
-            "target_aqi_24h", "target_aqi_48h", "target_aqi_72h",
-            "us_aqi", "us_aqi_pm25", "us_aqi_pm10",  # Reference AQI, not features
-            "pm25_aqi", "pm10_aqi",  # Intermediate calculations
+            "timestamp",
+            "location_id",
+            "city_name",
+            "data_source",
+            "collected_at",
+            "is_training_valid",
+            "target_aqi_24h",
+            "target_aqi_48h",
+            "target_aqi_72h",
+            "us_aqi",
+            "us_aqi_pm25",
+            "us_aqi_pm10",  # Reference AQI, not features
+            "pm25_aqi",
+            "pm10_aqi",  # Intermediate calculations
         ]
         # Also exclude string/object columns
         string_cols = df.select_dtypes(include=["object"]).columns.tolist()

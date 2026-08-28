@@ -166,7 +166,9 @@ def collect_one_round(city_ids=None, dry_run=False):
                 record["pm10_aqi"] = None
 
             # Use higher AQI as the target
-            aqi_values = [v for v in [record.get("pm25_aqi"), record.get("pm10_aqi")] if v is not None]
+            aqi_values = [
+                v for v in [record.get("pm25_aqi"), record.get("pm10_aqi")] if v is not None
+            ]
             record["aqi"] = max(aqi_values) if aqi_values else None
 
             # 7. Determine training validity
@@ -207,19 +209,19 @@ def collect_one_round(city_ids=None, dry_run=False):
     # 8. Persist to feature store (Hopsworks PRIMARY, Local FALLBACK)
     if all_records and not dry_run:
         df = pd.DataFrame(all_records)
-        
+
         # Ensure timestamp is datetime for Hopsworks
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-        
+
         # Try Hopsworks first (PRIMARY)
         try:
             from src.feature_store import get_feature_store
             from src.feature_store.schemas import DatasetMetadata, DatasetType
-            
+
             store = get_feature_store()
             logger.info(f"Using feature store: {store.__class__.__name__}")
-            
+
             metadata = DatasetMetadata(
                 dataset_version=f"hourly_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}",
                 dataset_type=DatasetType.REAL_TRAINING,
@@ -229,21 +231,19 @@ def collect_one_round(city_ids=None, dry_run=False):
                 record_count=len(df),
                 feature_count=len(df.columns),
             )
-            
+
             # Insert features
-            success = store.insert_features(
-                "aqi_features_prod", df, metadata, version=1
-            )
-            
+            success = store.insert_features("aqi_features_prod", df, metadata, version=1)
+
             if success:
                 results["hopsworks_persisted"] = True
                 logger.info(f"✅ Persisted {len(df)} records to Hopsworks Feature Store")
             else:
                 logger.warning("Hopsworks insert returned False")
-                
+
         except Exception as e:
             logger.warning(f"Hopsworks persistence failed: {e}")
-        
+
         # Always save locally as backup
         FEATURES_DIR.mkdir(parents=True, exist_ok=True)
         features_file = FEATURES_DIR / "hourly_observations.parquet"

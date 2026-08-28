@@ -75,15 +75,15 @@ class ModelService:
         try:
             import mlflow
             import mlflow.pyfunc
-            
+
             client = mlflow.tracking.MlflowClient()
             versions = client.get_latest_versions("aqi_predictor_production", stages=["Production"])
-            
+
             if versions:
                 prod_version = versions[0]
                 model_uri = f"runs:/{prod_version.run_id}/model"
                 model = mlflow.pyfunc.load_model(model_uri)
-                
+
                 # Get metadata from run
                 run = client.get_run(prod_version.run_id)
                 model_info = {
@@ -94,16 +94,18 @@ class ModelService:
                     "params": dict(run.data.params),
                     "source": "mlflow_registry",
                 }
-                
+
                 self._model = model
                 self._model_info = model_info
-                logger.info(f"Loaded model from MLflow Registry: {prod_version.name} v{prod_version.version}")
+                logger.info(
+                    f"Loaded model from MLflow Registry: {prod_version.name} v{prod_version.version}"
+                )
                 return model, model_info
             else:
                 logger.info("No production model in MLflow Registry, trying local pickle")
         except Exception as e:
             logger.warning(f"MLflow Registry load failed: {e}")
-        
+
         # Fallback to local pickle
         return self._load_local_pickle()
 
