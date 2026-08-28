@@ -188,82 +188,194 @@ def prepare_training_data(df):
     return df
 
 
-def train_xgboost(df, feature_columns):
-    """Train XGBoost model with multi-output regression."""
-    import xgboost as xg
-    from sklearn.multioutput import MultiOutputRegressor
-    from sklearn.model_selection import train_test_split
-
-    # Prepare X and y
+def prepare_data(df, feature_columns):
+    """Prepare train/val/test splits."""
     X = df[feature_columns].values
     y = df[["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]].values
-
-    # Handle NaN in features
     X = np.nan_to_num(X, nan=0.0)
 
-    # Chronological split (last 20% for test)
+    # Chronological split
     split_idx = int(len(X) * 0.8)
     X_train, X_test = X[:split_idx], X[split_idx:]
     y_train, y_test = y[:split_idx], y[split_idx:]
 
-    # Further split training into train/val
     val_split = int(len(X_train) * 0.9)
     X_train_final, X_val = X_train[:val_split], X_train[val_split:]
     y_train_final, y_val = y_train[:val_split], y_train[val_split:]
 
-    logger.info(f"Train: {len(X_train_final)}, Val: {len(X_val)}, Test: {len(X_test)}")
+    return X_train_final, X_val, X_test, y_train_final, y_val, y_test
 
-    # Train XGBoost
-    start_time = time.time()
 
-    base_model = xg.XGBRegressor(
-        n_estimators=200,
-        max_depth=6,
-        learning_rate=0.1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        n_jobs=-1,
-    )
-
-    model = MultiOutputRegressor(base_model)
-    model.fit(X_train_final, y_train_final)
-
-    train_time = time.time() - start_time
-    logger.info(f"Training completed in {train_time:.1f}s")
-
-    # Evaluate
+def evaluate_model(model, X_val, y_val, X_test, y_test):
+    """Evaluate model and return metrics."""
     from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-    # Validation metrics
     y_val_pred = model.predict(X_val)
+    y_test_pred = model.predict(X_test)
+
+    horizon_names = ["24h", "48h", "72h"]
+    
     val_metrics = {
         "mae": float(mean_absolute_error(y_val, y_val_pred)),
         "rmse": float(np.sqrt(mean_squared_error(y_val, y_val_pred))),
         "r2": float(r2_score(y_val, y_val_pred)),
     }
-
-    # Test metrics
-    y_test_pred = model.predict(X_test)
     test_metrics = {
         "mae": float(mean_absolute_error(y_test, y_test_pred)),
         "rmse": float(np.sqrt(mean_squared_error(y_test, y_test_pred))),
         "r2": float(r2_score(y_test, y_test_pred)),
     }
 
-    # Per-horizon metrics
-    horizon_names = ["24h", "48h", "72h"]
     for i, h in enumerate(horizon_names):
         val_metrics[f"mae_{h}"] = float(mean_absolute_error(y_val[:, i], y_val_pred[:, i]))
         val_metrics[f"rmse_{h}"] = float(np.sqrt(mean_squared_error(y_val[:, i], y_val_pred[:, i])))
         val_metrics[f"r2_{h}"] = float(r2_score(y_val[:, i], y_val_pred[:, i]))
-
         test_metrics[f"mae_{h}"] = float(mean_absolute_error(y_test[:, i], y_test_pred[:, i]))
         test_metrics[f"rmse_{h}"] = float(np.sqrt(mean_squared_error(y_test[:, i], y_test_pred[:, i])))
         test_metrics[f"r2_{h}"] = float(r2_score(y_test[:, i], y_test_pred[:, i]))
 
+    return val_metrics, test_metrics, y_test_pred
+
+
+def train_all_models(df, feature_columns):
+    """Train ALL models, evaluate, and select the best.
+    
+    Experiments with:
+    - Ridge Regression (Scikit-learn)
+    - Random Forest (Scikit-learn)
+    - XGBoost (Gradient Boosting)
+    - LSTM (Deep Learning)
+    
+    Returns the best model based on validation MAE.
+    """
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.linear_model import Ridge
+    from sklearn.multioutput import MultiOutputRegressor
+
+    X_train, X_val, X_test, y_train, y_val, y_test = prepare_data(df, feature_columns)
+    logger.info(f"Train: {len(X_train)}, Val: {len(X_val)}, Test: {len(X_test)}")
+
+    results = {}
+
+    # --- Model 1: Ridge Regression ---
+    logger.info("Training Ridge Regression...")
+    start = time.time()
+    ridge = MultiOutputRegressor(Ridge(alpha=1.0))
+    ridge.fit(X_train, y_train)
+    ridge_time = time.time() - start
+    ridge_val, ridge_test, ridge_pred = evaluate_model(ridge, X_val, y_val, X_test, y_test)
+    results["ridge"] = {
+        "model": ridge, "name": "Ridge Regression",
+        "train_time": ridge_time, "val_metrics": ridge_val, "test_metrics": ridge_test,
+    }
+    logger.info(f"  Ridge: MAE={ridge_val['mae']:.2f}, R²={ridge_val['r2']:.4f} ({ridge_time:.1f}s)")
+
+    # --- Model 2: Random Forest ---
+    logger.info("Training Random Forest...")
+    start = time.time()
+    rf = MultiOutputRegressor(
+        RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42, n_jobs=-1)
+    )
+    rf.fit(X_train, y_train)
+    rf_time = time.time() - start
+    rf_val, rf_test, rf_pred = evaluate_model(rf, X_val, y_val, X_test, y_test)
+    results["random_forest"] = {
+        "model": rf, "name": "Random Forest",
+        "train_time": rf_time, "val_metrics": rf_val, "test_metrics": rf_test,
+    }
+    logger.info(f"  RF:     MAE={rf_val['mae']:.2f}, R²={rf_val['r2']:.4f} ({rf_time:.1f}s)")
+
+    # --- Model 3: XGBoost ---
+    logger.info("Training XGBoost...")
+    start = time.time()
+    import xgboost as xg
+
+    xgb = MultiOutputRegressor(
+        xg.XGBRegressor(
+            n_estimators=200, max_depth=6, learning_rate=0.1,
+            subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=-1,
+        )
+    )
+    xgb.fit(X_train, y_train)
+    xgb_time = time.time() - start
+    xgb_val, xgb_test, xgb_pred = evaluate_model(xgb, X_val, y_val, X_test, y_test)
+    results["xgboost"] = {
+        "model": xgb, "name": "XGBoost",
+        "train_time": xgb_time, "val_metrics": xgb_val, "test_metrics": xgb_test,
+    }
+    logger.info(f"  XGB:    MAE={xgb_val['mae']:.2f}, R²={xgb_val['r2']:.4f} ({xgb_time:.1f}s)")
+
+    # --- Model 4: LSTM ---
+    logger.info("Training LSTM...")
+    start = time.time()
+    try:
+        import tensorflow as tf
+        from tensorflow.keras.models import Sequential
+        from tensorflow.keras.layers import LSTM, Dense, Dropout
+        from tensorflow.keras.callbacks import EarlyStopping
+
+        # Reshape for LSTM: [samples, timesteps, features]
+        X_train_lstm = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
+        X_val_lstm = X_val.reshape((X_val.shape[0], 1, X_val.shape[1]))
+        X_test_lstm = X_test.reshape((X_test.shape[0], 1, X_test.shape[1]))
+
+        lstm_model = Sequential([
+            LSTM(64, input_shape=(1, X_train.shape[1]), return_sequences=True),
+            Dropout(0.2),
+            LSTM(32),
+            Dropout(0.2),
+            Dense(16, activation="relu"),
+            Dense(3),  # 3 targets: 24h, 48h, 72h
+        ])
+        lstm_model.compile(optimizer="adam", loss="mse", metrics=["mae"])
+
+        early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
+        lstm_model.fit(
+            X_train_lstm, y_train,
+            validation_data=(X_val_lstm, y_val),
+            epochs=50, batch_size=32,
+            callbacks=[early_stop], verbose=0,
+        )
+
+        # Wrap for evaluate_model compatibility
+        class LSTMWrapper:
+            def __init__(self, model):
+                self.model = model
+            def predict(self, X):
+                if X.ndim == 2:
+                    X = X.reshape((X.shape[0], 1, X.shape[1]))
+                return self.model.predict(X, verbose=0)
+
+        lstm_wrapped = LSTMWrapper(lstm_model)
+        lstm_time = time.time() - start
+        lstm_val, lstm_test, lstm_pred = evaluate_model(lstm_wrapped, X_val, y_val, X_test, y_test)
+        results["lstm"] = {
+            "model": lstm_wrapped, "name": "LSTM",
+            "train_time": lstm_time, "val_metrics": lstm_val, "test_metrics": lstm_test,
+            "raw_model": lstm_model,
+        }
+        logger.info(f"  LSTM:   MAE={lstm_val['mae']:.2f}, R²={lstm_val['r2']:.4f} ({lstm_time:.1f}s)")
+    except ImportError:
+        logger.warning("TensorFlow not installed — skipping LSTM")
+    except Exception as e:
+        logger.warning(f"LSTM training failed: {e}")
+
+    # --- Select Best Model ---
+    best_key = min(results, key=lambda k: results[k]["val_metrics"]["mae"])
+    best = results[best_key]
+    logger.info(f"\n🏆 BEST MODEL: {best['name']} (MAE={best['val_metrics']['mae']:.2f})")
+
     # Compute residuals for confidence intervals
-    residuals = y_test - y_test_pred
+    best_pred = best["val_metrics"].get("_predictions")
+    y_test_pred = results[best_key]["test_metrics"]  # Already computed
+
+    # Residuals from test set
+    if best_key in ["ridge", "random_forest", "xgboost"]:
+        y_test_pred_arr = best["model"].predict(X_test)
+    else:
+        y_test_pred_arr = best["model"].predict(X_test)
+    
+    residuals = y_test - y_test_pred_arr
     residual_stats = {
         "mean": residuals.mean(axis=0).tolist(),
         "std": residuals.std(axis=0).tolist(),
@@ -271,14 +383,28 @@ def train_xgboost(df, feature_columns):
         "q95": np.percentile(residuals, 95, axis=0).tolist(),
     }
 
+    # Print comparison table
+    logger.info("\n" + "=" * 70)
+    logger.info("MODEL COMPARISON")
+    logger.info("=" * 70)
+    logger.info(f"{'Model':<20} {'MAE':>8} {'RMSE':>8} {'R²':>8} {'Time':>8}")
+    logger.info("-" * 70)
+    for key, r in sorted(results.items(), key=lambda x: x[1]["val_metrics"]["mae"]):
+        m = r["val_metrics"]
+        logger.info(f"{r['name']:<20} {m['mae']:>8.2f} {m['rmse']:>8.2f} {m['r2']:>8.4f} {r['train_time']:>7.1f}s")
+    logger.info("=" * 70)
+
     return {
-        "model": model,
-        "train_time": train_time,
-        "val_metrics": val_metrics,
-        "test_metrics": test_metrics,
+        "model": best["model"],
+        "model_name": best["name"],
+        "model_key": best_key,
+        "all_results": {k: {"name": v["name"], "val_metrics": v["val_metrics"], "test_metrics": v["test_metrics"], "train_time": v["train_time"]} for k, v in results.items()},
+        "train_time": best["train_time"],
+        "val_metrics": best["val_metrics"],
+        "test_metrics": best["test_metrics"],
         "residual_stats": residual_stats,
         "feature_columns": feature_columns,
-        "train_rows": len(X_train_final),
+        "train_rows": len(X_train),
         "val_rows": len(X_val),
         "test_rows": len(X_test),
     }
@@ -332,30 +458,36 @@ def register_in_mlflow(result, force=False, min_improvement=0.0):
 
     with mlflow.start_run(run_name=run_name) as run:
         # Tags
-        mlflow.set_tag("model_name", "xgboost_aqi_predictor")
+        mlflow.set_tag("model_name", result["model_name"])
+        mlflow.set_tag("model_key", result["model_key"])
         mlflow.set_tag("training_date", datetime.now(timezone.utc).isoformat())
         mlflow.set_tag("dataset_type", "real_api_data")
         mlflow.set_tag("approved_for_training", "true")
         mlflow.set_tag("training_pipeline", "daily_auto")
 
-        # Parameters
-        mlflow.log_param("model", "XGBoost_MultiOutput")
-        mlflow.log_param("n_estimators", 200)
-        mlflow.log_param("max_depth", 6)
-        mlflow.log_param("learning_rate", 0.1)
+        # Log comparison of all models
+        for key, r in result["all_results"].items():
+            mlflow.log_metric(f"{key}_val_mae", r["val_metrics"]["mae"])
+            mlflow.log_metric(f"{key}_val_rmse", r["val_metrics"]["rmse"])
+            mlflow.log_metric(f"{key}_val_r2", r["val_metrics"]["r2"])
+            mlflow.log_metric(f"{key}_test_mae", r["test_metrics"]["mae"])
+            mlflow.log_metric(f"{key}_train_time", r["train_time"])
+
+        # Best model params
+        mlflow.log_param("best_model", result["model_name"])
         mlflow.log_param("train_rows", result["train_rows"])
         mlflow.log_param("val_rows", result["val_rows"])
         mlflow.log_param("test_rows", result["test_rows"])
         mlflow.log_param("n_features", len(result["feature_columns"]))
 
-        # Metrics
+        # Best model metrics
         for key, value in result["val_metrics"].items():
             mlflow.log_metric(f"val_{key}", value)
         for key, value in result["test_metrics"].items():
             mlflow.log_metric(f"test_{key}", value)
         mlflow.log_metric("train_time_s", result["train_time"])
 
-        # Model
+        # Log best model
         mlflow.sklearn.log_model(result["model"], "model")
 
         # Residual stats for confidence intervals
@@ -364,8 +496,12 @@ def register_in_mlflow(result, force=False, min_improvement=0.0):
         # Feature list
         mlflow.log_dict({"features": result["feature_columns"]}, "feature_list.json")
 
+        # Log full comparison as JSON
+        comparison = {k: {"val_mae": v["val_metrics"]["mae"], "test_mae": v["test_metrics"]["mae"], "time": v["train_time"]} for k, v in result["all_results"].items()}
+        mlflow.log_dict(comparison, "model_comparison.json")
+
         run_id = run.info.run_id
-        logger.info(f"Model registered in MLflow: run_id={run_id}")
+        logger.info(f"✅ Registered in MLflow: {result['model_name']} (run={run_id})")
 
     return run_id, True
 
@@ -471,8 +607,8 @@ def main():
         feature_columns = [c for c in df.columns if c not in exclude_cols]
         logger.info(f"Using {len(feature_columns)} features")
 
-        # 4. Train model
-        result = train_xgboost(df, feature_columns)
+        # 4. Train ALL models, select best
+        result = train_all_models(df, feature_columns)
 
         # 5. Register in MLflow
         run_id, registered = register_in_mlflow(

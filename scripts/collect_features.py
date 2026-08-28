@@ -208,6 +208,10 @@ def collect_one_round(city_ids=None, dry_run=False):
     if all_records and not dry_run:
         df = pd.DataFrame(all_records)
         
+        # Ensure timestamp is datetime for Hopsworks
+        if "timestamp" in df.columns:
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+        
         # Try Hopsworks first (PRIMARY)
         try:
             from src.feature_store import get_feature_store
