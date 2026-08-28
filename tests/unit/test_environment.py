@@ -200,7 +200,7 @@ class TestProjectStructure:
     def test_data_directories_exist(self):
         project_root = Path(__file__).resolve().parent.parent.parent
         data_path = project_root / "data" / "processed"
-        assert data_path.exists(), f"Directory data/processed not found"
+        assert data_path.exists(), "Directory data/processed not found"
 
     def test_docs_directory_exists(self):
         docs_path = Path(__file__).resolve().parent.parent.parent / "docs"

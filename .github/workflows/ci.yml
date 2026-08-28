@@ -32,13 +32,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Check black formatting
-        run: black --check src/ tests/ app/
+        run: black --check src/ tests/ app/ scripts/
 
       - name: Check import sorting
-        run: isort --check-only src/ tests/ app/
+        run: isort --check-only src/ tests/ app/ scripts/
 
       - name: Run flake8
-        run: flake8 src/ tests/ app/
+        run: flake8 src/ tests/ app/ scripts/
 
   type-check:
     name: Type Check
