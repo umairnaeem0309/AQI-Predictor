@@ -2,8 +2,8 @@
 
 ## AQI Predictor — Project Status
 
-**Last Updated:** 27 August 2026  
-**Current Phase:** Production Ready — Model Trained, API Working, Dashboard Deployed
+**Last Updated:** 28 August 2026
+**Current Phase:** Production Complete — All Features Implemented
 
 ---
 
@@ -16,7 +16,7 @@
 | Phase 2 — Data Collection Architecture | ✅ Completed | 2 Aug 2026 |
 | Phase 3 — Real API Integration | ✅ Completed | 4 Aug 2026 |
 | Phase 4 — Feature Engineering Pipeline | ✅ Completed | 6 Aug 2026 |
-| Phase 5 — Historical Data Backfill | ✅ Completed (Pipeline) | 8 Aug 2026 |
+| Phase 5 — Historical Data Backfill | ✅ Completed | 8 Aug 2026 |
 | Phase 6 — Feature Store Implementation | ✅ Completed | 10 Aug 2026 |
 | Phase 7 — ML Experiment Pipeline | ✅ Completed | 12 Aug 2026 |
 | Phase 8 — Model Selection Framework | ✅ Completed | 14 Aug 2026 |
@@ -28,162 +28,88 @@
 | Phase 14 — Deployment | ✅ Completed | 20 Aug 2026 |
 | Phase 15 — Final Documentation | ✅ Completed | 21 Aug 2026 |
 | Phase 16 — Demo Preparation | ✅ Completed | 21 Aug 2026 |
-| Phase 17 — Historical Dataset (Open-Meteo) | 🔄 Active | 27 Aug 2026 |
+| Phase 17 — Historical Dataset (Open-Meteo) | ✅ Completed | 27 Aug 2026 |
+| Phase 18 — SHAP + Monitoring + History + Batch + Alerts | ✅ Completed | 28 Aug 2026 |
 
 ---
 
-## 2. Current Phase Details
+## 2. Complete API Endpoints
 
-**Phase 17 — Historical Dataset Generation** 🔄 ACTIVE
+| Endpoint | Method | Description | Status |
+|---|---|---|---|
+| `/health` | GET | Service health check | ✅ |
+| `/prediction` | POST | Single city AQI prediction | ✅ |
+| `/batch/predictions` | POST | Multi-city predictions (max 10) | ✅ NEW |
+| `/model-info` | GET | Model metadata and metrics | ✅ |
+| `/data/historical` | GET | Historical AQI/weather time series | ✅ |
+| `/data/statistics` | GET | Summary statistics per city | ✅ |
+| `/data/compare` | GET | Cross-city comparison | ✅ |
+| `/explain/feature-importance` | GET | XGBoost gain-based importance | ✅ |
+| `/explain/model-summary` | GET | Model architecture overview | ✅ |
+| `/explain/shap-explanation` | POST | Per-prediction SHAP values | ✅ NEW |
+| `/explain/shap-global` | GET | Global SHAP importance | ✅ NEW |
+| `/monitoring/drift` | GET | Evidently data drift detection | ✅ NEW |
+| `/monitoring/performance` | GET | Training performance metrics | ✅ NEW |
+| `/monitoring/alerts` | GET | AQI hazard alerts | ✅ NEW |
+| `/monitoring/system-health` | GET | System health overview | ✅ NEW |
+| `/history/predictions` | GET | Query prediction history | ✅ NEW |
+| `/history/stats` | GET | Prediction statistics | ✅ NEW |
 
-**Objective:** Generate 4-5 year ML-ready dataset from Open-Meteo historical APIs.
+---
 
-**Status:** Provider abstraction implemented, ingestion pipeline created, dataset generation ready.
+## 3. Streamlit Dashboard
 
-### 2.0 Data Source Migration (DEC-018)
-
-| Aspect | Previous | Current |
+| Page | Status | Features |
 |---|---|---|
-| Weather source | OpenWeather (current only) | Open-Meteo Archive (2017+) |
-| AQ source | AQICN (stale) + OpenWeather fallback | Open-Meteo Air Quality (Aug 2022+) |
-| Collection approach | 30-day live hourly collection | Historical batch download |
-| API key required | Yes (OpenWeather, AQICN) | No (Open-Meteo free tier) |
-| Data volume | ~720 rows/city (30 days) | ~35,000 rows/city (4+ years) |
+| **Dashboard** | ✅ | AQI cards, forecast chart, city selector, model info |
+| **Analytics** | ✅ | Historical trends, pollutant charts, city comparison |
+| **Explainability** | ✅ | 3 tabs: Feature Importance, Global SHAP, Per-Prediction SHAP |
+| **System** | ✅ | 3 tabs: Service Health, Monitoring (drift/performance), Alerts |
 
-### 2.1 AQI Methodology
+---
 
-| Aspect | Specification |
-|---|---|
-| Target | US EPA-method PM NowCast AQI |
-| Primary pollutant | PM2.5 (NowCast methodology) |
-| Secondary pollutant | PM10 (NowCast methodology) |
-| AQI equation | Standard EPA linear interpolation |
-| Breakpoints | EPA May 2024 (PM2.5 Good: 0.0-9.0 ug/m3) |
-| Methodology source | EPA-454/B-24-002, May 2024 |
-| Scope | Particle-pollution only (PM2.5 + PM10) |
-| Derived status | NOT official EPA/AirNow monitor reading |
+## 4. Model Accuracy
 
-### 2.2 Open-Meteo Provider Architecture
+| Horizon | MAE | RMSE | R² |
+|---|---|---|---|
+| **24h** | 19.22 | 28.36 | 0.6707 |
+| **48h** | 21.87 | 31.58 | 0.5887 |
+| **72h** | 22.87 | 32.57 | 0.5591 |
+| **Overall** | **21.32** | **30.89** | **0.6065** |
+
+**Selected Model:** XGBoost (MultiOutputRegressor)
+**Features:** 71
+**Training time:** 13s
+**Data:** Open-Meteo historical weather + air quality (107,064 rows, 4 years, 3 cities)
+
+---
+
+## 5. Test Results
 
 ```
-src/data/providers/
-├── __init__.py                    — Package exports
-├── base_provider.py               — Abstract historical provider
-├── open_meteo_weather.py          — /v1/archive (weather from 2017+)
-└── open_meteo_air_quality.py      — /v1/air-quality (CAMS from Aug 2022+)
-
-src/data/historical_ingestion.py   — Batch download + merge + AQI calc
-scripts/build_dataset.py           — CLI entry point
+640 passed, 3 skipped, 35 warnings
 ```
 
-### 2.3 API Status
+### New Test Files
 
-| API | Status | Notes |
+| Test File | Tests | Coverage |
 |---|---|---|
-| Open-Meteo Weather | ✅ Working | /v1/archive, hourly from 2017+, no API key |
-| Open-Meteo Air Quality | ✅ Working | /v1/air-quality, CAMS Global from Aug 2022+ |
-| OpenWeather Weather | ✅ Working | Current endpoint (free tier) — retained for real-time |
-| OpenWeather Air Pollution | ✅ Working | Current + historical — retained for real-time |
-| AQICN Bound Stations | ⚠️ Stale | Pakistani stations months/years old |
-
-### 2.4 Environment
-
-| Item | Status |
-|---|---|
-| Python | 3.11.15 ✅ |
-| duckdb | 1.0.0 ✅ |
-| hopsworks | 5.8.0 ✅ |
-| mlflow | 2.22.0 ✅ |
-| Hopsworks Cloud | ✅ Connected |
-
-### 2.5 Dataset Generation Status
-
-| Item | Status |
-|---|---|
-| Provider abstraction | ✅ Implemented |
-| Weather provider | ✅ OpenMeteoWeatherProvider |
-| AQ provider | ✅ OpenMeteoAirQualityProvider |
-| Ingestion pipeline | ✅ historical_ingestion.py |
-| CLI entry point | ✅ scripts/build_dataset.py |
-| Unit tests | ✅ 21 tests passing |
-| Integration tests | ✅ 25 tests passing |
-| Full test suite | ✅ 598 tests, 0 failures |
-
-### 2.6 Test Results
-
-| Suite | Tests | Passed |
-|---|---|---|
-| Open-Meteo Providers | 21 | ✅ 21 |
-| Historical Ingestion | 25 | ✅ 25 |
-| Full Project Suite | 598 | ✅ 598 |
-| Skipped | 1 | (expected) |
+| `test_shap_explainability.py` | 12 | SHAP models, helpers, explainer, API client |
+| `test_monitoring.py` | 15 | Drift detection, performance monitoring, alerts, helpers |
+| `test_prediction_history.py` | 13 | SQLite CRUD, filtering, cleanup, ordering |
+| `test_batch_and_alerts.py` | 12 | Batch requests, AQI categories, recommendations |
 
 ---
 
-## 3. Pending Tasks
+## 6. Deployment
 
-| Priority | Task | Phase |
-|---|---|
-| Current | Run build_dataset.py to generate historical dataset | Phase 17 |
-| Current | Validate generated dataset quality | Phase 17 |
-| Next | Production model training on real dataset | Phase 18 |
-
----
-
-## 4. Key Decisions
-
-| ID | Decision | Date |
+| Component | Platform | Status |
 |---|---|---|
-| DEC-014 | Data Source Authority (Amended: PM NowCast AQI fallback) | 26 Aug 2026 |
-| DEC-015 | Synthetic data restricted to pipeline testing only | 8 Aug 2026 |
-| DEC-016 | Production Deployment Strategy | 20 Aug 2026 |
-| DEC-018 | Historical Data Source Migration to Open-Meteo | 27 Aug 2026 |
+| FastAPI Backend | Render | ✅ Deployed |
+| Streamlit Dashboard | Streamlit Cloud | ✅ Deployed |
+| CI/CD | GitHub Actions | ✅ Workflows ready |
 
----
-
-## 5. Dataset Readiness
-
-| Criterion | Status |
-|---|---|
-| AQI methodology | ✅ Approved (EPA-454/B-24-002 May 2024) |
-| Open-Meteo providers | ✅ Implemented and tested |
-| Ingestion pipeline | ✅ Implemented and tested |
-| Dataset generation | ⏳ Ready to run build_dataset.py |
-| Historical data availability | ✅ Weather 2017+, AQ Aug 2022+ |
-
----
-
-## 6. Production Status
-
-| Component | Status | Details |
-|---|---|---|
-| **Dataset** | ✅ | 107,064 rows, 4 years, 3 cities |
-| **Model** | ✅ | XGBoost, MAE=21.32, R2=0.6065 |
-| **API** | ✅ | FastAPI on port 8000, all endpoints working |
-| **Dashboard** | ✅ | Streamlit on port 8501, connected to API |
-| **Live Predictions** | ✅ | Open-Meteo real-time data for all 3 cities |
-| **Tests** | ✅ | 599 passed, 0 failed |
-| **CI/CD** | ✅ | GitHub Actions workflows ready |
-| **Docker** | ⏳ | Dockerfile + docker-compose ready, Docker Desktop needs GUI install |
-
-### Live Predictions (Real-Time)
-
-| City | 24h AQI | Category | 48h AQI | 72h AQI |
-|---|---|---|---|---|
-| Karachi | 139 | Unhealthy for Sensitive | 67 | 100 |
-| Lahore | 183 | Unhealthy | 159 | 149 |
-| Islamabad | 134 | Unhealthy for Sensitive | 124 | 138 |
-
-### Streamlit Dashboard Status
-
-| Page | Status | Notes |
-|---|---|---|
-| Dashboard | ✅ Working | AQI cards, forecast chart, model info |
-| Analytics | ⏳ Placeholder | Historical trends, pollutant analysis (future) |
-| Explainability | ⏳ Placeholder | SHAP integration (future) |
-| System | ✅ Working | Health check, model info |
-
-### To Run Locally
+### Running Locally
 
 ```bash
 # Terminal 1: FastAPI
@@ -195,16 +121,23 @@ conda activate aqi-predictor
 streamlit run app/frontend/streamlit_app.py --server.port 8501
 ```
 
-### Docker (when Docker Desktop is installed)
+---
 
-```bash
-cd D:\CS\Projects\AQI-Predictor
-docker-compose up --build
-```
+## 7. Files Modified/Created in Latest Update
 
-## 7. Next Steps
-
-1. Install Docker Desktop (requires Windows GUI) and test docker-compose build
-2. Push to GitHub and verify CI/CD workflows
-3. Analytics page: add historical data endpoints
-4. Explainability: integrate SHAP for feature importance
+| File | Action |
+|---|---|
+| `app/routes/explain.py` | Modified — added SHAP endpoints |
+| `app/routes/monitoring.py` | Created — drift, performance, alerts, health |
+| `app/routes/history.py` | Created — prediction history query |
+| `app/routes/batch.py` | Created — multi-city batch predictions |
+| `app/routes/prediction.py` | Modified — auto-store predictions |
+| `app/backend/main.py` | Modified — register new routes |
+| `src/data/prediction_history.py` | Created — SQLite prediction store |
+| `app/frontend/pages/explainability.py` | Rewritten — 3-tab SHAP page |
+| `app/frontend/pages/system.py` | Updated — monitoring + alerts tabs |
+| `app/frontend/utils/api_client.py` | Updated — SHAP, monitoring, alerts methods |
+| `tests/unit/test_shap_explainability.py` | Created — 12 tests |
+| `tests/unit/test_monitoring.py` | Created — 15 tests |
+| `tests/unit/test_prediction_history.py` | Created — 13 tests |
+| `tests/unit/test_batch_and_alerts.py` | Created — 12 tests |
