@@ -258,6 +258,157 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             raise APIClientError(f"API error: {e}")
 
+    def get_shap_explanation(self, features: Dict[str, float], target: str = "target_aqi_24h") -> Dict[str, Any]:
+        """
+        Get SHAP explanation for a prediction.
+
+        Args:
+            features: Feature values dictionary
+            target: Target to explain (e.g. target_aqi_24h)
+
+        Returns:
+            SHAP explanation response
+        """
+        if self.mock_mode:
+            return self._mock_shap_explanation()
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/explain/shap-explanation",
+                json={"features": features, "target": target},
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_global_shap(self, top_n: int = 20) -> Dict[str, Any]:
+        """
+        Get global SHAP feature importance.
+
+        Args:
+            top_n: Number of top features
+
+        Returns:
+            Global SHAP importance response
+        """
+        if self.mock_mode:
+            return self._mock_global_shap()
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/explain/shap-global",
+                params={"top_n": top_n},
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=30,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_drift_report(self, n_recent: int = 500) -> Dict[str, Any]:
+        """
+        Get drift detection report.
+
+        Args:
+            n_recent: Number of recent rows to compare
+
+        Returns:
+            Drift report response
+        """
+        if self.mock_mode:
+            return {"drift_detected": False, "drifted_count": 0, "drift_percentage": 0}
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/monitoring/drift",
+                params={"n_recent": n_recent},
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=30,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_performance(self) -> Dict[str, Any]:
+        """
+        Get model performance metrics.
+
+        Returns:
+            Performance metrics response
+        """
+        if self.mock_mode:
+            return {"status": "healthy", "training_metrics": {}}
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/monitoring/performance",
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=10,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_alerts(self) -> Dict[str, Any]:
+        """
+        Get AQI hazard alerts.
+
+        Returns:
+            Alerts response
+        """
+        if self.mock_mode:
+            return {"alerts": [], "total_alerts": 0}
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/monitoring/alerts",
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=15,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
+    def get_system_health(self) -> Dict[str, Any]:
+        """
+        Get system health overview.
+
+        Returns:
+            System health response
+        """
+        if self.mock_mode:
+            return {"overall_status": "healthy", "checks": {}}
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/monitoring/system-health",
+                headers={"X-API-Key": self.api_key or ""},
+                timeout=10,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.ConnectionError:
+            raise APIConnectionError("Cannot connect to API server")
+        except requests.exceptions.RequestException as e:
+            raise APIClientError(f"API error: {e}")
+
     def is_available(self) -> bool:
         """Check if API is available."""
         if self.mock_mode:
@@ -347,4 +498,27 @@ class APIClient:
             "model_type": "XGBoost",
             "parameters": {},
             "metrics": {"mae": 21.32, "rmse": 30.89, "r2": 0.6065},
+        }
+
+    def _mock_shap_explanation(self) -> Dict[str, Any]:
+        """Return mock SHAP explanation."""
+        return {
+            "base_value": 120.0,
+            "shap_values": [],
+            "feature_names": [],
+            "feature_values": [],
+            "prediction": 137.0,
+            "target": "target_aqi_24h",
+            "top_positive": [],
+            "top_negative": [],
+        }
+
+    def _mock_global_shap(self) -> Dict[str, Any]:
+        """Return mock global SHAP."""
+        return {
+            "model_name": "xgboost_aqi_predictor",
+            "method": "TreeExplainer mean |SHAP|",
+            "n_samples": 100,
+            "total_features": 10,
+            "features": [],
         }

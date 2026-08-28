@@ -1,7 +1,7 @@
 """
 Prediction Route
 
-Handles prediction requests.
+Handles prediction requests and stores them in history.
 """
 
 import logging
@@ -16,6 +16,16 @@ from app.services.model_service import ModelNotLoadedError
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/prediction", tags=["prediction"])
+
+
+def _store_prediction(prediction_data: dict):
+    """Store prediction in history (best-effort, non-blocking)."""
+    try:
+        from src.data.prediction_history import PredictionHistoryStore
+        store = PredictionHistoryStore()
+        store.store_prediction(prediction_data)
+    except Exception as e:
+        logger.warning(f"Failed to store prediction in history: {e}")
 
 
 @router.post(
@@ -54,7 +64,10 @@ async def predict(
             city=city,
             include_explanation=request.include_explanation,
         )
-        
+
+        # Store in prediction history (best-effort)
+        _store_prediction(result)
+
         return PredictionResponse(**result)
         
     except ValueError as e:
