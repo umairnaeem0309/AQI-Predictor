@@ -45,8 +45,9 @@ COPY models/ ./models/
 # Copy environment template (actual .env is mounted at runtime)
 COPY .env.example .env
 
-# Note: data/processed/ excluded from image for smaller size
-# Data routes gracefully handle missing historical dataset
+# Copy ONLY the small metadata files needed for SHAP/monitoring endpoints
+# Full dataset is excluded for image size (64MB+)
+# Endpoints return helpful messages when data is unavailable
 
 # Default port (Render overrides this with its own PORT env var)
 ENV PORT=8000
