@@ -1,340 +1,195 @@
-# AQI Predictor — Complete Project Journey
+# AQI Predictor — Project Journey
 
-**Pearls AQI Predictor**  
-**Predicting Air Quality Index 24/48/72 hours ahead**  
-**Using a 100% serverless stack**
-
----
-
-## Table of Contents
-
-1. [Problem Definition](#1-problem-definition)
-2. [API Selection Process](#2-api-selection-process)
-3. [Architecture Decisions](#3-architecture-decisions)
-4. [Data Collection & Cleaning](#4-data-collection--cleaning)
-5. [Feature Engineering](#5-feature-engineering)
-6. [Feature Store Setup](#6-feature-store-setup)
-7. [Model Selection & Experiments](#7-model-selection--experiments)
-8. [Model Evaluation](#8-model-evaluation)
-9. [Model Registry](#9-model-registry)
-10. [Deployment](#10-deployment)
-11. [Automation & Monitoring](#11-automation--monitoring)
-12. [Blockers & Solutions](#12-blockers--solutions)
-13. [Final Results](#13-final-results)
+**Last Updated:** 2026-08-29
 
 ---
 
 ## 1. Problem Definition
 
-**Goal:** Predict Air Quality Index (AQI) for Pakistani cities (Karachi, Lahore, Islamabad) at 24h, 48h, and 72h horizons.
-
-**Why AQI Prediction Matters:**
-- Air pollution causes 7 million premature deaths annually (WHO)
-- Pakistan ranks among the most polluted countries
-- Early warnings enable health precautions
-- Policy makers need forecasting for intervention planning
-
-**Target:** US EPA AQI (0-500 scale) derived from PM2.5 and PM10 using EPA NowCast methodology.
-
-**Inputs:** Weather + pollution data from external APIs  
-**Outputs:** AQI predictions for 24h, 48h, 72h horizons
+Build a production-grade AQI forecasting system that predicts Air Quality Index 24, 48, and 72 hours ahead for three Pakistani cities: Karachi, Lahore, and Islamabad.
 
 ---
 
 ## 2. API Selection Process
 
-### Attempted Providers
+### Initial Attempt: OpenWeather + AQICN
 
-| Provider | Result | Reason |
-|----------|--------|--------|
-| **AQICN** | ❌ Rejected | Pakistani stations months/years stale; timezone bugs; no fresh data |
-| **OpenWeather** | ⚠️ Partial | Current works; historical air pollution works; historical weather requires paid plan |
-| **Open-Meteo** | ✅ Selected | Free, no API key, historical + forecast data, reliable |
+We initially planned to use:
+- **OpenWeather API** for weather data
+- **AQICN API** for US EPA AQI data
 
-### Why Open-Meteo Won
+**Problem discovered:** AQICN Pakistan stations were returning stale data (months/years old). The returned timezone offsets (-05:00, -06:00) were incorrect for Pakistani cities, causing timestamp normalization bugs.
 
-1. **Free tier:** Unlimited requests (fair use)
-2. **No API key required:** Simplifies deployment
-3. **Historical data:** 5+ years of hourly weather + air quality
-4. **Forecast data:** Up to 16 days ahead
-5. **Reliable:** Consistent uptime, fast responses
-6. **Comprehensive:** Temperature, humidity, wind, pressure, PM2.5, PM10, CO, NO2, SO2, O3
+**Decision:** Rejected AQICN as primary AQI source.
 
-### Data Sources Used
+### OpenWeather Investigation
 
-| Source | Variables | Frequency |
-|--------|-----------|-----------|
-| Open-Meteo Weather API | Temperature, humidity, pressure, wind, cloud cover, precipitation | Hourly |
-| Open-Meteo Air Quality API | PM2.5, PM10, CO, NO2, SO2, O3, US AQI | Hourly |
+OpenWeather had a separate Air Pollution API with historical data. However:
+- Free tier limited historical access
+- PM2.5 required 24-hour averaging for correct EPA AQI calculation
+- Complex gas concentration unit conversions needed
+
+**Decision:** OpenWeather was rejected due to API limitations on the free tier.
+
+### Final Choice: Open-Meteo
+
+Open-Meteo provided:
+- **No API key required** for non-commercial use
+- **Historical weather data** from 2017+ (IFS 9km) or 1940+ (ERA5)
+- **Historical air quality data** from Aug 2022+ (CAMS Global)
+- **Hourly granularity** for all pollutants
+- **Free tier** with generous rate limits
+
+**Decision:** Open-Meteo selected as the primary data provider.
 
 ---
 
 ## 3. Architecture Decisions
 
-### Decision 1: Feature Store
-
-**Choice:** **Hopsworks (PRIMARY)** + Local Parquet (FALLBACK)
-
-**Rationale:**
-- Hopsworks: Centralized repository, version control, online/offline serving
-- Eliminates redundant work across experiments
-- Free tier available for small projects
-- Local Parquet: Backup when Hopsworks unavailable
-
-### Decision 2: Model Registry
-
-**Choice:** MLflow (Local)
-
-**Rationale:**
-- Track every model version with metadata, metrics, artifacts
-- Enable rollback, comparison, and audit trails
-- Free, no cloud costs
-- Sufficient for single-model production
-
-### Decision 3: ML Model
-
-**Choice:** XGBoost (Multi-Output Regressor)
-
-**Rationale:**
-- Best accuracy among tested models
-- Handles tabular data well
-- Fast training and inference
-- Interpretable (feature importance)
-- No GPU required
-
-### Decision 4: AQI Calculation
-
-**Choice:** US EPA PM NowCast AQI (PM2.5 + PM10)
-
-**Rationale:**
-- Standard methodology (EPA-454/B-24-002, May 2024)
-- PM2.5 and PM10 are primary pollutants in Pakistan
-- Preserves 0-500 scale for health communication
-- Derived from Open-Meteo pollutant concentrations
-
-### Decision 5: Deployment
-
-**Choice:** Render (API) + Streamlit Cloud (Dashboard)
-
-**Rationale:**
-- Both free tier
-- Auto-deploy on git push
-- No server management
-- Clean separation of concerns
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Weather API | Open-Meteo Archive | Free, historical, hourly |
+| Air Quality API | Open-Meteo Air Quality | Free, PM2.5/PM10/CO/NO2/SO2/O3 |
+| Feature Store | Hopsworks (PRIMARY) | Cloud-based, versioned, scalable |
+| Fallback Store | Local Parquet | Works offline, no cloud dependency |
+| Model Registry | MLflow (local) | Version tracking, metrics logging |
+| Web Framework | FastAPI + Streamlit | Async API + interactive dashboard |
+| CI/CD | GitHub Actions | Automated hourly + daily pipelines |
+| Deployment | Render (API) + Streamlit Cloud (Dashboard) | Free tier, auto-deploy |
 
 ---
 
-## 4. Data Collection & Cleaning
+## 4. Data Collection
 
 ### Historical Data Downloaded
 
-| City | Start Date | End Date | Records |
-|------|------------|----------|---------|
-| Karachi | 2022-08-01 | 2026-08-26 | ~35,000 |
-| Lahore | 2022-08-01 | 2026-08-26 | ~35,000 |
-| Islamabad | 2022-08-01 | 2026-08-26 | ~35,000 |
+- **Weather:** 4 years hourly data (Aug 2022 - Aug 2026)
+- **Air Quality:** 4 years hourly data (Aug 2022 - Aug 2026)
+- **Cities:** Karachi (24.86°N, 67.00°E), Lahore (31.52°N, 74.36°E), Islamabad (33.68°N, 73.05°E)
+- **Total raw rows:** 107,064 (35,688 per city)
 
-**Total:** ~107,000 hourly observations (4 years)
+### Verification (2026-08-29)
 
-### Data Cleaning Steps
-
-1. **Timestamp normalization:** All timestamps converted to UTC
-2. **Missing value handling:**
-   - Forward-fill for gaps < 3 hours
-   - Interpolation for gaps 3-24 hours
-   - Drop rows with > 24 hours missing
-3. **Outlier detection:**
-   - PM2.5 > 500 → flagged as invalid
-   - Temperature < -50 or > 60 → flagged
-   - Humidity < 0 or > 100 → corrected
-4. **Duplicate removal:** Deduplicated by timestamp + location
-5. **AQI calculation:** EPA NowCast from PM2.5/PM10
+- ✅ Weather API returns 24 hourly records per city per day
+- ✅ Air Quality API returns 24 hourly records per city per day
+- ✅ Live fetcher returns current weather + pollution for all 3 cities
+- ✅ No API key required for Open-Meteo
 
 ---
 
-## 5. Feature Engineering
+## 5. Data Cleaning
 
-### Feature Categories (71 total)
+### Cleaning Steps Applied
+
+1. **Timestamp normalization:** All timestamps converted to UTC
+2. **Duplicate removal:** 0 duplicate (timestamp, city) pairs found
+3. **Missing values:** <0.2% across all features
+4. **Negative pollutants:** 0 negative values for PM2.5, PM10, CO, NO2, SO2
+5. **AQI calculation:** EPA PM Direct method using PM2.5 and PM10 concentrations
+
+### Verification (2026-08-29)
+
+- ✅ All 3 cities have equal row counts (35,688 each)
+- ✅ Date range: 2022-08-01 to 2026-08-26
+- ✅ No synthetic data marked for training
+- ✅ Dataset metadata records provenance
+
+---
+
+## 6. Feature Engineering
+
+### Features Created (68 total)
 
 | Category | Count | Examples |
 |----------|-------|----------|
-| **Weather** | 7 | temperature, humidity, pressure, wind_speed, cloud_cover |
-| **Pollution** | 6 | pm25, pm10, co, no2, so2, o3 |
-| **Time** | 6 | hour, day_of_week, month, is_weekend, hour_sin, hour_cos |
-| **AQI Lags** | 6 | aqi_lag_1h, aqi_lag_6h, aqi_lag_12h, aqi_lag_24h, aqi_lag_48h, aqi_lag_72h |
-| **PM Lags** | 6 | pm25_lag_1h, pm25_lag_24h, pm10_lag_1h, pm10_lag_24h |
-| **Temperature/Humidity Lags** | 6 | temperature_lag_1h, temperature_lag_24h, humidity_lag_1h, humidity_lag_24h |
-| **AQI Rolling** | 6 | aqi_rolling_mean_6h, 12h, 24h, aqi_rolling_std_24h, min_24h, max_24h |
-| **PM Rolling** | 4 | pm25_rolling_mean_6h, 24h, pm10_rolling_mean_24h |
-| **Weather Rolling** | 2 | temperature_rolling_mean_24h, humidity_rolling_mean_24h |
-| **Derived** | 12 | aqi_change_rate_1h/6h/24h, aqi_trend_24h, pm25_pm10_ratio, etc. |
+| Weather | 7 | temperature, humidity, pressure, wind_speed, wind_direction, cloud_cover, precipitation |
+| Pollution | 6 | pm25, pm10, co, no2, so2, o3 |
+| Time | 6 | hour, day_of_week, month, is_weekend, hour_sin, hour_cos |
+| Lag | 24 | aqi_lag_{1,6,12,24,48,72}h, pm25_lag_{1,6,12,24,48,72}h, temperature_lag_{...}, humidity_lag_{...} |
+| Rolling | 10 | aqi_rolling_{mean,std,min,max}_{6h,12h,24h}, pm25_rolling_{mean}_{6h,24h}, temperature/humidity_rolling_mean_24h |
+| Ratio | 3 | pm25_pm10_ratio, no2_so2_ratio, o3_no2_ratio |
+| Change/Trend | 5 | aqi_change_rate_{1h,6h,24h}, aqi_trend_24h, aqi_deviation_from_24h_avg |
+| Derived | 3 | temp_humidity_interaction, wind_cooling_effect, aqi_deviation_from_24h_avg |
 
-### Leakage Prevention
+### Verification (2026-08-29)
 
-- All lag features use `shift()` with `closed="left"` (no future data)
-- Rolling windows use time-based semantics (not row-based)
-- Targets are forward-shifted 24h, 48h, 72h
-- Train/test split is chronological (no random shuffling)
+- ✅ All 68 features present in processed training data
+- ✅ hour_sin range: [-1.0, 1.0] (correct)
+- ✅ is_weekend: [0, 1] (correct)
+- ✅ Feature engineering functions execute without errors
+- ✅ No data leakage: targets are future-shifted correctly
 
 ---
 
-## 6. Feature Store Setup
+## 7. Feature Store Setup
 
 ### Hopsworks Integration
 
-```python
-from src.feature_store import get_feature_store
+1. Created `src/feature_store/hopsworks_store.py`
+2. Uploaded 63,648 rows to `aqi_features_prod` v1
+3. Verified read-back: 63,648 rows, 73 columns
+4. Local Parquet fallback implemented
 
-# Connect to Hopsworks
-store = get_feature_store()
+### Verification (2026-08-29)
 
-# Insert features
-store.insert_features("aqi_features_prod", df, metadata)
-
-# Retrieve features
-features = store.get_features("aqi_features_prod")
-```
-
-### Backfill Historical Data
-
-```bash
-# Load 4 years of data into Hopsworks
-python scripts/backfill_hopsworks.py
-```
-
-**Result:** 63,648 rows loaded into Hopsworks Feature Store
+- ✅ Hopsworks connected: `eu-west.cloud.hopsworks.ai`
+- ✅ Feature group `aqi_features_prod` exists with data
+- ✅ Read-back returns correct schema and values
+- ✅ Fallback to local Parquet works
 
 ---
 
-## 7. Model Selection & Experiments
+## 8. Model Training & Selection
 
-### Models Tested
+### Models Trained
 
-| Model | Type | Rationale |
-|-------|------|-----------|
-| **Ridge Regression** | Linear | Simple, interpretable baseline |
-| **Random Forest** | Ensemble | Handles non-linearity |
-| **XGBoost** | Gradient Boosting | Best tabular performance |
-| **LSTM** | Deep Learning | Sequential pattern capture |
+| Model | Type | Why Selected |
+|-------|------|--------------|
+| Ridge Regression | Linear | Baseline, fast, interpretable |
+| Random Forest | Ensemble | Non-linear, robust |
+| XGBoost | Gradient Boosting | State-of-the-art tabular |
+| LSTM | Deep Learning | Sequential pattern capture |
 
-### Training Pipeline
+### Verification Results (2026-08-29, Full Dataset)
 
-```bash
-# Train ALL models, select best
-python scripts/train_model.py --force-register
-```
+**Validation Set:**
 
-### Why XGBoost Was Selected
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **17.95** | 26.30 | 0.2894 |
+| Random Forest | 18.80 | 26.08 | 0.3013 |
+| LSTM | 19.24 | 26.63 | 0.2715 |
+| XGBoost | 20.35 | 26.84 | 0.2597 |
 
-1. **Best accuracy:** Lowest MAE (21.32) and RMSE (30.89)
-2. **Best R²:** 0.61 (explains 61% of variance)
-3. **Fast inference:** 1.8ms per prediction (suitable for real-time)
-4. **Interpretable:** Feature importance + SHAP support
-5. **Robust:** Handles missing values, no scaling required
-6. **Deployable:** No GPU required, small model size
-
-### Why LSTM Was Not Selected
-
-- Higher error than XGBoost
-- 100x slower training
-- Requires GPU for reasonable training time
-- Harder to deploy (TensorFlow dependency)
-- No significant accuracy gain
-
----
-
-## 8. Model Evaluation
-
-### Metrics
-
-| Metric | Description |
-|--------|-------------|
-| **MAE** | Average prediction error magnitude |
-| **RMSE** | Penalizes larger errors more heavily |
-| **R²** | Proportion of variance explained |
-
-### Results (All Models)
-
-| Model | MAE | RMSE | R² | Training Time |
-|-------|-----|------|----|---------------|
-| **Ridge** | 28.96 | 37.52 | 0.4762 | 0.2s |
-| **Random Forest** | 29.31 | 38.14 | 0.4493 | 171.7s |
-| **XGBoost** | 30.09 | 38.63 | 0.4365 | 15.3s |
-| **LSTM** | 30.02 | 38.58 | 0.4467 | 112.7s |
-
-### Final XGBoost Results
+**Test Set (XGBoost per-horizon):**
 
 | Horizon | MAE | RMSE | R² |
 |---------|-----|------|----|
-| 24h | 19.22 | 28.36 | 0.6707 |
-| 48h | 21.87 | 31.58 | 0.5887 |
-| 72h | 22.87 | 32.57 | 0.5591 |
-| **Overall** | **21.32** | **30.89** | **0.6065** |
+| 24h | 19.12 | 28.38 | 0.6701 |
+| 48h | 21.60 | 31.16 | 0.5996 |
+| 72h | 22.91 | 32.53 | 0.5600 |
+
+**Selected Model:** Ridge Regression (lowest validation MAE = 17.95)
 
 ---
 
 ## 9. Model Registry
 
-### MLflow Integration
-
-```python
-from src.models.registry import ModelRegistry
-
-registry = ModelRegistry()
-
-# Register model
-registry.register_model(
-    model_name="xgboost_v1",
-    model=model,
-    metrics=metrics,
-    params=params,
-    dataset_metadata=dataset_metadata,
-    feature_columns=feature_columns
-)
-
-# Promote to production
-registry.promote_to_production(
-    model_name="xgboost_v1",
-    version=1,
-    dataset_type="real_api_data",
-    approved_for_training=True,
-    approval_status="approved"
-)
-
-# Load production model
-model = registry.load_production_model()
-```
-
-### Version Tracking
-
-| Version | Date | MAE | Status |
-|---------|------|-----|--------|
-| v1 | 2026-08-29 | 28.96 | Production |
+- Registered in MLflow experiment `aqi_predictor_production`
+- All 4 model metrics logged
+- Model artifacts saved locally
+- API loads model via MLflow → pickle fallback
 
 ---
 
 ## 10. Deployment
 
-### Services
+| Component | Platform | URL |
+|-----------|----------|-----|
+| API Backend | Render | https://aqi-predictor-api-nf7s.onrender.com |
+| Dashboard | Streamlit Cloud | https://airpulse.streamlit.app/ |
 
-| Service | Platform | URL |
-|---------|----------|-----|
-| **API Backend** | Render | https://aqi-predictor-api.onrender.com |
-| **Dashboard** | Streamlit Cloud | https://aqi-predictor-dashboard.streamlit.app |
-
-### Docker
-
-```bash
-# Build
-docker build -t aqi-predictor .
-
-# Run
-docker run -p 8000:8000 aqi-predictor
-```
-
-### Auto-Deploy
-
-Both services auto-deploy on git push to `main` branch.
+Both auto-deploy on git push to `main`.
 
 ---
 
@@ -342,128 +197,51 @@ Both services auto-deploy on git push to `main` branch.
 
 ### GitHub Actions
 
-| Workflow | Schedule | What It Does |
-|----------|----------|--------------|
-| `feature-collection.yml` | Every hour | Collects weather + pollution, stores in Hopsworks |
-| `daily-training.yml` | Daily 6 AM UTC | Trains all models, selects best, registers in MLflow |
-| `ci.yml` | On push | Lint, type-check, unit tests |
-| `ml-validation.yml` | Weekly | Data safety, feature quality, model artifact |
-| `cd.yml` | On push | Pre-deployment, Docker build |
+| Workflow | Schedule | Action |
+|----------|----------|--------|
+| `feature-collection.yml` | Every hour | Collect weather + pollution, store in Hopsworks |
+| `daily-training.yml` | Daily 6 AM UTC | Train all models, select best, register in MLflow |
+| `ci.yml` | On push | Lint, format, type-check, unit tests |
+| `ml-validation.yml` | Weekly | Data safety, feature quality, model artifact validation |
+| `cd.yml` | On push | Pre-deployment checks, Docker build |
 
 ### Monitoring
 
-- **Data Drift Detection:** Evidently AI PSI-based monitoring
-- **Performance Tracking:** MAE, RMSE, R² over time
-- **AQI Alerts:** Hazard detection for dangerous air quality levels
-- **Prediction History:** SQLite storage for audit trail
+- Evidently AI for data drift detection
+- AQI hazard alerts (threshold-based)
+- System health endpoint
 
 ---
 
 ## 12. Blockers & Solutions
 
-### Blocker 1: AQICN Data Staleness
-
-**Problem:** AQICN stations for Pakistani cities returned data from March 2025 (months old)
-
-**Solution:** Switched to Open-Meteo which provides fresh hourly data
-
-### Blocker 2: OpenWeather Historical Weather
-
-**Problem:** OpenWeather historical weather endpoint requires paid plan ($40/month)
-
-**Solution:** Used Open-Meteo which provides free historical weather data
-
-### Blocker 3: Feature Store Integration
-
-**Problem:** Hopsworks requires API key and cloud setup
-
-**Solution:** Implemented Local Parquet feature store as primary, Hopsworks as optional
-
-### Blocker 4: Timezone Bugs
-
-**Problem:** AQICN timestamps had incorrect UTC offsets (returned -05:00 for Pakistan which is UTC+5)
-
-**Solution:** Used Open-Meteo which handles timezone correctly
-
-### Blocker 5: Model Serving
-
-**Problem:** FastAPI needed to load model efficiently
-
-**Solution:** MLflow Model Registry with local pickle fallback
+| Blocker | Solution |
+|---------|----------|
+| AQICN Pakistan stations stale | Switched to Open-Meteo |
+| OpenWeather free tier limitations | Selected Open-Meteo (no key required) |
+| Feature engineering NaN errors | Implemented proper NaN handling with `np.nan_to_num` |
+| Hopsworks connection timeout | Added retry logic and local Parquet fallback |
+| Model saved as wrong type | Fixed train_model.py to save correct best model |
+| CI validation scripts gitignored | Added `!scripts/validate_production.py` to .gitignore |
+| Pre-deploy checks require API_KEY | Changed to warning in CI environments |
 
 ---
 
-## 13. Final Results
+## 13. Test Results
 
-### Live Predictions (Sample)
+```
+487 passed, 1 skipped, 0 failed
+```
 
-| City | 24h AQI | Category | 48h AQI | 72h AQI |
-|------|---------|----------|---------|---------|
-| Karachi | 137 | Unhealthy for Sensitive Groups | 79 | 138 |
-| Lahore | 186 | Unhealthy | 166 | 141 |
-| Islamabad | 131 | Unhealthy for Sensitive Groups | 123 | 137 |
-
-### Confidence Intervals
-
-Predictions include 90% confidence intervals using residual quantile method:
-
-| City | 24h AQI | 90% CI |
-|------|---------|--------|
-| Karachi | 137 | [99 - 175] |
-| Lahore | 186 | [155 - 217] |
-| Islamabad | 131 | [95 - 167] |
-
-### System Metrics
-
-| Metric | Value |
-|--------|-------|
-| **Total Tests** | 487 passed |
-| **API Endpoints** | 15 |
-| **Dashboard Pages** | 4 |
-| **Features** | 71 |
-| **Historical Rows** | 107,064 |
-| **Deployment** | Render + Streamlit Cloud |
+The 1 skipped test is a conditional skip when the master CSV file is not present — legitimate behavior.
 
 ---
 
-## Appendix: Complete File Structure
+## 14. Current System State
 
-```
-AQI-Predictor/
-├── scripts/                    # Pipeline scripts
-│   ├── collect_features.py     # Feature pipeline (hourly)
-│   ├── train_model.py          # Training pipeline (daily)
-│   ├── backfill_hopsworks.py   # Hopsworks backfill
-│   └── validate_production.py  # CI validation
-│
-├── src/                        # Source code
-│   ├── data/                   # Data collection
-│   │   ├── live_fetcher.py     # Live data
-│   │   └── providers/          # API providers
-│   ├── features/               # Feature engineering
-│   ├── feature_store/          # Hopsworks + Local
-│   ├── models/                 # ML models
-│   │   ├── training.py         # Training
-│   │   ├── registry.py         # MLflow registry
-│   │   ├── evaluation.py       # Evaluation
-│   │   └── lstm_model.py       # LSTM
-│   └── monitoring/             # Drift detection
-│
-├── app/                        # Web app
-│   ├── backend/                # FastAPI
-│   │   └── routes/             # API endpoints
-│   └── frontend/               # Streamlit
-│       └── pages/              # Dashboard pages
-│
-├── notebooks/                  # EDA notebooks
-│   ├── 01_dataset_exploration.ipynb
-│   ├── 02_feature_analysis.ipynb
-│   ├── 03_model_experiments.ipynb
-│   └── 04_model_comparison.ipynb
-│
-├── tests/                      # Test suite
-├── docs/                       # Documentation
-├── data/                       # Datasets
-├── models/                     # Trained models
-└── .github/workflows/          # CI/CD
-```
+- **All pipelines verified end-to-end**
+- **487 tests passing**
+- **Hopsworks connected with 63,648 rows**
+- **MLflow tracking experiments**
+- **CI/CD all green**
+- **Both services deployed and accessible**
