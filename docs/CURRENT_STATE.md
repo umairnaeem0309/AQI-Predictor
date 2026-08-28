@@ -5,119 +5,94 @@
 
 ---
 
-## System Architecture
+## System Overview
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    DATA COLLECTION (Hourly)                  │
-│  Open-Meteo Weather API + Air Quality API                   │
-│  → Feature Store (Local Parquet + Hopsworks)                │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────┐
-│                    MODEL TRAINING (Daily)                    │
-│  Feature Store → XGBoost Training → MLflow Registry         │
-│  → Local Pickle (fallback)                                  │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────┐
-│                    API + DASHBOARD                           │
-│  FastAPI (17 endpoints) → Streamlit (4 pages)               │
-│  Model loaded from MLflow or local pickle                   │
-└─────────────────────────────────────────────────────────────┘
-```
+A production-grade AQI forecasting system that predicts Air Quality Index 24/48/72 hours ahead for Pakistani cities using machine learning.
 
 ---
 
-## Component Status
+## Pipeline Status
+
+### Feature Pipeline (Hourly)
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| **Data Collection** | ✅ Active | `scripts/collect_features.py` |
-| **Feature Store** | ✅ Active | `src/feature_store/` (Local Parquet) |
-| **Model Training** | ✅ Active | `scripts/train_model.py` |
-| **MLflow Registry** | ✅ Active | Local MLflow tracking |
-| **FastAPI Backend** | ✅ Running | `app/backend/main.py` |
-| **Streamlit Dashboard** | ✅ Running | `app/frontend/streamlit_app.py` |
-| **CI/CD** | ✅ Active | `.github/workflows/` |
-| **Auto-Retraining** | ✅ Enabled | GitHub Actions (daily) |
+| Data Collection | ✅ Active | `scripts/collect_features.py` |
+| API Provider | ✅ Open-Meteo | `src/data/providers/` |
+| Feature Engineering | ✅ 71 features | `src/features/feature_engineering.py` |
+| Feature Store | ✅ Hopsworks PRIMARY | `src/feature_store/hopsworks_store.py` |
+| Local Fallback | ✅ Parquet | `src/feature_store/local_store.py` |
 
----
+### Training Pipeline (Daily)
 
-## Automated Pipelines
+| Component | Status | Location |
+|-----------|--------|----------|
+| Data Loading | ✅ From Feature Store | `scripts/train_model.py` |
+| Model Training | ✅ Ridge, RF, XGBoost, LSTM | `src/models/training.py` |
+| Model Selection | ✅ Best by MAE | `src/models/selection.py` |
+| Model Registry | ✅ MLflow Local | `src/models/registry.py` |
+| Model Serving | ✅ MLflow → pickle | `app/services/model_service.py` |
 
-### Hourly Feature Collection
-- **Schedule:** Every hour via GitHub Actions
-- **Workflow:** `.github/workflows/feature-collection.yml`
-- **Script:** `scripts/collect_features.py`
-- **What it does:**
-  1. Fetches current weather + pollution from Open-Meteo
-  2. Engineers features (time, lags, rolling)
-  3. Calculates EPA AQI from PM2.5/PM10
-  4. Stores in local Parquet feature store
-  5. Deduplicates and persists
+### CI/CD Pipeline
 
-### Daily Model Training
-- **Schedule:** Every day at 6 AM UTC via GitHub Actions
-- **Workflow:** `.github/workflows/daily-training.yml`
-- **Script:** `scripts/train_model.py`
-- **What it does:**
-  1. Reads features from feature store
-  2. Falls back to historical dataset if insufficient data
-  3. Trains XGBoost multi-output model
-  4. Evaluates on validation/test sets
-  5. Registers in MLflow if performance improved
-  6. Saves locally as pickle (API fallback)
+| Workflow | Schedule | Status |
+|----------|----------|--------|
+| Feature Collection | Every hour | ✅ Active |
+| Model Training | Daily 6 AM UTC | ✅ Active |
+| CI Pipeline | On push | ✅ Active |
+| ML Validation | Weekly | ✅ Active |
+| CD Pipeline | On push | ✅ Active |
 
 ---
 
 ## Model Performance
 
-| Metric | 24h | 48h | 72h | Overall |
-|--------|-----|-----|-----|---------|
-| **MAE** | 19.22 | 21.87 | 22.87 | 21.32 |
-| **RMSE** | 28.36 | 31.58 | 32.57 | 30.89 |
-| **R²** | 0.6707 | 0.5887 | 0.5591 | 0.6065 |
+| Model | MAE | RMSE | R² | Status |
+|-------|-----|------|----|--------|
+| Ridge Regression | 28.96 | 37.52 | 0.4762 | Tested |
+| Random Forest | 29.31 | 38.14 | 0.4493 | Tested |
+| **XGBoost** | **30.09** | **38.63** | **0.4365** | **Selected** |
+| LSTM | 30.02 | 38.58 | 0.4467 | Tested |
 
 ---
 
-## API Endpoints (17 total)
+## API Endpoints (15 total)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/api/v1/predict/{city}` | GET | AQI prediction |
-| `/api/v1/model/info` | GET | Model metadata |
-| `/api/v1/model/feature-importance` | GET | XGBoost feature importance |
+| `/prediction` | POST | AQI prediction |
+| `/model-info` | GET | Model metadata |
+| `/explain/feature-importance` | GET | XGBoost feature importance |
+| `/explain/model-summary` | GET | Model summary |
 | `/explain/shap-global` | GET | Global SHAP analysis |
 | `/explain/shap-explanation` | POST | Per-prediction SHAP |
 | `/monitoring/drift` | GET | Data drift detection |
 | `/monitoring/performance` | GET | Training metrics |
 | `/monitoring/alerts` | GET | AQI hazard alerts |
 | `/monitoring/system-health` | GET | System health |
+| `/data/historical` | GET | Historical data |
+| `/data/statistics` | GET | City statistics |
 | `/history/predictions` | GET | Prediction history |
-| `/history/stats` | GET | Prediction statistics |
 | `/batch/predictions` | POST | Batch predictions |
-| `/api/v1/data/raw` | GET | Raw observations |
-| `/api/v1/data/processed` | GET | Processed features |
-| `/api/v1/data/cities` | GET | City statistics |
-| `/api/v1/data/collection-status` | GET | Collection status |
 
 ---
 
 ## Dashboard Pages (4)
 
-1. **Dashboard** — Live AQI predictions with confidence intervals
-2. **Analytics** — Historical trends and city comparison
-3. **Model Explainability** — Feature importance, SHAP global, SHAP per-prediction
-4. **System** — Service health, monitoring, alerts
+| Page | Description |
+|------|-------------|
+| **Dashboard** | Live AQI predictions with confidence intervals |
+| **Analytics** | Historical trends and city comparison |
+| **Explainability** | Feature importance, SHAP global, SHAP per-prediction |
+| **System** | Service health, monitoring, alerts |
 
 ---
 
 ## Test Results
 
 ```
-648 passed, 3 skipped, 0 failed
+487 passed, 1 skipped, 0 failed
 ```
 
 ---
@@ -126,81 +101,42 @@
 
 | Service | Platform | URL |
 |---------|----------|-----|
-| **Backend (API)** | Render | `https://aqi-predictor-api.onrender.com` |
-| **Dashboard** | Streamlit Cloud | `https://aqi-predictor-dashboard.streamlit.app` |
+| API Backend | Render | https://aqi-predictor-api.onrender.com |
+| Dashboard | Streamlit Cloud | https://aqi-predictor-dashboard.streamlit.app |
 
 Both services auto-deploy on git push to `main`.
 
 ---
 
-## Feature Store & Model Registry Architecture
+## Data
 
-### Component Roles
-
-| Component | Tool | Role |
-|-----------|------|------|
-| **Feature Store** | **Hopsworks (PRIMARY)** | Store, version, reuse engineered features |
-| **Feature Store** | Local Parquet (FALLBACK) | Backup when Hopsworks unavailable |
-| **Model Registry** | **MLflow** | Track model versions, metrics, artifacts |
-
-### Data Flow
-```
-Open-Meteo API → collect_features.py → Hopsworks Feature Store (PRIMARY)
-                                            ↓ (fallback)
-                                    Local Parquet (backup)
-                                            ↓
-                              train_model.py → reads from Feature Store
-                                            ↓
-                              XGBoost Training → MLflow Model Registry
-                                            ↓
-                              API loads model → predictions
-```
-
-### Why Hopsworks for Feature Store?
-- Centralized repository for engineered features
-- Version control for feature groups
-- Eliminates redundant work across experiments
-- Online/offline serving capability
-- Free tier available
-
-### Why MLflow for Model Registry?
-- Track every model version with metadata
-- Compare experiments (metrics, params)
-- Enable rollback to previous versions
-- Audit trails for compliance
-- Local or cloud deployment
-
-### Storage Locations
-- **Hopsworks Feature Store:** Cloud (primary)
-- **Local Parquet Backup:** `data/processed/features/hourly_observations.parquet`
-- **Collection Metadata:** `data/processed/features/collection_metadata.json`
-- **Health Log:** `data/collection_health.json`
-- **Historical Dataset:** `data/processed/train_features.csv` (4 years)
-- **Production Model:** `models/production/xgboost_model.pkl`
-- **Model Metadata:** `models/production/model_metadata.json`
-- **MLflow Registry:** `mlflow.db` (local)
+| Dataset | Rows | Columns | Location |
+|---------|------|---------|----------|
+| Training Features | 45,722 | 71 | `data/processed/train_features.csv` |
+| Validation Features | 5,081 | 71 | `data/processed/val_features.csv` |
+| Test Features | 12,701 | 71 | `data/processed/test_features.csv` |
+| Hopsworks Feature Store | 63,648 | 73 | Cloud |
 
 ---
 
-## Key Decisions
+## Commands
 
-| Decision | Rationale |
-|----------|-----------|
-| **XGBoost over LSTM** | Better accuracy (MAE=21.32), simpler deployment |
-| **Open-Meteo over OpenWeather** | Free, no API key, historical data available |
-| **US EPA PM NowCast AQI** | Standard methodology, PM2.5 + PM10 |
-| **Local MLflow** | No cloud costs, sufficient for single-model setup |
-| **Local Parquet** | Fast, no external dependencies for feature store |
-| **GitHub Actions** | Free tier, auto-deploy on push |
+```bash
+# Feature collection (hourly)
+python scripts/collect_features.py
 
----
+# Model training (daily)
+python scripts/train_model.py --force-register
 
-## Remaining Work (Optional Enhancements)
+# Backfill Hopsworks
+python scripts/backfill_hopsworks.py
 
-| Item | Priority | Effort |
-|------|----------|--------|
-| Email/Slack AQI alerts | Low | Medium |
-| More cities (Delhi, Mumbai) | Low | Small |
-| Hopsworks cloud feature store | Low | Medium |
-| Confidence intervals refinement | Low | Small |
-| Mobile app | Low | Large |
+# Run tests
+python -m pytest tests/ -v
+
+# Start API
+uvicorn app.backend.main:app --port 8000
+
+# Start Dashboard
+streamlit run app/frontend/streamlit_app.py --server.port 8501
+```
