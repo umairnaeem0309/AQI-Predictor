@@ -62,43 +62,50 @@ class ModelService:
         self._model = None
         self._model_info = None
 
-    def load_local_model(
-        self,
-        model_path: str = "models/production/xgboost_model.pkl",
-        metadata_path: str = "models/production/model_metadata.json",
-    ) -> Tuple[Any, Dict]:
+    def load_production_model_from_registry(self) -> Tuple[Any, Dict]:
         """
-        Load model from local pickle file (fallback when MLflow registry unavailable).
+        Load production model from MLflow Model Registry.
 
-        Args:
-            model_path: Path to pickled model.
-            metadata_path: Path to model metadata JSON.
+        Tries MLflow first, falls back to local pickle.
 
         Returns:
             Tuple of (model, model_info)
         """
-        import pickle
-        from pathlib import Path
-
-        model_file = Path(model_path)
-        meta_file = Path(metadata_path)
-
-        if not model_file.exists():
-            raise ModelNotLoadedError(f"Model file not found: {model_path}")
-
-        with open(model_file, "rb") as f:
-            model = pickle.load(f)
-
-        model_info = {}
-        if meta_file.exists():
-            with open(meta_file) as f:
-                model_info = json.load(f)
-
-        self._model = model
-        self._model_info = model_info
-
-        logger.info("Loaded local model from %s", model_path)
-        return model, model_info
+        # Try MLflow first
+        try:
+            import mlflow
+            import mlflow.pyfunc
+            
+            client = mlflow.tracking.MlflowClient()
+            versions = client.get_latest_versions("aqi_predictor_production", stages=["Production"])
+            
+            if versions:
+                prod_version = versions[0]
+                model_uri = f"runs:/{prod_version.run_id}/model"
+                model = mlflow.pyfunc.load_model(model_uri)
+                
+                # Get metadata from run
+                run = client.get_run(prod_version.run_id)
+                model_info = {
+                    "model_name": prod_version.name,
+                    "model_version": prod_version.version,
+                    "run_id": prod_version.run_id,
+                    "metrics": dict(run.data.metrics),
+                    "params": dict(run.data.params),
+                    "source": "mlflow_registry",
+                }
+                
+                self._model = model
+                self._model_info = model_info
+                logger.info(f"Loaded model from MLflow Registry: {prod_version.name} v{prod_version.version}")
+                return model, model_info
+            else:
+                logger.info("No production model in MLflow Registry, trying local pickle")
+        except Exception as e:
+            logger.warning(f"MLflow Registry load failed: {e}")
+        
+        # Fallback to local pickle
+        return self.load_local_model()
 
     def load_production_model(self) -> Tuple[Any, Dict]:
         """
