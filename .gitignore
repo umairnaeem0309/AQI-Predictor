@@ -94,3 +94,4 @@ scripts/check_*.py
 scripts/show_*.py
 scripts/merge_*.py
 data/predictions/
+data/collection_health.json
