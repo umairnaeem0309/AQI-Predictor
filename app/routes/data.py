@@ -45,7 +45,14 @@ async def get_historical_data(
         # Load raw observations
         csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
         if not os.path.exists(csv_path):
-            raise HTTPException(status_code=404, detail="Dataset not found")
+            return {
+                "city": city,
+                "count": 0,
+                "start": None,
+                "end": None,
+                "data": [],
+                "message": "Historical dataset not available in this deployment",
+            }
 
         df = pd.read_csv(csv_path)
 
@@ -114,13 +121,25 @@ async def get_statistics(
     try:
         csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
         if not os.path.exists(csv_path):
-            raise HTTPException(status_code=404, detail="Dataset not found")
+            return {
+                "city": city,
+                "total_rows": 0,
+                "date_range": {"start": None, "end": None},
+                "statistics": {},
+                "message": "Dataset not available in this deployment",
+            }
 
         df = pd.read_csv(csv_path)
         df = df[df["location_id"] == city.lower()]
 
         if df.empty:
-            raise HTTPException(status_code=404, detail=f"No data for city: {city}")
+            return {
+                "city": city,
+                "total_rows": 0,
+                "date_range": {"start": None, "end": None},
+                "statistics": {},
+                "message": f"No data for city: {city}",
+            }
 
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
 
@@ -170,7 +189,7 @@ async def compare_cities(
     try:
         csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
         if not os.path.exists(csv_path):
-            raise HTTPException(status_code=404, detail="Dataset not found")
+            return {"data": {"karachi": [], "lahore": [], "islamabad": []}, "message": "Dataset not available"}
 
         df = pd.read_csv(csv_path)
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)

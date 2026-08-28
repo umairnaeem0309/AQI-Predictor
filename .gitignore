@@ -49,6 +49,7 @@ data/raw/api_audit/
 
 # --- Models (large files) ---
 models/*
+!models/production/
 !models/.gitkeep
 
 # --- MLflow ---
@@ -56,6 +57,7 @@ mlruns/
 mlartifacts/
 models/experiment_artifacts/
 *.pkl
+!models/production/*.pkl
 *.joblib
 *.h5
 *.hdf5
