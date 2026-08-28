@@ -107,7 +107,7 @@ def render_dashboard(api_client: APIClient):
     
     # Forecast Chart
     st.subheader("3-Day Forecast")
-    
+
     timestamps = [
         prediction.get("timestamp", ""),
         "24h",
@@ -120,21 +120,91 @@ def render_dashboard(api_client: APIClient):
         prediction.get("aqi_48h", 0),
         prediction.get("aqi_72h", 0),
     ]
-    
+
     fig = create_forecast_chart(timestamps, aqi_values, f"AQI Forecast - {selected_city}")
     st.plotly_chart(fig, use_container_width=True)
-    
+
+    # Confidence Intervals
+    confidence = prediction.get("confidence")
+    if confidence and confidence.get("intervals"):
+        st.subheader("📊 Prediction Confidence Intervals")
+        st.caption(f"Method: {confidence.get('method', 'N/A')} | Level: {confidence.get('level', 'N/A')}%")
+
+        intervals = confidence["intervals"]
+        import plotly.graph_objects as go
+
+        horizons = []
+        point_preds = []
+        lower_bounds = []
+        upper_bounds = []
+
+        for h in ["24h", "48h", "72h"]:
+            iv = intervals.get(h)
+            if iv:
+                horizons.append(h)
+                point_preds.append(iv["point_prediction"])
+                lower_bounds.append(iv["lower"])
+                upper_bounds.append(iv["upper"])
+
+        if horizons:
+            fig = go.Figure()
+
+            # Confidence band
+            fig.add_trace(go.Scatter(
+                x=horizons + horizons[::-1],
+                y=upper_bounds + lower_bounds[::-1],
+                fill="toself",
+                fillcolor="rgba(99, 110, 250, 0.15)",
+                line=dict(color="rgba(99, 110, 250, 0)"),
+                name="Confidence Band",
+            ))
+
+            # Point predictions
+            fig.add_trace(go.Scatter(
+                x=horizons,
+                y=point_preds,
+                mode="lines+markers+text",
+                name="Point Prediction",
+                line=dict(color="#636EFA", width=2),
+                marker=dict(size=10),
+                text=[f"AQI {int(p)}" for p in point_preds],
+                textposition="top center",
+            ))
+
+            fig.update_layout(
+                title=f"AQI Prediction with {confidence.get('level', 90)}% Confidence Intervals",
+                xaxis_title="Forecast Horizon",
+                yaxis_title="AQI",
+                height=400,
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Interval details table
+            import pandas as pd
+            iv_data = []
+            for h in ["24h", "48h", "72h"]:
+                iv = intervals.get(h)
+                if iv:
+                    iv_data.append({
+                        "Horizon": h,
+                        "Point Prediction": int(iv["point_prediction"]),
+                        "Lower Bound": int(iv["lower"]),
+                        "Upper Bound": int(iv["upper"]),
+                        "Interval Width": int(iv["width"]),
+                    })
+            if iv_data:
+                st.dataframe(pd.DataFrame(iv_data), hide_index=True, use_container_width=True)
+    elif confidence is None:
+        st.info("ℹ️ Confidence intervals will appear once residual statistics are computed.")
+
     # Model Info
     st.subheader("Model Information")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.markdown(f"**Model Version:** {prediction.get('model_version', 'N/A')}")
-    
+
     with col2:
-        st.markdown(f"**Confidence:** {prediction.get('confidence', 'N/A')}")
-    
-    # Note about confidence
-    if prediction.get("confidence") is None:
-        st.caption("ℹ️ Confidence scores will be available when uncertainty quantification is implemented.")
+        level = confidence.get('level', 'N/A') if confidence else 'N/A'
+        st.markdown(f"**Confidence Level:** {level}%")
