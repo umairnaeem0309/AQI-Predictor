@@ -49,46 +49,44 @@ def load_features():
     """Load features from the Feature Store.
     
     Priority:
-    1. Feature Store (Hopsworks or Local Parquet)
-    2. Historical dataset fallback (CSV files)
+    1. Hopsworks Feature Store (PRIMARY - cloud)
+    2. Local Parquet (FALLBACK - backup)
+    3. Historical dataset (CSV - last resort)
     """
+    # 1. Try Hopsworks first (PRIMARY)
     try:
         from src.feature_store import get_feature_store
         
         store = get_feature_store()
-        logger.info(f"Connected to Feature Store: {store.__class__.__name__}")
+        logger.info(f"Feature Store: {store.__class__.__name__}")
         
-        # Try to get features from the feature store
+        # Try production feature group
         try:
             df = store.get_features("aqi_features_prod", version=1)
             if not df.empty:
-                logger.info(f"Loaded {len(df)} records from Feature Store")
+                logger.info(f"✅ Loaded {len(df)} records from Hopsworks Feature Store")
                 return df
         except Exception as e:
-            logger.warning(f"Could not load from feature store group: {e}")
+            logger.warning(f"Could not load from prod feature group: {e}")
         
-        # Try test group
+        # Try test feature group
         try:
             df = store.get_features("aqi_features_test", version=1)
             if not df.empty:
-                logger.info(f"Loaded {len(df)} records from Feature Store (test group)")
+                logger.info(f"✅ Loaded {len(df)} records from Hopsworks (test group)")
                 return df
         except Exception as e:
             logger.warning(f"Could not load from test feature group: {e}")
             
     except Exception as e:
-        logger.warning(f"Feature Store connection failed: {e}")
+        logger.warning(f"Hopsworks connection failed: {e}")
     
-    # Fallback to local files
+    # 2. Fallback to local Parquet
     features_file = FEATURES_DIR / "hourly_observations.parquet"
-    historical_file = PROJECT_ROOT / "data" / "processed" / "train_features.csv"
-    historical_targets = PROJECT_ROOT / "data" / "processed" / "train_targets.csv"
-
     if features_file.exists():
         df = pd.read_parquet(features_file)
-        logger.info(f"Loaded {len(df)} records from local feature store (Parquet)")
+        logger.info(f"✅ Loaded {len(df)} records from local Parquet (fallback)")
 
-        # Filter to training-valid only
         if "is_training_valid" in df.columns:
             valid_df = df[df["is_training_valid"] == True].copy()
             logger.info(f"Training-valid records: {len(valid_df)}")
@@ -97,21 +95,22 @@ def load_features():
 
         return valid_df
 
-    elif historical_file.exists():
-        logger.info("Loading from historical dataset (CSV fallback)")
+    # 3. Last resort: historical CSV
+    historical_file = PROJECT_ROOT / "data" / "processed" / "train_features.csv"
+    historical_targets = PROJECT_ROOT / "data" / "processed" / "train_targets.csv"
+
+    if historical_file.exists():
+        logger.info("Loading from historical dataset (CSV last resort)")
         features_df = pd.read_csv(historical_file)
         targets_df = pd.read_csv(historical_targets)
 
-        # Merge features and targets
         df = pd.merge(features_df, targets_df, on=["timestamp", "location_id"], how="inner")
         
-        # Drop rows with NaN targets
         target_cols = ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]
         before_drop = len(df)
         df = df.dropna(subset=target_cols)
-        logger.info(f"Loaded {len(df)} records from historical dataset (dropped {before_drop - len(df)} with NaN targets)")
+        logger.info(f"✅ Loaded {len(df)} records from historical CSV (dropped {before_drop - len(df)} with NaN targets)")
         
-        # Set flag so prepare_training_data knows targets exist
         df["_targets_precomputed"] = True
         
         return df

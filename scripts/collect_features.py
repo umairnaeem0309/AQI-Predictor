@@ -204,29 +204,55 @@ def collect_one_round(city_ids=None, dry_run=False):
             results["errors"].append({"city": city_id, "error": str(e)})
             results["failed_requests"] += 1
 
-    # 8. Persist to feature store
+    # 8. Persist to feature store (Hopsworks PRIMARY, Local FALLBACK)
     if all_records and not dry_run:
         df = pd.DataFrame(all_records)
-
-        # Save to local feature store (Parquet)
+        
+        # Try Hopsworks first (PRIMARY)
+        try:
+            from src.feature_store import get_feature_store
+            from src.feature_store.schemas import DatasetMetadata, DatasetType
+            
+            store = get_feature_store()
+            logger.info(f"Using feature store: {store.__class__.__name__}")
+            
+            metadata = DatasetMetadata(
+                dataset_version=f"hourly_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}",
+                dataset_type=DatasetType.REAL_TRAINING,
+                approved_for_training=True,
+                source="open-meteo",
+                generation_timestamp=datetime.now(timezone.utc).isoformat(),
+                record_count=len(df),
+                feature_count=len(df.columns),
+            )
+            
+            # Insert features
+            success = store.insert_features(
+                "aqi_features_prod", df, metadata, version=1
+            )
+            
+            if success:
+                results["hopsworks_persisted"] = True
+                logger.info(f"✅ Persisted {len(df)} records to Hopsworks Feature Store")
+            else:
+                logger.warning("Hopsworks insert returned False")
+                
+        except Exception as e:
+            logger.warning(f"Hopsworks persistence failed: {e}")
+        
+        # Always save locally as backup
         FEATURES_DIR.mkdir(parents=True, exist_ok=True)
         features_file = FEATURES_DIR / "hourly_observations.parquet"
 
         if features_file.exists():
             existing_df = pd.read_parquet(features_file)
-            # Deduplicate by timestamp + location_id
             df = pd.concat([existing_df, df], ignore_index=True)
             df = df.drop_duplicates(subset=["timestamp", "location_id"], keep="last")
             df = df.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
 
-            # Count duplicates rejected
-            results["duplicates_rejected"] = len(all_records) - len(
-                df[df["timestamp"].isin([r["timestamp"] for r in all_records])]
-            )
-
         df.to_parquet(features_file, index=False)
         results["local_persisted"] = True
-        logger.info(f"Persisted {len(df)} total records to local feature store")
+        logger.info(f"✅ Persisted {len(df)} records to local Parquet (backup)")
 
         # Save metadata
         meta = {

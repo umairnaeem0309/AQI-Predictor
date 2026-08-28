@@ -30,9 +30,13 @@ def get_feature_store(
 ) -> FeatureStoreInterface:
     """Factory function to get the appropriate feature store.
 
+    Priority:
+    1. Hopsworks (cloud feature store) — PRIMARY
+    2. Local Parquet — FALLBACK
+
     Logic:
     1. If prefer_local=True, always return LocalStore
-    2. If HOPSWORKS_HOST is configured, try HopsworksStore
+    2. If HOPSWORKS_HOST is configured, try HopsworksStore (PRIMARY)
     3. If Hopsworks connection fails, fall back to LocalStore
     4. If HOPSWORKS_HOST is not configured, use LocalStore
 
@@ -43,7 +47,7 @@ def get_feature_store(
         FeatureStoreInterface implementation.
     """
     if prefer_local:
-        logger.info("Using local feature store (preferred)")
+        logger.info("Using local feature store (forced)")
         store = LocalStore()
         store.connect()
         return store
@@ -51,18 +55,23 @@ def get_feature_store(
     # Check if Hopsworks is configured
     hopsworks_host = os.environ.get("HOPSWORKS_HOST")
     if not hopsworks_host:
-        logger.info("HOPSWORKS_HOST not configured — using local feature store")
+        logger.warning(
+            "HOPSWORKS_HOST not configured. "
+            "Hopsworks is the PRIMARY feature store. "
+            "Set HOPSWORKS_HOST to enable cloud feature store. "
+            "Falling back to local Parquet store."
+        )
         store = LocalStore()
         store.connect()
         return store
 
-    # Try Hopsworks
+    # Try Hopsworks (PRIMARY)
     try:
         from src.feature_store.hopsworks_store import ConfigurationError, HopsworksStore
 
         store = HopsworksStore()
         store.connect()
-        logger.info("Connected to Hopsworks feature store")
+        logger.info("✅ Connected to Hopsworks feature store (PRIMARY)")
         return store
     except ConfigurationError as e:
         logger.warning(
@@ -75,7 +84,8 @@ def get_feature_store(
             str(e),
         )
 
-    # Fallback to local
+    # Fallback to local (SECONDARY)
+    logger.info("Using local Parquet store as fallback")
     store = LocalStore()
     store.connect()
     return store

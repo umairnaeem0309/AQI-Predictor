@@ -133,19 +133,46 @@ Both services auto-deploy on git push to `main`.
 
 ---
 
-## Feature Store Architecture
+## Feature Store & Model Registry Architecture
+
+### Component Roles
+
+| Component | Tool | Role |
+|-----------|------|------|
+| **Feature Store** | **Hopsworks (PRIMARY)** | Store, version, reuse engineered features |
+| **Feature Store** | Local Parquet (FALLBACK) | Backup when Hopsworks unavailable |
+| **Model Registry** | **MLflow** | Track model versions, metrics, artifacts |
 
 ### Data Flow
 ```
-Open-Meteo API → collect_features.py → hourly_observations.parquet
+Open-Meteo API → collect_features.py → Hopsworks Feature Store (PRIMARY)
+                                            ↓ (fallback)
+                                    Local Parquet (backup)
                                             ↓
-                              train_model.py → MLflow Registry
+                              train_model.py → reads from Feature Store
+                                            ↓
+                              XGBoost Training → MLflow Model Registry
                                             ↓
                               API loads model → predictions
 ```
 
+### Why Hopsworks for Feature Store?
+- Centralized repository for engineered features
+- Version control for feature groups
+- Eliminates redundant work across experiments
+- Online/offline serving capability
+- Free tier available
+
+### Why MLflow for Model Registry?
+- Track every model version with metadata
+- Compare experiments (metrics, params)
+- Enable rollback to previous versions
+- Audit trails for compliance
+- Local or cloud deployment
+
 ### Storage Locations
-- **Hourly Features:** `data/processed/features/hourly_observations.parquet`
+- **Hopsworks Feature Store:** Cloud (primary)
+- **Local Parquet Backup:** `data/processed/features/hourly_observations.parquet`
 - **Collection Metadata:** `data/processed/features/collection_metadata.json`
 - **Health Log:** `data/collection_health.json`
 - **Historical Dataset:** `data/processed/train_features.csv` (4 years)
