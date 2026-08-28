@@ -1,116 +1,179 @@
-# Current State
+# AQI Predictor — Current State
 
-## AQI Predictor — Project Status
-
-**Last Updated:** 28 August 2026
-**Current Phase:** Production Complete — All Features Implemented
+**Last Updated:** 2026-08-29  
+**Status:** Production Ready — Auto-Retraining Enabled
 
 ---
 
-## 1. Completed Work
+## System Architecture
 
-| Phase | Status | Date |
-|---|---|---|
-| Phase 0 — Requirement Analysis | ✅ | 31 Jul 2026 |
-| Phase 1 — Repository Setup | ✅ | 1 Aug 2026 |
-| Phase 2 — Data Collection Architecture | ✅ | 2 Aug 2026 |
-| Phase 3 — Real API Integration | ✅ | 4 Aug 2026 |
-| Phase 4 — Feature Engineering | ✅ | 6 Aug 2026 |
-| Phase 5 — Historical Data Backfill | ✅ | 8 Aug 2026 |
-| Phase 6 — Feature Store | ✅ | 10 Aug 2026 |
-| Phase 7 — ML Experiments | ✅ | 12 Aug 2026 |
-| Phase 8 — Model Selection | ✅ | 14 Aug 2026 |
-| Phase 9 — Model Registry | ✅ | 15 Aug 2026 |
-| Phase 10 — CI/CD | ✅ | 16 Aug 2026 |
-| Phase 11 — Monitoring | ✅ | 17 Aug 2026 |
-| Phase 12 — FastAPI Backend | ✅ | 18 Aug 2026 |
-| Phase 13 — Streamlit Dashboard | ✅ | 19 Aug 2026 |
-| Phase 14 — Deployment | ✅ | 20 Aug 2026 |
-| Phase 15 — Documentation | ✅ | 21 Aug 2026 |
-| Phase 16 — Demo | ✅ | 21 Aug 2026 |
-| Phase 17 — Historical Dataset (Open-Meteo) | ✅ | 27 Aug 2026 |
-| Phase 18 — SHAP + Monitoring + History + Batch + Alerts | ✅ | 28 Aug 2026 |
-| Phase 19 — Confidence Intervals | ✅ | 28 Aug 2026 |
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    DATA COLLECTION (Hourly)                  │
+│  Open-Meteo Weather API + Air Quality API                   │
+│  → Feature Store (Local Parquet + Hopsworks)                │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                    MODEL TRAINING (Daily)                    │
+│  Feature Store → XGBoost Training → MLflow Registry         │
+│  → Local Pickle (fallback)                                  │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                    API + DASHBOARD                           │
+│  FastAPI (17 endpoints) → Streamlit (4 pages)               │
+│  Model loaded from MLflow or local pickle                   │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 2. Model Accuracy
+## Component Status
 
-| Horizon | MAE | RMSE | R² | 90% CI Width |
-|---|---|---|---|---|
-| **24h** | 19.22 | 28.36 | 0.6707 | ~76 |
-| **48h** | 21.87 | 31.58 | 0.5887 | ~76 |
-| **72h** | 22.87 | 32.57 | 0.5591 | ~76 |
-| **Overall** | **21.32** | **30.89** | **0.6065** | — |
-
-**Selected Model:** XGBoost (MultiOutputRegressor)
-**Confidence Intervals:** Residual quantile method (90% level)
-**Features:** 71
-**Training Data:** Open-Meteo historical (107,064 rows, 4 years, 3 cities)
+| Component | Status | Location |
+|-----------|--------|----------|
+| **Data Collection** | ✅ Active | `scripts/collect_features.py` |
+| **Feature Store** | ✅ Active | `src/feature_store/` (Local Parquet) |
+| **Model Training** | ✅ Active | `scripts/train_model.py` |
+| **MLflow Registry** | ✅ Active | Local MLflow tracking |
+| **FastAPI Backend** | ✅ Running | `app/backend/main.py` |
+| **Streamlit Dashboard** | ✅ Running | `app/frontend/streamlit_app.py` |
+| **CI/CD** | ✅ Active | `.github/workflows/` |
+| **Auto-Retraining** | ✅ Enabled | GitHub Actions (daily) |
 
 ---
 
-## 3. Complete API Endpoints
+## Automated Pipelines
+
+### Hourly Feature Collection
+- **Schedule:** Every hour via GitHub Actions
+- **Workflow:** `.github/workflows/feature-collection.yml`
+- **Script:** `scripts/collect_features.py`
+- **What it does:**
+  1. Fetches current weather + pollution from Open-Meteo
+  2. Engineers features (time, lags, rolling)
+  3. Calculates EPA AQI from PM2.5/PM10
+  4. Stores in local Parquet feature store
+  5. Deduplicates and persists
+
+### Daily Model Training
+- **Schedule:** Every day at 6 AM UTC via GitHub Actions
+- **Workflow:** `.github/workflows/daily-training.yml`
+- **Script:** `scripts/train_model.py`
+- **What it does:**
+  1. Reads features from feature store
+  2. Falls back to historical dataset if insufficient data
+  3. Trains XGBoost multi-output model
+  4. Evaluates on validation/test sets
+  5. Registers in MLflow if performance improved
+  6. Saves locally as pickle (API fallback)
+
+---
+
+## Model Performance
+
+| Metric | 24h | 48h | 72h | Overall |
+|--------|-----|-----|-----|---------|
+| **MAE** | 19.22 | 21.87 | 22.87 | 21.32 |
+| **RMSE** | 28.36 | 31.58 | 32.57 | 30.89 |
+| **R²** | 0.6707 | 0.5887 | 0.5591 | 0.6065 |
+
+---
+
+## API Endpoints (17 total)
 
 | Endpoint | Method | Description |
-|---|---|---|
-| `/health` | GET | Service health check |
-| `/prediction` | POST | AQI prediction with confidence intervals |
-| `/batch/predictions` | POST | Multi-city predictions (max 10) |
-| `/model-info` | GET | Model metadata |
-| `/data/historical` | GET | Historical time series |
-| `/data/statistics` | GET | City statistics |
-| `/explain/feature-importance` | GET | XGBoost importance |
-| `/explain/model-summary` | GET | Model overview |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/v1/predict/{city}` | GET | AQI prediction |
+| `/api/v1/model/info` | GET | Model metadata |
+| `/api/v1/model/feature-importance` | GET | XGBoost feature importance |
+| `/explain/shap-global` | GET | Global SHAP analysis |
 | `/explain/shap-explanation` | POST | Per-prediction SHAP |
-| `/explain/shap-global` | GET | Global SHAP importance |
-| `/monitoring/drift` | GET | Evidently drift detection |
+| `/monitoring/drift` | GET | Data drift detection |
 | `/monitoring/performance` | GET | Training metrics |
 | `/monitoring/alerts` | GET | AQI hazard alerts |
 | `/monitoring/system-health` | GET | System health |
 | `/history/predictions` | GET | Prediction history |
 | `/history/stats` | GET | Prediction statistics |
+| `/batch/predictions` | POST | Batch predictions |
+| `/api/v1/data/raw` | GET | Raw observations |
+| `/api/v1/data/processed` | GET | Processed features |
+| `/api/v1/data/cities` | GET | City statistics |
+| `/api/v1/data/collection-status` | GET | Collection status |
 
 ---
 
-## 4. Dashboard
+## Dashboard Pages (4)
 
-| Page | Features |
-|---|---|
-| **Dashboard** | AQI cards, forecast chart, confidence intervals, city selector |
-| **Analytics** | Historical trends, pollutant charts, city comparison |
-| **Explainability** | Feature Importance, Global SHAP, Per-Prediction SHAP |
-| **System** | Service Health, Drift Monitoring, Performance Metrics, AQI Alerts |
+1. **Dashboard** — Live AQI predictions with confidence intervals
+2. **Analytics** — Historical trends and city comparison
+3. **Model Explainability** — Feature importance, SHAP global, SHAP per-prediction
+4. **System** — Service health, monitoring, alerts
 
 ---
 
-## 5. Test Results
+## Test Results
 
 ```
-640 passed, 0 failed, 3 skipped
+648 passed, 3 skipped, 0 failed
 ```
 
 ---
 
-## 6. Deployment
+## Deployment
 
-| Component | Platform | Auto-Deploy |
-|---|---|---|
-| FastAPI Backend | Render | ✅ Yes (autoDeploy: true) |
-| Streamlit Dashboard | Streamlit Cloud | ✅ Yes (pulls from GitHub) |
+| Service | Platform | URL |
+|---------|----------|-----|
+| **Backend (API)** | Render | `https://aqi-predictor-api.onrender.com` |
+| **Dashboard** | Streamlit Cloud | `https://aqi-predictor-dashboard.streamlit.app` |
+
+Both services auto-deploy on git push to `main`.
 
 ---
 
-## 7. How to Run Locally
+## Feature Store Architecture
 
-```bash
-# Terminal 1: FastAPI
-conda activate aqi-predictor
-uvicorn app.backend.main:app --port 8000
-
-# Terminal 2: Streamlit
-conda activate aqi-predictor
-streamlit run app/frontend/streamlit_app.py --server.port 8501
+### Data Flow
+```
+Open-Meteo API → collect_features.py → hourly_observations.parquet
+                                            ↓
+                              train_model.py → MLflow Registry
+                                            ↓
+                              API loads model → predictions
 ```
 
-Open http://localhost:8501 in your browser.
+### Storage Locations
+- **Hourly Features:** `data/processed/features/hourly_observations.parquet`
+- **Collection Metadata:** `data/processed/features/collection_metadata.json`
+- **Health Log:** `data/collection_health.json`
+- **Historical Dataset:** `data/processed/train_features.csv` (4 years)
+- **Production Model:** `models/production/xgboost_model.pkl`
+- **Model Metadata:** `models/production/model_metadata.json`
+- **MLflow Registry:** `mlflow.db` (local)
+
+---
+
+## Key Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **XGBoost over LSTM** | Better accuracy (MAE=21.32), simpler deployment |
+| **Open-Meteo over OpenWeather** | Free, no API key, historical data available |
+| **US EPA PM NowCast AQI** | Standard methodology, PM2.5 + PM10 |
+| **Local MLflow** | No cloud costs, sufficient for single-model setup |
+| **Local Parquet** | Fast, no external dependencies for feature store |
+| **GitHub Actions** | Free tier, auto-deploy on push |
+
+---
+
+## Remaining Work (Optional Enhancements)
+
+| Item | Priority | Effort |
+|------|----------|--------|
+| Email/Slack AQI alerts | Low | Medium |
+| More cities (Delhi, Mumbai) | Low | Small |
+| Hopsworks cloud feature store | Low | Medium |
+| Confidence intervals refinement | Low | Small |
+| Mobile app | Low | Large |
