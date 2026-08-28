@@ -1,7 +1,7 @@
 {
   "model_version": "v20260828",
   "model_name": "Ridge Regression",
-  "training_date": "2026-08-28T22:43:59.987955+00:00",
+  "training_date": "2026-08-28T23:24:14.812084+00:00",
   "dataset_type": "real_api_data",
   "data_provider": "open-meteo",
   "feature_version": "2.0",
@@ -120,10 +120,10 @@
     "max_depth": 6,
     "learning_rate": 0.1
   },
-  "train_time": 0.1472017765045166,
+  "train_time": 0.17537212371826172,
   "train_rows": 45567,
   "val_rows": 5063,
   "test_rows": 12658,
   "n_features": 68,
-  "mlflow_run_id": "c83c927011b74002819511b78282c638"
+  "mlflow_run_id": "bcd766bbd3144769b856a36d4ff5cc02"
 }
