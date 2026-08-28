@@ -80,12 +80,12 @@ async def lifespan(app: FastAPI):
 
         logger.info("Services initialized successfully")
 
-        # Load production model from local file
+        # Load production model (MLflow Registry first, then local pickle)
         try:
-            model_service.load_local_model()
+            model_service.load_production_model_from_registry()
             logger.info("Production model loaded successfully")
         except Exception as e:
-            logger.warning(f"Could not load local model: {e}")
+            logger.warning(f"Could not load model: {e}")
             logger.info("API will start without model - health check only")
 
     except Exception as e:

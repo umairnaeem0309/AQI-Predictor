@@ -46,14 +46,47 @@ METADATA_DIR = PROJECT_ROOT / "models" / "metadata"
 
 
 def load_features():
-    """Load features from the local feature store or historical dataset."""
+    """Load features from the Feature Store.
+    
+    Priority:
+    1. Feature Store (Hopsworks or Local Parquet)
+    2. Historical dataset fallback (CSV files)
+    """
+    try:
+        from src.feature_store import get_feature_store
+        
+        store = get_feature_store()
+        logger.info(f"Connected to Feature Store: {store.__class__.__name__}")
+        
+        # Try to get features from the feature store
+        try:
+            df = store.get_features("aqi_features_prod", version=1)
+            if not df.empty:
+                logger.info(f"Loaded {len(df)} records from Feature Store")
+                return df
+        except Exception as e:
+            logger.warning(f"Could not load from feature store group: {e}")
+        
+        # Try test group
+        try:
+            df = store.get_features("aqi_features_test", version=1)
+            if not df.empty:
+                logger.info(f"Loaded {len(df)} records from Feature Store (test group)")
+                return df
+        except Exception as e:
+            logger.warning(f"Could not load from test feature group: {e}")
+            
+    except Exception as e:
+        logger.warning(f"Feature Store connection failed: {e}")
+    
+    # Fallback to local files
     features_file = FEATURES_DIR / "hourly_observations.parquet"
     historical_file = PROJECT_ROOT / "data" / "processed" / "train_features.csv"
     historical_targets = PROJECT_ROOT / "data" / "processed" / "train_targets.csv"
 
     if features_file.exists():
         df = pd.read_parquet(features_file)
-        logger.info(f"Loaded {len(df)} records from hourly feature store")
+        logger.info(f"Loaded {len(df)} records from local feature store (Parquet)")
 
         # Filter to training-valid only
         if "is_training_valid" in df.columns:
@@ -65,7 +98,7 @@ def load_features():
         return valid_df
 
     elif historical_file.exists():
-        logger.info("No hourly features found, loading from historical dataset")
+        logger.info("Loading from historical dataset (CSV fallback)")
         features_df = pd.read_csv(historical_file)
         targets_df = pd.read_csv(historical_targets)
 
