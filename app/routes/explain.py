@@ -215,24 +215,31 @@ async def get_shap_explanation(
         if not feature_names:
             raise HTTPException(status_code=500, detail="Feature names not found in metadata")
 
-        # Build feature vector in correct order
+        # Compute training means for filling missing features
+        import pandas as pd
+        train_means = {}
+        for candidate in [
+            os.path.join("data", "processed", "train_features.csv"),
+            os.path.join("data", "processed", "raw_observations.csv"),
+        ]:
+            if os.path.exists(candidate):
+                try:
+                    df_means = pd.read_csv(candidate, nrows=1000)
+                    train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
+                except Exception:
+                    pass
+                break
+
+        # Build feature vector in correct order, fill missing with training mean
         feature_values = []
-        missing_features = []
+        missing_count = 0
         for fname in feature_names:
             if fname in request.features:
                 feature_values.append(request.features[fname])
             else:
-                missing_features.append(fname)
-
-        if missing_features and len(missing_features) > len(feature_names) * 0.5:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Too many missing features: {len(missing_features)}/{len(feature_names)}",
-            )
-
-        # Pad missing with 0.0 (best effort)
-        while len(feature_values) < len(feature_names):
-            feature_values.append(0.0)
+                # Use training mean, fallback to 0
+                feature_values.append(float(train_means.get(fname, 0.0)))
+                missing_count += 1
 
         X = np.array([feature_values], dtype=np.float64)
 
@@ -333,8 +340,11 @@ async def get_global_shap_importance(
         if not feature_names:
             raise HTTPException(status_code=500, detail="Feature names not found in metadata")
 
-        # Load processed dataset for background sample
-        data_path = os.path.join("data", "processed", "raw_observations.csv")
+        # Load feature-engineered dataset for background sample
+        # Try train_features.csv first (has all 71 engineered features), fallback to raw
+        data_path = os.path.join("data", "processed", "train_features.csv")
+        if not os.path.exists(data_path):
+            data_path = os.path.join("data", "processed", "raw_observations.csv")
         if not os.path.exists(data_path):
             raise HTTPException(status_code=404, detail="Processed data not found for SHAP background sample")
 
