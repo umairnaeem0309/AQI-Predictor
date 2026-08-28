@@ -67,22 +67,25 @@
 
 ### Decision 1: Feature Store
 
-**Choice:** Local Parquet (primary) + Hopsworks (optional cloud)
+**Choice:** **Hopsworks (PRIMARY)** + Local Parquet (FALLBACK)
 
 **Rationale:**
-- Local Parquet: Zero cost, fast, sufficient for single-city prediction
-- Hopsworks: Available if cloud collaboration needed later
-- DuckDB: SQL queries on Parquet files
+- Hopsworks: Centralized repository, version control, online/offline serving
+- Eliminates redundant work across experiments
+- Free tier available for small projects
+- Local Parquet: Backup when Hopsworks unavailable
 
 ### Decision 2: Model Registry
 
-**Choice:** Local MLflow
+**Choice:** MLflow (Local)
 
 **Rationale:**
+- Track every model version with metadata, metrics, artifacts
+- Enable rollback, comparison, and audit trails
 - Free, no cloud costs
-- Tracks experiments, metrics, artifacts
-- Supports model versioning and promotion
 - Sufficient for single-model production
+
+**Note:** Hopsworks also offers a Model Registry via MLflow plugin, but we use standalone MLflow for simplicity.
 
 ### Decision 3: ML Model
 
@@ -242,16 +245,24 @@
 │                    DATA COLLECTION (Hourly)                  │
 │  Open-Meteo Weather + Air Quality APIs                      │
 │  → scripts/collect_features.py                              │
-│  → Feature Store (Local Parquet)                            │
+│  → Hopsworks Feature Store (PRIMARY)                        │
+│  → Local Parquet (FALLBACK)                                 │
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
 │                    MODEL TRAINING (Daily)                    │
 │  scripts/train_model.py                                     │
-│  → Reads from Feature Store                                 │
+│  → Reads from Hopsworks Feature Store                       │
 │  → Trains XGBoost (Multi-Output)                            │
-│  → Registers in MLflow                                      │
+│  → Registers in MLflow Model Registry                       │
 │  → Saves local pickle (fallback)                            │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                    MODEL REGISTRY (MLflow)                   │
+│  → Track versions, metrics, artifacts                       │
+│  → Enable rollback, comparison, audit trails                │
+│  → API loads production model                               │
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
@@ -262,6 +273,21 @@
 │  → SHAP explainability, drift monitoring, alerts            │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Pipeline Stages (from PPTX)
+
+| Stage | Implementation | Status |
+|-------|----------------|--------|
+| Business Problem | AQI prediction for 3 cities | ✅ |
+| Data Collection | Open-Meteo APIs + collect_features.py | ✅ |
+| EDA | Jupyter notebooks | ✅ |
+| Feature Engineering | 71 features (lags, rolling, time) | ✅ |
+| Feature Store | **Hopsworks (PRIMARY)** + Local Parquet | ✅ |
+| Model Training | XGBoost, Ridge, RF, LSTM | ✅ |
+| Evaluation | MAE, RMSE, R² | ✅ |
+| Model Registry | MLflow (track versions, rollback) | ✅ |
+| Deployment | Render + Streamlit Cloud | ✅ |
+| Monitoring | Evidently drift + alerts | ✅ |
 
 ---
 
