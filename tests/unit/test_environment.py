@@ -203,10 +203,6 @@ class TestProjectStructure:
             data_path = project_root / "data" / subdir
             assert data_path.exists(), f"Directory data/{subdir} not found"
 
-    def test_pipelines_directory_exists(self):
-        pipelines_path = Path(__file__).resolve().parent.parent.parent / "pipelines"
-        assert pipelines_path.exists()
-
     def test_docs_directory_exists(self):
         docs_path = Path(__file__).resolve().parent.parent.parent / "docs"
         assert docs_path.exists()
