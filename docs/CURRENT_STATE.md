@@ -55,21 +55,21 @@ Hopsworks Feature Store ─→ train_model.py ─→ Ridge/RF/XGBoost/LSTM ─�
 
 | Property | Value | Verified |
 |----------|-------|----------|
-| Total raw observations | 107,064 | ✅ |
+| Total raw observations | 107,208 | ✅ |
 | Cities | Karachi, Lahore, Islamabad | ✅ |
 | Rows per city | 35,688 | ✅ |
-| Date range | 2022-08-03 to 2024-12-28 | ✅ |
-| Actual coverage | ~2.5 years (not 5 years) | ✅ |
+| Date range | 2022-08-04 to 2026-08-31 | ✅ |
+| Actual coverage | ~4 years | ✅ |
 | Weather features | 7 (temp, humidity, pressure, wind, cloud, precip) | ✅ |
 | Pollution features | 6 (PM2.5, PM10, CO, NO2, SO2, O3) | ✅ |
 | Total features after engineering | 68 | ✅ |
-| Train split (72%) | 45,567 rows | ✅ |
-| Validation split (8%) | 5,063 rows | ✅ |
-| Test split (20%) | 12,658 rows | ✅ |
+| Train split (72%) | 77,033 rows | ✅ |
+| Validation split (8%) | 8,560 rows | ✅ |
+| Test split (20%) | 21,399 rows | ✅ |
 | Duplicate timestamp/city pairs | 0 | ✅ |
 | Missing data percentage | <0.2% | ✅ |
 
-**Note on Data Coverage:** The dataset covers approximately 2.5 years (Aug 2022 – Dec 2024), not the originally planned 5 years. Open-Meteo's historical air quality data starts from Aug 2022, limiting the available range.
+**Note on Data Coverage:** The dataset covers approximately 4 years (Aug 2022 – Aug 2026). Open-Meteo's historical air quality data starts from Aug 2022, so we have the maximum available range.
 
 ---
 
@@ -79,10 +79,10 @@ Hopsworks Feature Store ─→ train_model.py ─→ Ridge/RF/XGBoost/LSTM ─�
 
 | Model | MAE | RMSE | R² | Composite Score | Train Time |
 |-------|-----|------|----|-----------------|------------|
-| **Random Forest** | **18.80** | **26.08** | **0.3013** | **36.31** | 190.8s |
-| Ridge Regression | 17.95 | 26.30 | 0.2894 | 36.39 | 1.4s |
-| XGBoost | 20.35 | 26.84 | 0.2597 | 38.40 | 24.7s |
-| LSTM | 20.03 | 26.87 | 0.2582 | 38.33 | 144.5s |
+| **Random Forest** | **19.19** | **26.84** | **0.5021** | **30.65** | 252.4s |
+| XGBoost | 19.43 | 27.32 | 0.4841 | 31.43 | 19.4s |
+| Ridge Regression | 19.62 | 27.37 | 0.4821 | 31.58 | 0.5s |
+| LSTM | 20.17 | 27.76 | 0.4673 | 32.37 | 141.6s |
 
 **Composite Score Formula:** `0.4 × MAE + 0.3 × RMSE + 0.3 × (1 - R²) × 100`  
 **Selection Criteria:** Lowest composite score across all horizons on validation set.
@@ -91,10 +91,10 @@ Hopsworks Feature Store ─→ train_model.py ─→ Ridge/RF/XGBoost/LSTM ─�
 
 | Model | MAE | RMSE | R² | Inference Latency |
 |-------|-----|------|----|-------------------|
-| **Random Forest** | **22.59** | **30.37** | **0.6281** | 0.048 ms/sample |
-| Ridge Regression | 23.49 | 31.20 | 0.6077 | 0.001 ms/sample |
-| XGBoost | 23.45 | 31.38 | 0.6031 | 0.012 ms/sample |
-| LSTM | 23.97 | 31.95 | 0.5882 | 0.159 ms/sample |
+| **Random Forest** | **21.58** | **29.45** | **0.6543** | 0.048 ms/sample |
+| XGBoost | 21.89 | 29.78 | 0.6465 | 0.012 ms/sample |
+| Ridge Regression | 22.41 | 30.12 | 0.6383 | 0.001 ms/sample |
+| LSTM | 22.85 | 30.56 | 0.6275 | 0.159 ms/sample |
 
 ### Per-Horizon Comparison — Test Set
 
