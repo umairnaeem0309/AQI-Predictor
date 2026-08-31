@@ -2,7 +2,7 @@
   "model_version": "v20260831",
   "model_name": "XGBoost",
   "model_key": "xgboost",
-  "training_date": "2026-08-31T16:42:34.217560+00:00",
+  "training_date": "2026-08-31T17:05:53.749492+00:00",
   "data_source": "hopsworks_feature_store",
   "feature_columns": [
     "temperature",
@@ -78,7 +78,7 @@
       "test_mae": 21.836660385131836,
       "test_rmse": 30.6747254549781,
       "test_r2": 0.650912880897522,
-      "train_time": 0.30879640579223633
+      "train_time": 0.272902250289917
     },
     "random_forest": {
       "name": "Random Forest",
@@ -87,8 +87,8 @@
       "val_r2": 0.5022846546861502,
       "test_mae": 21.394137212372993,
       "test_rmse": 30.327424380770005,
-      "test_r2": 0.6587771926974241,
-      "train_time": 310.2033975124359
+      "test_r2": 0.658777192697424,
+      "train_time": 281.9019639492035
     },
     "xgboost": {
       "name": "XGBoost",
@@ -98,7 +98,17 @@
       "test_mae": 21.310380935668945,
       "test_rmse": 30.32801531890265,
       "test_r2": 0.65876305103302,
-      "train_time": 22.540839672088623
+      "train_time": 23.7399001121521
+    },
+    "lstm": {
+      "name": "LSTM",
+      "val_mae": 31.235076904296875,
+      "val_rmse": 38.06367217766091,
+      "val_r2": -0.0013658205280080438,
+      "test_mae": 39.576019287109375,
+      "test_rmse": 52.56555849083242,
+      "test_r2": -0.025233427062630653,
+      "train_time": 92.80594992637634
     }
   },
   "metrics": {
@@ -136,7 +146,7 @@
       "r2": 0.65876305103302
     }
   },
-  "train_time": 22.540839672088623,
+  "train_time": 23.7399001121521,
   "train_rows": 77086,
   "val_rows": 8565,
   "test_rows": 21413,
