@@ -24,6 +24,39 @@ router = APIRouter(prefix="/data", tags=["data"])
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "processed")
 
 
+def _load_dataset():
+    """Load dataset from Hopsworks (primary) or local CSV (fallback).
+
+    Returns DataFrame or None if no data available.
+    """
+    # Try Hopsworks first
+    try:
+        from src.feature_store import get_feature_store
+
+        store = get_feature_store()
+        for fg_name in ["aqi_features_prod", "aqi_features_test"]:
+            try:
+                df = store.get_features(fg_name, version=1)
+                if not df.empty:
+                    if "timestamp" in df.columns:
+                        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+                    return df
+            except Exception:
+                continue
+    except Exception as e:
+        logger.warning(f"Hopsworks read failed: {e}")
+
+    # Fallback to local CSV
+    csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+        if "timestamp" in df.columns:
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+        return df
+
+    return None
+
+
 @router.get(
     "/historical",
     summary="Get historical AQI data",
@@ -42,23 +75,31 @@ async def get_historical_data(
     Returns time series of AQI, weather, and pollutant data.
     """
     try:
-        # Load raw observations
-        csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
-        if not os.path.exists(csv_path):
+        # Load from Hopsworks (primary) or local CSV (fallback)
+        df = _load_dataset()
+        if df is None:
             return {
                 "city": city,
                 "count": 0,
                 "start": None,
                 "end": None,
                 "data": [],
-                "message": "Historical dataset not available in this deployment",
+                "message": "Historical dataset not available",
             }
-
-        df = pd.read_csv(csv_path)
 
         # Filter by city (location_id)
         city_lower = city.lower()
-        df = df[df["location_id"] == city_lower]
+        if "location_id" in df.columns:
+            df = df[df["location_id"] == city_lower]
+        else:
+            return {
+                "city": city,
+                "count": 0,
+                "start": None,
+                "end": None,
+                "data": [],
+                "message": "location_id column not found",
+            }
 
         if df.empty:
             raise HTTPException(status_code=404, detail=f"No data for city: {city}")
@@ -131,18 +172,27 @@ async def get_statistics(
 ):
     """Get summary statistics for a city."""
     try:
-        csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
-        if not os.path.exists(csv_path):
+        df = _load_dataset()
+        if df is None:
             return {
                 "city": city,
                 "total_rows": 0,
                 "date_range": {"start": None, "end": None},
                 "statistics": {},
-                "message": "Dataset not available in this deployment",
+                "message": "Dataset not available",
             }
 
-        df = pd.read_csv(csv_path)
-        df = df[df["location_id"] == city.lower()]
+        city_lower = city.lower()
+        if "location_id" in df.columns:
+            df = df[df["location_id"] == city_lower]
+        else:
+            return {
+                "city": city,
+                "total_rows": 0,
+                "date_range": {"start": None, "end": None},
+                "statistics": {},
+                "message": "location_id column not found",
+            }
 
         if df.empty:
             return {
@@ -199,14 +249,13 @@ async def compare_cities(
 ):
     """Compare AQI across all cities."""
     try:
-        csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
-        if not os.path.exists(csv_path):
+        df = _load_dataset()
+        if df is None:
             return {
                 "data": {"karachi": [], "lahore": [], "islamabad": []},
                 "message": "Dataset not available",
             }
 
-        df = pd.read_csv(csv_path)
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
 
         if start_date:

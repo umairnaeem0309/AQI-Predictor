@@ -65,22 +65,26 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 ## Verified Model Performance
 
-*All results verified on full dataset (2026-08-29).*
+*All results verified on full dataset (2026-08-31).*
 
-### Model Comparison (Test Set)
+### Model Comparison — Overall (Test Set)
 
-| Model | MAE | RMSE | R² | Train Time |
-|-------|-----|------|----|------------|
-| **Ridge Regression** | **23.49** | **31.20** | **0.6077** | 0.2s |
-| XGBoost | 21.21 | 30.74 | 0.6099 | 13.2s |
+| Model | MAE | RMSE | R² | Inference Latency |
+|-------|-----|------|----|-------------------|
+| **Random Forest** | **22.59** | **30.37** | **0.6281** | 0.048 ms/sample |
+| Ridge Regression | 23.49 | 31.20 | 0.6077 | 0.001 ms/sample |
+| XGBoost | 23.45 | 31.38 | 0.6031 | 0.012 ms/sample |
+| LSTM | 23.97 | 31.95 | 0.5882 | 0.159 ms/sample |
 
-### Per-Horizon (XGBoost)
+### Per-Horizon Breakdown (Test Set)
 
-| Horizon | MAE | R² |
-|---------|-----|----|
-| 24h | 19.12 | 0.67 |
-| 48h | 21.60 | 0.60 |
-| 72h | 22.91 | 0.56 |
+| Horizon | Best Model | MAE | RMSE | R² |
+|---------|------------|-----|------|----|
+| 24h | Random Forest | 19.39 | 26.93 | 0.7016 |
+| 48h | Random Forest | 23.36 | 30.83 | 0.6135 |
+| 72h | Random Forest | 25.00 | 33.03 | 0.5692 |
+
+**Selected Model:** Random Forest (composite score: 0.4×MAE + 0.3×RMSE + 0.3×(1-R²)×100)
 
 ---
 
