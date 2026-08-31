@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Daily Training Pipeline.
+Daily Training Pipeline — Hopsworks Feature Store Edition.
 
-Reads features from the feature store, trains XGBoost,
-evaluates performance, and registers in MLflow if improved.
+Reads features+targets from Hopsworks Feature View, trains Ridge,
+Random Forest, XGBoost, and LSTM, evaluates performance, and
+registers the best model in Hopsworks Model Registry.
 
-Designed to run daily via GitHub Actions or cron.
+NO local CSV files are used. All data comes from Hopsworks.
 
 Usage:
     python scripts/train_model.py
@@ -25,7 +26,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -40,178 +40,186 @@ logging.basicConfig(
 logger = logging.getLogger("train_model")
 
 # Paths
-FEATURES_DIR = PROJECT_ROOT / "data" / "processed" / "features"
 MODELS_DIR = PROJECT_ROOT / "models" / "production"
 METADATA_DIR = PROJECT_ROOT / "models" / "metadata"
 
 
-def load_features():
-    """Load features from the Feature Store.
+# =============================================================================
+# DATA LOADING — Hopsworks Feature View (PRIMARY)
+# =============================================================================
 
-    Priority:
-    1. Hopsworks Feature Store (PRIMARY - cloud)
-    2. Local Parquet (FALLBACK - backup)
-    3. Historical dataset (CSV - last resort)
+
+def load_training_data_from_hopsworks():
+    """Load training data from Hopsworks Feature View.
+
+    This is the SINGLE data loading path. No local CSV fallback.
+
+    Returns:
+        DataFrame with features + targets from Hopsworks.
     """
-    # 1. Try Hopsworks first (PRIMARY)
-    try:
-        from src.feature_store import get_feature_store
+    import hopsworks
 
-        store = get_feature_store()
-        logger.info(f"Feature Store: {store.__class__.__name__}")
+    host = os.environ.get("HOPSWORKS_HOST")
+    api_key = os.environ.get("HOPSWORKS_API_KEY")
+    project_name = os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
 
-        # Try production feature group
-        try:
-            df = store.get_features("aqi_features_prod", version=1)
-            if not df.empty:
-                logger.info(f"✅ Loaded {len(df)} records from Hopsworks Feature Store")
-                return df
-        except Exception as e:
-            logger.warning(f"Could not load from prod feature group: {e}")
-
-        # Try test feature group
-        try:
-            df = store.get_features("aqi_features_test", version=1)
-            if not df.empty:
-                logger.info(f"✅ Loaded {len(df)} records from Hopsworks (test group)")
-                return df
-        except Exception as e:
-            logger.warning(f"Could not load from test feature group: {e}")
-
-    except Exception as e:
-        logger.warning(f"Hopsworks connection failed: {e}")
-
-    # 2. Fallback to local Parquet
-    features_file = FEATURES_DIR / "hourly_observations.parquet"
-    if features_file.exists():
-        df = pd.read_parquet(features_file)
-        logger.info(f"✅ Loaded {len(df)} records from local Parquet (fallback)")
-
-        if "is_training_valid" in df.columns:
-            valid_df = df[df["is_training_valid"] == True].copy()
-            logger.info(f"Training-valid records: {len(valid_df)}")
-        else:
-            valid_df = df.copy()
-
-        return valid_df
-
-    # 3. Last resort: historical CSV
-    historical_file = PROJECT_ROOT / "data" / "processed" / "train_features.csv"
-    historical_targets = PROJECT_ROOT / "data" / "processed" / "train_targets.csv"
-
-    if historical_file.exists():
-        logger.info("Loading from historical dataset (CSV last resort)")
-        features_df = pd.read_csv(historical_file)
-        targets_df = pd.read_csv(historical_targets)
-
-        df = pd.merge(features_df, targets_df, on=["timestamp", "location_id"], how="inner")
-
-        target_cols = ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]
-        before_drop = len(df)
-        df = df.dropna(subset=target_cols)
-        logger.info(
-            f"✅ Loaded {len(df)} records from historical CSV (dropped {before_drop - len(df)} with NaN targets)"
+    if not host or not api_key:
+        raise RuntimeError(
+            "HOPSWORKS_HOST and HOPSWORKS_API_KEY must be set. "
+            "Run ingest_to_hopsworks.py first to populate the feature store."
         )
 
-        df["_targets_precomputed"] = True
-
-        return df
-
-    else:
-        raise FileNotFoundError(
-            f"No features found. Run collect_features.py first, "
-            f"or ensure historical data exists at {historical_file}"
-        )
-
-
-def prepare_training_data(df):
-    """
-    Prepare features and targets for training.
-
-    Uses the same feature engineering as the original pipeline.
-    """
-    from src.features.feature_engineering import (
-        add_lag_features,
-        add_rolling_features,
-        add_time_features,
+    # Connect to Hopsworks
+    project = hopsworks.login(
+        host=host,
+        api_key_value=api_key,
+        project=project_name,
     )
-    from src.utils.epa_aqi import calculate_pm10_aqi, calculate_pm25_aqi
+    fs = project.get_feature_store()
 
-    # Ensure timestamp is datetime
-    if df["timestamp"].dtype == "object":
-        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-    elif not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
-        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    # Get the feature group (features + targets stored together)
+    fg = fs.get_feature_group(name="aqi_features_prod", version=1)
 
-    # Sort by timestamp only for proper chronological split
-    df = df.sort_values("timestamp").reset_index(drop=True)
+    # Read ALL data from the feature group
+    df = fg.read()
 
-    # Add time features
-    df = add_time_features(df)
-
-    # Calculate AQI if not present
-    if "aqi" not in df.columns or df["aqi"].isna().all():
-        df["pm25_aqi"] = df["pm25"].apply(lambda x: calculate_pm25_aqi(x) if pd.notna(x) else None)
-        df["pm10_aqi"] = df["pm10"].apply(lambda x: calculate_pm10_aqi(x) if pd.notna(x) else None)
-        df["aqi"] = df[["pm25_aqi", "pm10_aqi"]].max(axis=1)
-
-    # Add lag features
-    df = add_lag_features(df)
-
-    # Add rolling features
-    df = add_rolling_features(df)
-
-    # Add AQI-specific lags
-    for lag in [1, 6, 12, 24, 48, 72]:
-        df[f"aqi_lag_{lag}h"] = df.groupby("location_id")["aqi"].shift(lag)
-
-    # Add PM lags
-    for lag in [1, 24]:
-        df[f"pm25_lag_{lag}h"] = df.groupby("location_id")["pm25"].shift(lag)
-
-    # Create targets only if not already present
-    if "_targets_precomputed" in df.columns and df["_targets_precomputed"].all():
-        logger.info("Targets already pre-computed, skipping target generation")
-        df = df.drop(columns=["_targets_precomputed"])
-    else:
-        for horizon, col_name in [
-            (24, "target_aqi_24h"),
-            (48, "target_aqi_48h"),
-            (72, "target_aqi_72h"),
-        ]:
-            df[col_name] = df.groupby("location_id")["aqi"].shift(-horizon)
-
-        # Drop rows with NaN targets
-        target_cols = ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]
-        before_drop = len(df)
-        df = df.dropna(subset=target_cols)
-        logger.info(
-            f"Dropped {before_drop - len(df)} rows with missing targets, {len(df)} remaining"
-        )
+    logger.info(f"✅ Loaded {len(df)} rows from Hopsworks Feature Store")
+    logger.info(f"   Columns: {len(df.columns)}")
+    logger.info(f"   Cities: {df['location_id'].nunique()}")
+    logger.info(f"   Date range: {df['timestamp'].min()} to {df['timestamp'].max()}")
 
     return df
 
 
-def prepare_data(df, feature_columns):
-    """Prepare train/val/test splits."""
-    X = df[feature_columns].values
-    y = df[["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]].values
-    X = np.nan_to_num(X, nan=0.0)
+def load_training_data_from_feature_view():
+    """Load training data using Hopsworks Feature View with train_test_split.
 
-    # Chronological split
-    split_idx = int(len(X) * 0.8)
-    X_train, X_test = X[:split_idx], X[split_idx:]
-    y_train, y_test = y[:split_idx], y[split_idx:]
+    This uses the Feature View's built-in train/test split to ensure
+    reproducible, consistent splits across training runs.
 
-    val_split = int(len(X_train) * 0.9)
-    X_train_final, X_val = X_train[:val_split], X_train[val_split:]
-    y_train_final, y_val = y_train[:val_split], y_train[val_split:]
+    Returns:
+        Tuple of (X_train, X_val, X_test, y_train, y_val, y_test, feature_names)
+    """
+    import hopsworks
 
-    return X_train_final, X_val, X_test, y_train_final, y_val, y_test
+    host = os.environ.get("HOPSWORKS_HOST")
+    api_key = os.environ.get("HOPSWORKS_API_KEY")
+    project_name = os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
+
+    project = hopsworks.login(
+        host=host,
+        api_key_value=api_key,
+        project=project_name,
+    )
+    fs = project.get_feature_store()
+
+    # Try to get the Feature View
+    try:
+        fv = fs.get_feature_view(name="aqi_feature_view", version=1)
+        logger.info("Using Hopsworks Feature View: aqi_feature_view v1")
+    except Exception:
+        logger.warning(
+            "Feature view not found. Falling back to feature group read. "
+            "Run ingest_to_hopsworks.py first."
+        )
+        return None
+
+    # Get training data from Feature View
+    # This returns features + labels combined
+    training_data = fv.get_training_data(description="AQI prediction training data")
+
+    if training_data is None or training_data.empty:
+        logger.warning("Feature view returned empty data")
+        return None
+
+    logger.info(f"✅ Loaded {len(training_data)} rows from Feature View")
+
+    return training_data
+
+
+def prepare_data_from_dataframe(df):
+    """Prepare features and targets from a Hopsworks DataFrame.
+
+    Separates features from targets, handles NaN, and creates
+    chronological train/val/test splits.
+
+    Returns:
+        Tuple of (X_train, X_val, X_test, y_train, y_val, y_test, feature_names)
+    """
+    # Target columns
+    target_cols = ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]
+
+    # Verify targets exist
+    missing_targets = [c for c in target_cols if c not in df.columns]
+    if missing_targets:
+        raise ValueError(f"Missing target columns: {missing_targets}")
+
+    # Drop rows with NaN targets
+    before_drop = len(df)
+    df = df.dropna(subset=target_cols)
+    dropped = before_drop - len(df)
+    if dropped > 0:
+        logger.info(f"Dropped {dropped} rows with NaN targets, {len(df)} remaining")
+
+    # Sort by timestamp for chronological split
+    if "timestamp" in df.columns:
+        df = df.sort_values("timestamp").reset_index(drop=True)
+
+    # Feature columns: everything except targets and metadata
+    exclude_cols = set(
+        target_cols
+        + [
+            "timestamp",
+            "location_id",
+            "city_name",
+            "data_source",
+            "collected_at",
+            "is_training_valid",
+            "us_aqi",
+            "us_aqi_pm25",
+            "us_aqi_pm10",
+            "pm25_aqi",
+            "pm10_aqi",
+            "provider",
+            "weather_available",
+            "aqi_available",
+        ]
+    )
+    # Also exclude string/object columns
+    string_cols = df.select_dtypes(include=["object"]).columns.tolist()
+    exclude_cols = exclude_cols.union(set(string_cols))
+
+    feature_names = [c for c in df.columns if c not in exclude_cols]
+    logger.info(f"Using {len(feature_names)} features")
+
+    # Extract arrays
+    X = df[feature_names].values.astype(np.float32)
+    y = df[target_cols].values.astype(np.float32)
+
+    # Replace NaN/inf with 0
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Chronological split: 72% train, 8% val, 20% test
+    n = len(X)
+    train_end = int(n * 0.72)
+    val_end = int(n * 0.80)
+
+    X_train, y_train = X[:train_end], y[:train_end]
+    X_val, y_val = X[train_end:val_end], y[train_end:val_end]
+    X_test, y_test = X[val_end:], y[val_end:]
+
+    logger.info(f"Split: Train={len(X_train)}, Val={len(X_val)}, Test={len(X_test)}")
+
+    return X_train, X_val, X_test, y_train, y_val, y_test, feature_names
+
+
+# =============================================================================
+# MODEL TRAINING
+# =============================================================================
 
 
 def evaluate_model(model, X_val, y_val, X_test, y_test):
-    """Evaluate model and return metrics."""
+    """Evaluate model and return metrics for all horizons."""
     from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
     y_val_pred = model.predict(X_val)
@@ -240,36 +248,48 @@ def evaluate_model(model, X_val, y_val, X_test, y_test):
         )
         test_metrics[f"r2_{h}"] = float(r2_score(y_test[:, i], y_test_pred[:, i]))
 
-    return val_metrics, test_metrics, y_test_pred
+    return val_metrics, test_metrics
 
 
-def train_all_models(df, feature_columns):
-    """Train ALL models, evaluate, and select the best.
+def compute_composite_score(metrics):
+    """Compute composite score: 0.4*MAE + 0.3*RMSE + 0.3*(1-R²)*100.
 
-    Experiments with:
-    - Ridge Regression (Scikit-learn)
-    - Random Forest (Scikit-learn)
-    - XGBoost (Gradient Boosting)
-    - LSTM (Deep Learning)
+    Lower is better.
+    """
+    horizon_names = ["24h", "48h", "72h"]
+    mae_scores = [metrics.get(f"mae_{h}", metrics["mae"]) for h in horizon_names]
+    rmse_scores = [metrics.get(f"rmse_{h}", metrics["rmse"]) for h in horizon_names]
+    r2_scores = [metrics.get(f"r2_{h}", metrics["r2"]) for h in horizon_names]
 
-    Returns the best model based on validation MAE.
+    avg_mae = np.mean(mae_scores)
+    avg_rmse = np.mean(rmse_scores)
+    avg_r2 = np.mean(r2_scores)
+
+    return 0.4 * avg_mae + 0.3 * avg_rmse + 0.3 * (1 - avg_r2) * 100
+
+
+def train_all_models(X_train, X_val, X_test, y_train, y_val, y_test, feature_names):
+    """Train all 4 models and return comparison results.
+
+    Models:
+    - Ridge Regression
+    - Random Forest
+    - XGBoost
+    - LSTM (PyTorch)
     """
     from sklearn.ensemble import RandomForestRegressor
     from sklearn.linear_model import Ridge
     from sklearn.multioutput import MultiOutputRegressor
 
-    X_train, X_val, X_test, y_train, y_val, y_test = prepare_data(df, feature_columns)
-    logger.info(f"Train: {len(X_train)}, Val: {len(X_val)}, Test: {len(X_test)}")
-
     results = {}
 
-    # --- Model 1: Ridge Regression ---
+    # ── Model 1: Ridge Regression ────────────────────────────────────────
     logger.info("Training Ridge Regression...")
     start = time.time()
     ridge = MultiOutputRegressor(Ridge(alpha=1.0))
     ridge.fit(X_train, y_train)
     ridge_time = time.time() - start
-    ridge_val, ridge_test, ridge_pred = evaluate_model(ridge, X_val, y_val, X_test, y_test)
+    ridge_val, ridge_test = evaluate_model(ridge, X_val, y_val, X_test, y_test)
     results["ridge"] = {
         "model": ridge,
         "name": "Ridge Regression",
@@ -278,18 +298,21 @@ def train_all_models(df, feature_columns):
         "test_metrics": ridge_test,
     }
     logger.info(
-        f"  Ridge: MAE={ridge_val['mae']:.2f}, R²={ridge_val['r2']:.4f} ({ridge_time:.1f}s)"
+        f"  Ridge: Val MAE={ridge_val['mae']:.2f}, Test MAE={ridge_test['mae']:.2f} "
+        f"({ridge_time:.1f}s)"
     )
 
-    # --- Model 2: Random Forest ---
+    # ── Model 2: Random Forest ───────────────────────────────────────────
     logger.info("Training Random Forest...")
     start = time.time()
     rf = MultiOutputRegressor(
-        RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42, n_jobs=-1)
+        RandomForestRegressor(
+            n_estimators=100, max_depth=12, min_samples_leaf=5, random_state=42, n_jobs=-1
+        )
     )
     rf.fit(X_train, y_train)
     rf_time = time.time() - start
-    rf_val, rf_test, rf_pred = evaluate_model(rf, X_val, y_val, X_test, y_test)
+    rf_val, rf_test = evaluate_model(rf, X_val, y_val, X_test, y_test)
     results["random_forest"] = {
         "model": rf,
         "name": "Random Forest",
@@ -297,9 +320,11 @@ def train_all_models(df, feature_columns):
         "val_metrics": rf_val,
         "test_metrics": rf_test,
     }
-    logger.info(f"  RF:     MAE={rf_val['mae']:.2f}, R²={rf_val['r2']:.4f} ({rf_time:.1f}s)")
+    logger.info(
+        f"  RF:     Val MAE={rf_val['mae']:.2f}, Test MAE={rf_test['mae']:.2f} " f"({rf_time:.1f}s)"
+    )
 
-    # --- Model 3: XGBoost ---
+    # ── Model 3: XGBoost ─────────────────────────────────────────────────
     logger.info("Training XGBoost...")
     start = time.time()
     import xgboost as xg
@@ -317,7 +342,7 @@ def train_all_models(df, feature_columns):
     )
     xgb.fit(X_train, y_train)
     xgb_time = time.time() - start
-    xgb_val, xgb_test, xgb_pred = evaluate_model(xgb, X_val, y_val, X_test, y_test)
+    xgb_val, xgb_test = evaluate_model(xgb, X_val, y_val, X_test, y_test)
     results["xgboost"] = {
         "model": xgb,
         "name": "XGBoost",
@@ -325,58 +350,90 @@ def train_all_models(df, feature_columns):
         "val_metrics": xgb_val,
         "test_metrics": xgb_test,
     }
-    logger.info(f"  XGB:    MAE={xgb_val['mae']:.2f}, R²={xgb_val['r2']:.4f} ({xgb_time:.1f}s)")
+    logger.info(
+        f"  XGB:    Val MAE={xgb_val['mae']:.2f}, Test MAE={xgb_test['mae']:.2f} "
+        f"({xgb_time:.1f}s)"
+    )
 
-    # --- Model 4: LSTM ---
+    # ── Model 4: LSTM (PyTorch) ──────────────────────────────────────────
     logger.info("Training LSTM...")
     start = time.time()
     try:
-        import tensorflow as tf
-        from tensorflow.keras.callbacks import EarlyStopping
-        from tensorflow.keras.layers import LSTM, Dense, Dropout
-        from tensorflow.keras.models import Sequential
+        import torch
+        import torch.nn as nn
+        from torch.utils.data import DataLoader, TensorDataset
 
-        # Reshape for LSTM: [samples, timesteps, features]
-        X_train_lstm = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
-        X_val_lstm = X_val.reshape((X_val.shape[0], 1, X_val.shape[1]))
-        X_test_lstm = X_test.reshape((X_test.shape[0], 1, X_test.shape[1]))
+        class LSTMModel(nn.Module):
+            def __init__(self, input_size, hidden_size=64, num_layers=2, output_size=3):
+                super().__init__()
+                self.lstm = nn.LSTM(
+                    input_size, hidden_size, num_layers, batch_first=True, dropout=0.2
+                )
+                self.fc = nn.Linear(hidden_size, output_size)
 
-        lstm_model = Sequential(
-            [
-                LSTM(64, input_shape=(1, X_train.shape[1]), return_sequences=True),
-                Dropout(0.2),
-                LSTM(32),
-                Dropout(0.2),
-                Dense(16, activation="relu"),
-                Dense(3),  # 3 targets: 24h, 48h, 72h
-            ]
-        )
-        lstm_model.compile(optimizer="adam", loss="mse", metrics=["mae"])
+            def forward(self, x):
+                x = x.unsqueeze(1)
+                out, _ = self.lstm(x)
+                return self.fc(out[:, -1, :])
 
-        early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
-        lstm_model.fit(
-            X_train_lstm,
-            y_train,
-            validation_data=(X_val_lstm, y_val),
-            epochs=50,
-            batch_size=32,
-            callbacks=[early_stop],
-            verbose=0,
-        )
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Wrap for evaluate_model compatibility
-        class LSTMWrapper:
-            def __init__(self, model):
+        lstm_model = LSTMModel(X_train.shape[1]).to(device)
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.Adam(lstm_model.parameters(), lr=0.001)
+
+        X_train_t = torch.FloatTensor(X_train).to(device)
+        y_train_t = torch.FloatTensor(y_train).to(device)
+        X_val_t = torch.FloatTensor(X_val).to(device)
+        y_val_t = torch.FloatTensor(y_val).to(device)
+        X_test_t = torch.FloatTensor(X_test).to(device)
+
+        train_dataset = TensorDataset(X_train_t, y_train_t)
+        train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True)
+
+        best_val_loss = float("inf")
+        patience_counter = 0
+
+        for epoch in range(50):
+            lstm_model.train()
+            for batch_X, batch_y in train_loader:
+                optimizer.zero_grad()
+                pred = lstm_model(batch_X)
+                loss = criterion(pred, batch_y)
+                loss.backward()
+                optimizer.step()
+
+            # Early stopping
+            lstm_model.eval()
+            with torch.no_grad():
+                val_pred = lstm_model(X_val_t)
+                val_loss = criterion(val_pred, y_val_t)
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    patience_counter = 0
+                    best_state = {k: v.clone() for k, v in lstm_model.state_dict().items()}
+                else:
+                    patience_counter += 1
+                if patience_counter >= 5:
+                    break
+
+        # Restore best weights
+        lstm_model.load_state_dict(best_state)
+
+        class LSTMPredictor:
+            def __init__(self, model, device):
                 self.model = model
+                self.device = device
 
             def predict(self, X):
-                if X.ndim == 2:
-                    X = X.reshape((X.shape[0], 1, X.shape[1]))
-                return self.model.predict(X, verbose=0)
+                self.model.eval()
+                with torch.no_grad():
+                    X_t = torch.FloatTensor(X).to(self.device)
+                    return self.model(X_t).cpu().numpy()
 
-        lstm_wrapped = LSTMWrapper(lstm_model)
+        lstm_wrapped = LSTMPredictor(lstm_model, device)
         lstm_time = time.time() - start
-        lstm_val, lstm_test, lstm_pred = evaluate_model(lstm_wrapped, X_val, y_val, X_test, y_test)
+        lstm_val, lstm_test = evaluate_model(lstm_wrapped, X_val, y_val, X_test, y_test)
         results["lstm"] = {
             "model": lstm_wrapped,
             "name": "LSTM",
@@ -384,75 +441,35 @@ def train_all_models(df, feature_columns):
             "val_metrics": lstm_val,
             "test_metrics": lstm_test,
             "raw_model": lstm_model,
+            "device": str(device),
         }
         logger.info(
-            f"  LSTM:   MAE={lstm_val['mae']:.2f}, R²={lstm_val['r2']:.4f} ({lstm_time:.1f}s)"
+            f"  LSTM:   Val MAE={lstm_val['mae']:.2f}, Test MAE={lstm_test['mae']:.2f} "
+            f"({lstm_time:.1f}s, {device})"
         )
+
     except ImportError:
-        logger.warning("TensorFlow not installed — skipping LSTM")
+        logger.warning("PyTorch not installed — skipping LSTM")
     except Exception as e:
         logger.warning(f"LSTM training failed: {e}")
 
-    # --- Select Best Model (composite score) ---
-    # Score = weighted combination of MAE, RMSE, R2 across all horizons
-    # Lower is better for MAE/RMSE, higher is better for R2
-    # Normalize: MAE and RMSE are already 'lower=better'
-    # R2: convert to (1 - R2) so lower is better
-    # Weights: MAE 40%, RMSE 30%, R2 30%
-    horizon_names = ["24h", "48h", "72h"]
-
-    def compute_composite_score(metrics):
-        """Compute a composite score from validation metrics.
-        Lower is better."""
-        mae_scores = [metrics.get(f"mae_{h}", metrics["mae"]) for h in horizon_names]
-        rmse_scores = [metrics.get(f"rmse_{h}", metrics["rmse"]) for h in horizon_names]
-        r2_scores = [metrics.get(f"r2_{h}", metrics["r2"]) for h in horizon_names]
-
-        avg_mae = np.mean(mae_scores)
-        avg_rmse = np.mean(rmse_scores)
-        avg_r2 = np.mean(r2_scores)
-
-        # Normalize to [0, 1] range using min-max across models
-        # For now, use raw weighted sum (models are on same scale)
-        score = 0.4 * avg_mae + 0.3 * avg_rmse + 0.3 * (1 - avg_r2) * 100
-        return score
-
+    # ── Select Best Model (composite score on test set) ───────────────────
     composite_scores = {}
-    test_scores = {}
     for k, v in results.items():
-        val_score = compute_composite_score(v["val_metrics"])
         test_score = compute_composite_score(v["test_metrics"])
-        composite_scores[k] = val_score
-        test_scores[k] = test_score
+        composite_scores[k] = test_score
         logger.info(
-            f"  {v['name']}: val_composite={val_score:.2f} test_composite={test_score:.2f} "
-            f"(Val MAE={v['val_metrics']['mae']:.2f}, Test MAE={v['test_metrics']['mae']:.2f}, "
-            f"Test R2={v['test_metrics']['r2']:.4f})"
+            f"  {v['name']}: composite={test_score:.2f} "
+            f"(MAE={v['test_metrics']['mae']:.2f}, R²={v['test_metrics']['r2']:.4f})"
         )
 
-    # Select best model: prefer test performance (what matters for production)
-    # Use test MAE as primary metric (lower is better)
-    best_key = min(test_scores, key=test_scores.get)
+    best_key = min(composite_scores, key=composite_scores.get)
     best = results[best_key]
-    logger.info(
-        f"\n🏆 BEST MODEL: {best['name']} (composite={composite_scores[best_key]:.2f})"
-    )
-    logger.info(
-        f"   Val MAE={best['val_metrics']['mae']:.2f}, "
-        f"RMSE={best['val_metrics']['rmse']:.2f}, R2={best['val_metrics']['r2']:.4f}"
-    )
+    logger.info(f"\n🏆 BEST MODEL: {best['name']} (composite={composite_scores[best_key]:.2f})")
 
     # Compute residuals for confidence intervals
-    best_pred = best["val_metrics"].get("_predictions")
-    y_test_pred = results[best_key]["test_metrics"]  # Already computed
-
-    # Residuals from test set
-    if best_key in ["ridge", "random_forest", "xgboost"]:
-        y_test_pred_arr = best["model"].predict(X_test)
-    else:
-        y_test_pred_arr = best["model"].predict(X_test)
-
-    residuals = y_test - y_test_pred_arr
+    y_test_pred = best["model"].predict(X_test)
+    residuals = y_test - y_test_pred
     residual_stats = {
         "mean": residuals.mean(axis=0).tolist(),
         "std": residuals.std(axis=0).tolist(),
@@ -462,14 +479,15 @@ def train_all_models(df, feature_columns):
 
     # Print comparison table
     logger.info("\n" + "=" * 70)
-    logger.info("MODEL COMPARISON")
+    logger.info("MODEL COMPARISON (Test Set)")
     logger.info("=" * 70)
-    logger.info(f"{'Model':<20} {'MAE':>8} {'RMSE':>8} {'R²':>8} {'Time':>8}")
+    logger.info(f"{'Model':<20} {'MAE':>8} {'RMSE':>8} {'R²':>8} {'Composite':>10} {'Time':>8}")
     logger.info("-" * 70)
-    for key, r in sorted(results.items(), key=lambda x: x[1]["val_metrics"]["mae"]):
-        m = r["val_metrics"]
+    for key, r in sorted(results.items(), key=lambda x: composite_scores[x[0]]):
+        m = r["test_metrics"]
         logger.info(
-            f"{r['name']:<20} {m['mae']:>8.2f} {m['rmse']:>8.2f} {m['r2']:>8.4f} {r['train_time']:>7.1f}s"
+            f"{r['name']:<20} {m['mae']:>8.2f} {m['rmse']:>8.2f} "
+            f"{m['r2']:>8.4f} {composite_scores[key]:>10.2f} {r['train_time']:>7.1f}s"
         )
     logger.info("=" * 70)
 
@@ -490,119 +508,102 @@ def train_all_models(df, feature_columns):
         "val_metrics": best["val_metrics"],
         "test_metrics": best["test_metrics"],
         "residual_stats": residual_stats,
-        "feature_columns": feature_columns,
+        "feature_columns": feature_names,
         "train_rows": len(X_train),
         "val_rows": len(X_val),
         "test_rows": len(X_test),
     }
 
 
-def register_in_hopsworks(result, force=False, min_improvement=0.0):
-    """
-    Register model in Hopsworks Model Registry if performance improved.
+# =============================================================================
+# MODEL REGISTRY — Hopsworks
+# =============================================================================
 
-    Returns:
-        (registered) tuple
-    """
+
+def register_in_hopsworks(result, force=False, min_improvement=0.0):
+    """Register model in Hopsworks Model Registry if improved."""
     try:
         from src.models.hopsworks_registry import get_model_registry
     except ImportError:
-        logger.warning("Hopsworks registry not available, skipping registration")
+        logger.warning("Hopsworks registry not available")
         return False
 
     registry = get_model_registry()
 
-    # Check if we should register
     should_register = force
 
     if not should_register:
-        # Load previous best metrics
         best_metrics_file = METADATA_DIR / "best_metrics.json"
         if best_metrics_file.exists():
             with open(best_metrics_file) as f:
                 prev = json.load(f)
-
             prev_mae = prev.get("mae", float("inf"))
             curr_mae = result["val_metrics"]["mae"]
-
             improvement = (prev_mae - curr_mae) / prev_mae
-            logger.info(
-                f"Previous MAE: {prev_mae:.2f}, Current: {curr_mae:.2f}, Improvement: {improvement:.4f}"
-            )
 
             if improvement > min_improvement:
                 should_register = True
                 logger.info(f"Model improved by {improvement:.2%}, registering...")
             else:
-                logger.info(
-                    f"Model did not improve enough (need >{min_improvement:.2%}), skipping registration"
-                )
+                logger.info(f"No improvement (need >{min_improvement:.2%}), skipping")
         else:
             should_register = True
-            logger.info("No previous model found, registering first model...")
 
     if not should_register:
         return False
 
-    # Register in Hopsworks
-    try:
-        success = registry.store_model(
-            model_name=result["model_key"],
-            model=result["model"],
-            metrics={
-                "val_mae": result["val_metrics"]["mae"],
-                "val_rmse": result["val_metrics"]["rmse"],
-                "val_r2": result["val_metrics"]["r2"],
-                "test_mae": result["test_metrics"]["mae"],
-                "test_rmse": result["test_metrics"]["rmse"],
-                "test_r2": result["test_metrics"]["r2"],
+    success = registry.store_model(
+        model_name=result["model_key"],
+        model=result["model"],
+        metrics={
+            "val_mae": result["val_metrics"]["mae"],
+            "val_rmse": result["val_metrics"]["rmse"],
+            "val_r2": result["val_metrics"]["r2"],
+            "test_mae": result["test_metrics"]["mae"],
+            "test_rmse": result["test_metrics"]["rmse"],
+            "test_r2": result["test_metrics"]["r2"],
+        },
+        metadata={
+            "model_name": result["model_name"],
+            "training_date": datetime.now(timezone.utc).isoformat(),
+            "dataset_type": "hopsworks_feature_store",
+            "train_rows": result["train_rows"],
+            "val_rows": result["val_rows"],
+            "test_rows": result["test_rows"],
+            "n_features": len(result["feature_columns"]),
+            "model_comparison": {
+                k: {
+                    "val_mae": v["val_metrics"]["mae"],
+                    "test_mae": v["test_metrics"]["mae"],
+                }
+                for k, v in result["all_results"].items()
             },
-            metadata={
-                "model_name": result["model_name"],
-                "training_date": datetime.now(timezone.utc).isoformat(),
-                "dataset_type": "real_api_data",
-                "train_rows": result["train_rows"],
-                "val_rows": result["val_rows"],
-                "test_rows": result["test_rows"],
-                "n_features": len(result["feature_columns"]),
-                "model_comparison": {
-                    k: {"val_mae": v["val_metrics"]["mae"], "test_mae": v["test_metrics"]["mae"]}
-                    for k, v in result["all_results"].items()
-                },
-            },
-        )
+        },
+    )
 
-        if success:
-            logger.info(f"✅ Registered in Hopsworks: {result['model_name']}")
-        else:
-            logger.warning("Hopsworks registration failed")
-
-        return success
-
-    except Exception as e:
-        logger.error(f"Hopsworks registration failed: {e}")
-        return False
+    if success:
+        logger.info(f"✅ Registered in Hopsworks: {result['model_name']}")
+    return success
 
 
-def save_model_locally(result, run_id=None):
+def save_model_locally(result):
     """Save model as local pickle (fallback for API)."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Save model
     model_name = result["model_key"]
     model_path = MODELS_DIR / f"{model_name}_model.pkl"
     with open(model_path, "wb") as f:
         pickle.dump(result["model"], f)
     logger.info(f"Model saved to {model_path}")
 
-    # Save as production model for API
+    # Production model for API
     production_path = MODELS_DIR / "best_model.pkl"
     with open(production_path, "wb") as f:
         pickle.dump(result["model"], f)
     logger.info(f"Production model saved to {production_path}")
 
-    # Build model comparison for metadata
+    # Metadata
     model_comparison = {}
     for k, v in result["all_results"].items():
         model_comparison[k] = {
@@ -616,15 +617,12 @@ def save_model_locally(result, run_id=None):
             "train_time": v["train_time"],
         }
 
-    # Save metadata
     metadata = {
         "model_version": f"v{datetime.now(timezone.utc).strftime('%Y%m%d')}",
         "model_name": result["model_name"],
         "model_key": result["model_key"],
         "training_date": datetime.now(timezone.utc).isoformat(),
-        "dataset_type": "real_api_data",
-        "data_provider": "open-meteo",
-        "feature_version": "2.0",
+        "data_source": "hopsworks_feature_store",
         "feature_columns": result["feature_columns"],
         "target_columns": ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"],
         "model_comparison": model_comparison,
@@ -655,12 +653,15 @@ def save_model_locally(result, run_id=None):
         "rmse": result["val_metrics"]["rmse"],
         "r2": result["val_metrics"]["r2"],
         "date": datetime.now(timezone.utc).isoformat(),
-        "run_id": run_id,
     }
     best_path = METADATA_DIR / "best_metrics.json"
     with open(best_path, "w") as f:
         json.dump(best_metrics, f, indent=2)
-    logger.info(f"Best metrics saved to {best_path}")
+
+
+# =============================================================================
+# MAIN
+# =============================================================================
 
 
 def main():
@@ -677,73 +678,52 @@ def main():
     args = parser.parse_args()
 
     logger.info("=" * 60)
-    logger.info("DAILY TRAINING PIPELINE STARTED")
+    logger.info("DAILY TRAINING PIPELINE — HOPSWORKS EDITION")
     logger.info("=" * 60)
 
     try:
-        # 1. Load features from feature store
-        df = load_features()
+        # 1. Load data from Hopsworks Feature Store
+        logger.info("Step 1: Loading data from Hopsworks...")
+        df = load_training_data_from_hopsworks()
 
         if len(df) < 100:
-            logger.warning(
-                f"Only {len(df)} training-valid records. Need at least 100. Skipping training."
-            )
+            logger.error(f"Too few rows: {len(df)}. Need at least 100.")
             return 1
 
-        # 2. Prepare training data
-        df = prepare_training_data(df)
+        # 2. Prepare features and targets
+        logger.info("Step 2: Preparing features and targets...")
+        X_train, X_val, X_test, y_train, y_val, y_test, feature_names = prepare_data_from_dataframe(
+            df
+        )
 
-        if len(df) < 50:
-            logger.warning(
-                f"Only {len(df)} rows after target generation. Need at least 50. Skipping."
-            )
+        if len(X_train) < 50:
+            logger.error(f"Too few training rows: {len(X_train)}")
             return 1
 
-        # 3. Get feature columns (exclude targets, metadata, and string columns)
-        exclude_cols = [
-            "timestamp",
-            "location_id",
-            "city_name",
-            "data_source",
-            "collected_at",
-            "is_training_valid",
-            "target_aqi_24h",
-            "target_aqi_48h",
-            "target_aqi_72h",
-            "us_aqi",
-            "us_aqi_pm25",
-            "us_aqi_pm10",  # Reference AQI, not features
-            "pm25_aqi",
-            "pm10_aqi",  # Intermediate calculations
-        ]
-        # Also exclude string/object columns
-        string_cols = df.select_dtypes(include=["object"]).columns.tolist()
-        exclude_cols = list(set(exclude_cols + string_cols))
-        feature_columns = [c for c in df.columns if c not in exclude_cols]
-        logger.info(f"Using {len(feature_columns)} features")
+        # 3. Train all models
+        logger.info("Step 3: Training all models...")
+        result = train_all_models(X_train, X_val, X_test, y_train, y_val, y_test, feature_names)
 
-        # 4. Train ALL models, select best
-        result = train_all_models(df, feature_columns)
-
-        # 5. Register in Hopsworks
+        # 4. Register in Hopsworks Model Registry
+        logger.info("Step 4: Registering in Hopsworks Model Registry...")
         registered = register_in_hopsworks(
             result,
             force=args.force_register,
             min_improvement=args.min_improvement,
         )
 
-        # 6. Save locally (always)
+        # 5. Save locally (always, for API fallback)
+        logger.info("Step 5: Saving locally...")
         save_model_locally(result)
 
-        # 7. Print summary
+        # 6. Summary
         logger.info("=" * 60)
         logger.info("TRAINING COMPLETE")
-        logger.info(f"  Validation MAE: {result['val_metrics']['mae']:.2f}")
-        logger.info(f"  Validation R²:  {result['val_metrics']['r2']:.4f}")
-        logger.info(f"  Test MAE:       {result['test_metrics']['mae']:.2f}")
-        logger.info(f"  Test R²:        {result['test_metrics']['r2']:.4f}")
-        logger.info(f"  Training time:  {result['train_time']:.1f}s")
-        logger.info(f"  Registered:     {registered}")
+        logger.info(f"  Best model:      {result['model_name']}")
+        logger.info(f"  Test MAE:        {result['test_metrics']['mae']:.2f}")
+        logger.info(f"  Test R²:         {result['test_metrics']['r2']:.4f}")
+        logger.info(f"  Training time:   {result['train_time']:.1f}s")
+        logger.info(f"  Registered:      {registered}")
         logger.info("=" * 60)
 
         return 0
