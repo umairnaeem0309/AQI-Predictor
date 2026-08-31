@@ -51,7 +51,8 @@ class HopsworksModelRegistry:
                 api_key_value=api_key,
                 project=project_name,
             )
-            self._project = self._connection.get_project()
+            # In Hopsworks, the connection object IS the project
+            self._project = self._connection
             logger.info(f"Connected to Hopsworks project: {project_name}")
             return True
 
@@ -85,9 +86,15 @@ class HopsworksModelRegistry:
                 if not self.connect():
                     return False
 
-            # Create version string
+            # Create version number (Hopsworks expects small integer)
             if not model_version:
-                model_version = f"v{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}"
+                # Use simple incrementing version
+                try:
+                    mr = self._connection.get_model_registry()
+                    existing = mr.get_models(model_name)
+                    model_version = len(existing) + 1
+                except Exception:
+                    model_version = 1
 
             # Save model to local temp file
             temp_dir = Path("temp_models")
