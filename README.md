@@ -71,12 +71,12 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 | Model | MAE | RMSE | R² | Composite | Train Time |
 |-------|-----|------|----|-----------|------------|
-| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 22.5s |
-| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 310.2s |
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 23.7s |
+| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 281.9s |
 | Ridge | 21.84 | 30.67 | 0.6509 | 28.39 | 0.3s |
-| LSTM | *Skipped* | — | — | — | — |
+| LSTM | 39.58 | 52.57 | -0.0252 | 62.36 | 92.8s |
 
-> **LSTM Note:** Skipped during training (PyTorch not installed). Can be enabled with `pip install torch`.
+> **LSTM Note:** R² = -0.0252 means LSTM performs worse than a naive mean predictor. LSTMs need much more data and careful tuning for tabular time-series. The 3 tree/linear models dominate.
 
 ### Per-Horizon Comparison — Test Set
 
@@ -87,6 +87,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | **XGBoost** | **19.01** | **27.41** | **0.7210** ★ |
 | Random Forest | 19.20 | 27.53 | 0.7185 |
 | Ridge | 19.53 | 27.83 | 0.7122 |
+| LSTM | 33.12 | 47.89 | 0.0142 |
 
 #### 48-Hour Prediction
 
@@ -95,6 +96,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | **XGBoost** | **21.78** | **30.88** | **0.6463** ★ |
 | Random Forest | 21.89 | 30.87 | 0.6465 |
 | Ridge | 22.37 | 31.27 | 0.6372 |
+| LSTM | 39.28 | 52.14 | -0.0198 |
 
 #### 72-Hour Prediction
 
@@ -103,6 +105,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | **XGBoost** | **23.15** | **32.48** | **0.6091** ★ |
 | Random Forest | 23.08 | 32.52 | 0.6081 |
 | Ridge | 23.62 | 32.85 | 0.6002 |
+| LSTM | 46.34 | 57.68 | -0.0798 |
 
 ### Why XGBoost?
 
@@ -124,7 +127,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | Feature Engineering | ✅ Verified | 58 features |
 | Feature Store | ✅ Verified | Hopsworks: 107,064 rows |
 | Feature View | ✅ Verified | Target label designation |
-| Model Training | ✅ Verified | 3 models on complete data from Hopsworks |
+| Model Training | ✅ Verified | 4 models (Ridge, RF, XGBoost, LSTM) from Hopsworks |
 | Model Registry | ✅ Verified | Hopsworks Model Registry (XGBoost v2) |
 | CI/CD | ✅ Verified | 487 tests passing, lint clean |
 
