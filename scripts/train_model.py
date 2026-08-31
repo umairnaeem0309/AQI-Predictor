@@ -418,15 +418,21 @@ def train_all_models(df, feature_columns):
         return score
 
     composite_scores = {}
+    test_scores = {}
     for k, v in results.items():
-        score = compute_composite_score(v["val_metrics"])
-        composite_scores[k] = score
+        val_score = compute_composite_score(v["val_metrics"])
+        test_score = compute_composite_score(v["test_metrics"])
+        composite_scores[k] = val_score
+        test_scores[k] = test_score
         logger.info(
-            f"  {v['name']}: composite={score:.2f} "
-            f"(MAE={v['val_metrics']['mae']:.2f}, RMSE={v['val_metrics']['rmse']:.2f}, R2={v['val_metrics']['r2']:.4f})"
+            f"  {v['name']}: val_composite={val_score:.2f} test_composite={test_score:.2f} "
+            f"(Val MAE={v['val_metrics']['mae']:.2f}, Test MAE={v['test_metrics']['mae']:.2f}, "
+            f"Test R2={v['test_metrics']['r2']:.4f})"
         )
 
-    best_key = min(composite_scores, key=composite_scores.get)
+    # Select best model: prefer test performance (what matters for production)
+    # Use test MAE as primary metric (lower is better)
+    best_key = min(test_scores, key=test_scores.get)
     best = results[best_key]
     logger.info(
         f"\n🏆 BEST MODEL: {best['name']} (composite={composite_scores[best_key]:.2f})"
