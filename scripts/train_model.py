@@ -17,6 +17,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import pickle
 import sys
 import time
@@ -81,13 +82,41 @@ def load_training_data_from_hopsworks():
     fg = fs.get_feature_group(name="aqi_features_prod", version=1)
 
     # Read ALL data from the feature group
-    df = fg.read()
+    try:
+        df = fg.read()
+    except Exception as e:
+        logger.warning(f"Hopsworks read failed (materialization may still be running): {e}")
+        logger.info("Falling back to local CSV backup...")
+        return _load_from_local_csv()
+
+    if df is None or df.empty:
+        logger.warning("Hopsworks returned empty data, falling back to local CSV")
+        return _load_from_local_csv()
 
     logger.info(f"✅ Loaded {len(df)} rows from Hopsworks Feature Store")
     logger.info(f"   Columns: {len(df.columns)}")
     logger.info(f"   Cities: {df['location_id'].nunique()}")
     logger.info(f"   Date range: {df['timestamp'].min()} to {df['timestamp'].max()}")
 
+    return df
+
+
+def _load_from_local_csv():
+    """Load from local CSV backup (fallback when Hopsworks is not ready)."""
+    features_file = PROJECT_ROOT / "data" / "processed" / "train_features.csv"
+    targets_file = PROJECT_ROOT / "data" / "processed" / "train_targets.csv"
+
+    if not features_file.exists() or not targets_file.exists():
+        raise FileNotFoundError(
+            f"Neither Hopsworks nor local CSV available. " f"Run ingest_to_hopsworks.py first."
+        )
+
+    logger.info("Loading from local CSV backup...")
+    features_df = pd.read_csv(features_file)
+    targets_df = pd.read_csv(targets_file)
+    df = pd.merge(features_df, targets_df, on=["timestamp", "location_id"], how="inner")
+
+    logger.info(f"✅ Loaded {len(df)} rows from local CSV backup")
     return df
 
 

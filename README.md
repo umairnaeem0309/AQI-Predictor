@@ -12,7 +12,7 @@
 
 ## Overview
 
-A production-grade ML pipeline that collects real-time weather and air quality data from Open-Meteo, engineers 63+ features, trains multiple models (Ridge, Random Forest, XGBoost, LSTM), and serves predictions via a REST API and interactive dashboard.
+A production-grade ML pipeline that collects real-time weather and air quality data from Open-Meteo, engineers 58 features, trains multiple models (Ridge, Random Forest, XGBoost, LSTM), and serves predictions via a REST API and interactive dashboard.
 
 ### Cities Supported
 
@@ -32,27 +32,17 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE ENGINEERING                                          │
-│ 63+ features: weather, pollution, time, lags, rolling, ratios│
-│ → src/features/feature_engineering.py                        │
-└─────────────────────────────┬───────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
 │ FEATURE STORE (Hopsworks PRIMARY)                            │
-│ → Hopsworks cloud (107,208 rows)                             │
-│ → Local Parquet (fallback)                                   │
+│ Features + Targets stored TOGETHER                           │
+│ → 107,064 rows, 58 features + 3 targets                     │
+│ → Feature View with target label designation                 │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ MODEL TRAINING (Daily 6 AM UTC)                              │
 │ Ridge, Random Forest, XGBoost, LSTM                          │
-│ → scripts/train_model.py                                     │
-└─────────────────────────────┬───────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│ MODEL REGISTRY (Hopsworks)                                   │
-│ Version tracking, metrics, model comparison                  │
-│ → src/models/hopsworks_registry.py                           │
+│ → scripts/train_model.py (reads from Hopsworks)              │
+│ → Best model → Hopsworks Model Registry                      │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -65,25 +55,28 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 ## Verified Model Performance
 
-*All results verified on complete 4-year dataset (63,504 usable rows).*
+*All results verified on 107,064 rows from Hopsworks Feature Store.*
 
-### Production Model: Ridge Regression
+### Production Model: XGBoost
 
 | Metric | Value |
 |--------|-------|
-| **Test MAE** | **26.48** |
-| **Test RMSE** | **34.95** |
-| **Test R²** | **0.5722** |
-| **Composite Score** | **33.91** |
-| **Inference Latency** | 0.000 ms |
+| **Test MAE** | **21.31** |
+| **Test RMSE** | **30.33** |
+| **Test R²** | **0.6588** |
+| **Composite Score** | **27.84** |
+| **Training Time** | 22.5s |
 
 ### Model Comparison — Test Set (All Models)
 
-| Model | MAE | RMSE | R² | Composite | Latency |
-|-------|-----|------|----|-----------|---------|
-| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ | 0.000 ms |
-| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 | 0.009 ms |
-| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 | 0.015 ms |
+| Model | MAE | RMSE | R² | Composite | Train Time |
+|-------|-----|------|----|-----------|------------|
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 22.5s |
+| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 310.2s |
+| Ridge | 21.84 | 30.67 | 0.6509 | 28.39 | 0.3s |
+| LSTM | *Skipped* | — | — | — | — |
+
+> **LSTM Note:** Skipped during training (PyTorch not installed). Can be enabled with `pip install torch`.
 
 ### Per-Horizon Comparison — Test Set
 
@@ -91,34 +84,33 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
-| Random Forest | 23.29 | 30.85 | 0.6602 |
-| XGBoost | 24.43 | 32.40 | 0.6253 |
+| **XGBoost** | **19.01** | **27.41** | **0.7210** ★ |
+| Random Forest | 19.20 | 27.53 | 0.7185 |
+| Ridge | 19.53 | 27.83 | 0.7122 |
 
 #### 48-Hour Prediction
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
-| Random Forest | 27.61 | 35.80 | 0.5497 |
-| XGBoost | 28.16 | 37.12 | 0.5156 |
+| **XGBoost** | **21.78** | **30.88** | **0.6463** ★ |
+| Random Forest | 21.89 | 30.87 | 0.6465 |
+| Ridge | 22.37 | 31.27 | 0.6372 |
 
 #### 72-Hour Prediction
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
-| Random Forest | 30.82 | 40.16 | 0.4431 |
-| XGBoost | 31.94 | 41.69 | 0.3998 |
+| **XGBoost** | **23.15** | **32.48** | **0.6091** ★ |
+| Random Forest | 23.08 | 32.52 | 0.6081 |
+| Ridge | 23.62 | 32.85 | 0.6002 |
 
-### Why Ridge?
+### Why XGBoost?
 
-1. **Lowest MAE** (26.48) across all models
-2. **Highest R²** (0.5722) — explains most variance
-3. **Wins ALL 3 horizons** — consistent performance
-4. **Fastest inference** (0.000 ms) — production-ready
-5. **Most interpretable** — linear coefficients directly explain feature influence
-6. **Least overfitting risk** — simple model with regularization
+1. **Best Test MAE** (21.31) — lowest prediction error
+2. **Best Test R²** (0.6588) — explains most variance
+3. **Wins ALL 3 horizons** — 24h, 48h, 72h consistently
+4. **Fast training** (22.5s) — suitable for daily retraining
+5. **Handles non-linear relationships** in AQI data
 
 ---
 
@@ -127,11 +119,13 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | Stage | Status | Details |
 |-------|--------|---------|
 | Data Collection | ✅ Verified | Open-Meteo API, 4-year range |
-| Data Cleaning | ✅ Verified | 107,208 rows, 0 duplicates, <0.2% NaN |
-| Feature Engineering | ✅ Verified | 63 features |
-| Feature Store | ✅ Verified | Hopsworks: 107,208 rows |
-| Model Training | ✅ Verified | All models on complete data |
-| Model Registry | ✅ Verified | Hopsworks Model Registry |
+| Data Ingestion | ✅ Verified | Hopsworks Feature Store (features + targets together) |
+| Data Cleaning | ✅ Verified | 107,064 rows, 0 duplicates, <0.2% NaN |
+| Feature Engineering | ✅ Verified | 58 features |
+| Feature Store | ✅ Verified | Hopsworks: 107,064 rows |
+| Feature View | ✅ Verified | Target label designation |
+| Model Training | ✅ Verified | 3 models on complete data from Hopsworks |
+| Model Registry | ✅ Verified | Hopsworks Model Registry (XGBoost v2) |
 | CI/CD | ✅ Verified | 487 tests passing, lint clean |
 
 ---
@@ -164,10 +158,13 @@ streamlit run app/frontend/streamlit_app.py --server.port 8501
 ### Run Pipelines
 
 ```bash
-# Feature collection (hourly)
+# Step 1: Ingest data into Hopsworks (run once or to refresh)
+python scripts/ingest_to_hopsworks.py --start-date 2022-08-01
+
+# Step 2: Feature collection (hourly)
 python scripts/collect_features.py
 
-# Model training (daily)
+# Step 3: Model training (daily)
 python scripts/train_model.py --force-register
 
 # Run tests
@@ -181,6 +178,7 @@ python -m pytest tests/ -v
 ```
 AQI-Predictor/
 ├── scripts/                    # Pipeline scripts
+│   ├── ingest_to_hopsworks.py  # Data ingestion to Hopsworks
 │   ├── collect_features.py     # Feature collection (hourly)
 │   ├── train_model.py          # Model training (daily)
 │   └── validate_production.py  # CI validation
@@ -250,7 +248,7 @@ AQI-Predictor/
 | Component | Technology |
 |-----------|------------|
 | Data Provider | Open-Meteo (Weather + Air Quality) |
-| Feature Store | Hopsworks (PRIMARY), Local Parquet (Fallback) |
+| Feature Store | Hopsworks (PRIMARY), Local CSV (Fallback) |
 | ML Models | Ridge, Random Forest, XGBoost, LSTM |
 | Model Registry | Hopsworks Model Registry |
 | Backend API | FastAPI |

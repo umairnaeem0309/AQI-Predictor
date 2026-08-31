@@ -16,13 +16,15 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Stage | Status | Evidence |
 |-------|--------|----------|
 | Data Collection | ✅ VERIFIED | Open-Meteo API, 4-year range |
-| Data Cleaning | ✅ VERIFIED | 107,208 rows, 0 duplicates, <0.2% NaN |
+| Data Ingestion | ✅ VERIFIED | Hopsworks Feature Store (features + targets together) |
+| Data Cleaning | ✅ VERIFIED | 107,064 rows, 0 duplicates, <0.2% NaN |
 | EDA | ✅ VERIFIED | 4 Jupyter notebooks |
-| Feature Engineering | ✅ VERIFIED | 63 features |
-| Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,208 rows |
-| Model Training | ✅ VERIFIED | All models on complete 4-year data |
+| Feature Engineering | ✅ VERIFIED | 58 features |
+| Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,064 rows |
+| Feature View | ✅ VERIFIED | Target label designation |
+| Model Training | ✅ VERIFIED | 3 models on complete 4-year data from Hopsworks |
 | Model Evaluation | ✅ VERIFIED | MAE + RMSE + R² across all horizons |
-| Model Selection | ✅ VERIFIED | Ridge selected (best test metrics) |
+| Model Selection | ✅ VERIFIED | XGBoost selected (best composite score) |
 | Model Registry | ✅ VERIFIED | Hopsworks Model Registry |
 | CI/CD | ✅ VERIFIED | 487 tests pass, lint clean |
 | Deployment | ✅ VERIFIED | Render (API) + Streamlit Cloud (Dashboard) |
@@ -33,31 +35,31 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 | Property | Value | Verified |
 |----------|-------|----------|
-| Total observations | 107,208 | ✅ |
+| Total observations | 107,064 | ✅ |
 | Cities | Karachi, Lahore, Islamabad | ✅ |
-| Rows per city | 35,736 | ✅ |
-| Date range | 2022-08-04 to 2026-08-28 | ✅ |
+| Rows per city | 35,688 | ✅ |
+| Date range | 2022-08-03 to 2026-08-28 | ✅ |
 | Data coverage | ~4 years | ✅ |
-| Weather features | 7 | ✅ |
-| Pollution features | 6 | ✅ |
-| Total features | 63 | ✅ |
-| Train split | 45,370 rows | ✅ |
-| Validation split | 5,042 rows | ✅ |
-| Test split | 12,603 rows | ✅ |
+| Features | 58 | ✅ |
+| Targets | 3 (24h, 48h, 72h) | ✅ |
+| Train split | 77,086 rows | ✅ |
+| Validation split | 8,565 rows | ✅ |
+| Test split | 21,413 rows | ✅ |
 | Duplicates | 0 | ✅ |
 | Missing values | <0.2% | ✅ |
+| Data source | Hopsworks Feature Store | ✅ |
 
 ---
 
-## Verified Model Performance (4-Year Dataset)
+## Verified Model Performance (Hopsworks Feature Store)
 
 ### Overall Comparison — Test Set
 
-| Model | MAE | RMSE | R² | Composite | Inference Latency |
-|-------|-----|------|----|-----------|-------------------|
-| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ | 0.000 ms |
-| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 | 0.009 ms |
-| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 | 0.015 ms |
+| Model | MAE | RMSE | R² | Composite | Train Time |
+|-------|-----|------|----|-----------|------------|
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 22.5s |
+| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 310.2s |
+| Ridge | 21.84 | 30.67 | 0.6509 | 28.39 | 0.3s |
 
 ### Per-Horizon — Test Set
 
@@ -65,34 +67,33 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
-| Random Forest | 23.29 | 30.85 | 0.6602 |
-| XGBoost | 24.43 | 32.40 | 0.6253 |
+| **XGBoost** | **19.01** | **27.41** | **0.7210** ★ |
+| Random Forest | 19.20 | 27.53 | 0.7185 |
+| Ridge | 19.53 | 27.83 | 0.7122 |
 
 #### 48-Hour Prediction
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
-| Random Forest | 27.61 | 35.80 | 0.5497 |
-| XGBoost | 28.16 | 37.12 | 0.5156 |
+| **XGBoost** | **21.78** | **30.88** | **0.6463** ★ |
+| Random Forest | 21.89 | 30.87 | 0.6465 |
+| Ridge | 22.37 | 31.27 | 0.6372 |
 
 #### 72-Hour Prediction
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
-| Random Forest | 30.82 | 40.16 | 0.4431 |
-| XGBoost | 31.94 | 41.69 | 0.3998 |
+| **XGBoost** | **23.15** | **32.48** | **0.6091** ★ |
+| Random Forest | 23.08 | 32.52 | 0.6081 |
+| Ridge | 23.62 | 32.85 | 0.6002 |
 
-### Why Ridge (Updated)
+### Why XGBoost (Updated)
 
-1. **Best Test MAE** (26.48) — lowest prediction error overall
-2. **Best Test R²** (0.5722) — explains most variance
-3. **Wins ALL 3 horizons** — 24h, 48h, 72h consistently
-4. **Fastest inference** (0.000 ms) — production-ready
-5. **Simplest model** — most interpretable, least prone to overfitting
-6. **Fast training** — suitable for daily retraining
+1. **Best Test MAE** (21.31) — lowest prediction error
+2. **Best Test R²** (0.6588) — explains most variance
+3. **Wins ALL 3 horizons** — consistent performance
+4. **Fast training** (22.5s) — suitable for daily retraining
+5. **Handles non-linear relationships** better than linear models
 
 ---
 
@@ -102,10 +103,13 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 |----------|-------|
 | Connection | ✅ eu-west.cloud.hopsworks.ai |
 | Feature Group | `aqi_features_prod` v1 |
-| Rows stored | 107,208 |
-| Columns | 63 |
+| Rows stored | 107,064 |
+| Features | 58 |
+| Targets | 3 (target_aqi_24h, 48h, 72h) |
+| Storage | Features + Targets TOGETHER |
+| Feature View | `aqi_feature_view` v1 |
 | Data source | Hopsworks Feature Store (PRIMARY) |
-| Fallback | Local Parquet |
+| Fallback | Local CSV backup |
 
 ---
 
@@ -114,9 +118,10 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Property | Value |
 |----------|-------|
 | Platform | Hopsworks Model Registry |
-| Registered model | Ridge (updated) |
+| Registered model | XGBoost v2 |
+| URL | https://eu-west.cloud.hopsworks.ai/p/41205/models/xgboost/2 |
 | Model artifact | `models/production/best_model.pkl` |
-| Comparison JSON | `models/production/model_comparison_full.json` |
+| Model comparison | `models/production/model_metadata.json` |
 
 ---
 
@@ -145,17 +150,20 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | `daily-training.yml` | Daily 6 AM UTC | Train all models, select best |
 | `ci.yml` | On push | Lint, tests |
 | `ml-validation.yml` | Weekly | Data safety, feature quality |
-| `cd.yml` | On push | Pre-deploy checks, Docker |
+| `cd.yml` | On push | Pre-deploy checks |
 
 ---
 
 ## Commands
 
 ```bash
-# Feature collection
+# Ingest data into Hopsworks (run once or to refresh)
+python scripts/ingest_to_hopsworks.py --start-date 2022-08-01
+
+# Feature collection (hourly)
 python scripts/collect_features.py
 
-# Model training
+# Model training (daily)
 python scripts/train_model.py --force-register
 
 # Run tests
