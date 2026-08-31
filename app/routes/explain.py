@@ -204,14 +204,20 @@ async def get_model_summary(
             "model_type": model_info.get("model_key", "unknown") + " (MultiOutputRegressor)",
             "parameters": meta.get("model_params", {}),
             "metrics": model_info.get("metrics", {}),
+            "val_metrics": model_info.get("val_metrics", {}),
+            "test_metrics": model_info.get("test_metrics", {}),
+            "model_comparison": model_info.get("model_comparison", {}),
             "feature_count": len(meta.get("feature_columns", [])),
             "target_count": len(meta.get("target_columns", [])),
             "targets": meta.get("target_columns", []),
             "training_data": {
                 "provider": model_info.get("data_provider", "open-meteo"),
-                "date_range": "2022-08 to 2026-08",
+                "date_range": "2022-08 to 2024-12",
                 "cities": ["karachi", "lahore", "islamabad"],
                 "total_hours": 107064,
+                "train_rows": meta.get("train_rows", 0),
+                "val_rows": meta.get("val_rows", 0),
+                "test_rows": meta.get("test_rows", 0),
             },
             "aqi_method": "US EPA PM NowCast AQI (EPA-454/B-24-002, May 2024)",
             "data_source": "Open-Meteo Historical Weather + Air Quality APIs",
@@ -254,17 +260,35 @@ async def get_shap_explanation(
         import pandas as pd
 
         train_means = {}
-        for candidate in [
-            os.path.join("data", "processed", "train_features.csv"),
-            os.path.join("data", "processed", "raw_observations.csv"),
-        ]:
-            if os.path.exists(candidate):
+        # Try Hopsworks first
+        try:
+            from src.feature_store import get_feature_store
+
+            store = get_feature_store()
+            for fg_name in ["aqi_features_prod", "aqi_features_test"]:
                 try:
-                    df_means = pd.read_csv(candidate, nrows=1000)
-                    train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
+                    df_means = store.get_features(fg_name, version=1)
+                    if not df_means.empty:
+                        train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
+                        break
                 except Exception:
-                    pass
-                break
+                    continue
+        except Exception:
+            pass
+
+        # Fallback to local CSV
+        if not train_means:
+            for candidate in [
+                os.path.join("data", "processed", "train_features.csv"),
+                os.path.join("data", "processed", "raw_observations.csv"),
+            ]:
+                if os.path.exists(candidate):
+                    try:
+                        df_means = pd.read_csv(candidate, nrows=1000)
+                        train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
+                    except Exception:
+                        pass
+                    break
 
         # Build feature vector in correct order, fill missing with training mean
         feature_values = []
@@ -410,21 +434,36 @@ async def get_global_shap_importance(
             raise HTTPException(status_code=500, detail="Feature names not found in metadata")
 
         # Load feature-engineered dataset for background sample
-        # Try train_features.csv first (has all 71 engineered features), fallback to raw
-        data_path = os.path.join("data", "processed", "train_features.csv")
-        if not os.path.exists(data_path):
-            data_path = os.path.join("data", "processed", "raw_observations.csv")
-        if not os.path.exists(data_path):
-            return {
-                "model_name": "xgboost_aqi_predictor",
-                "method": "TreeExplainer mean |SHAP|",
-                "n_samples": 0,
-                "total_features": 0,
-                "features": [],
-                "message": "Training dataset not available in this environment.",
-            }
+        # Try Hopsworks first, then local CSV files
+        df = None
+        try:
+            from src.feature_store import get_feature_store
 
-        df = pd.read_csv(data_path)
+            store = get_feature_store()
+            for fg_name in ["aqi_features_prod", "aqi_features_test"]:
+                try:
+                    df = store.get_features(fg_name, version=1)
+                    if not df.empty:
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        if df is None or df.empty:
+            data_path = os.path.join("data", "processed", "train_features.csv")
+            if not os.path.exists(data_path):
+                data_path = os.path.join("data", "processed", "raw_observations.csv")
+            if not os.path.exists(data_path):
+                return {
+                    "model_name": model_info.get("model_name", "unknown"),
+                    "method": "LinearExplainer" if not hasattr(model.estimators_[0], "feature_importances_") else "TreeExplainer",
+                    "n_samples": 0,
+                    "total_features": 0,
+                    "features": [],
+                    "message": "Training dataset not available for SHAP background sample.",
+                }
+            df = pd.read_csv(data_path)
 
         # Select only the feature columns that exist in the data
         available = [f for f in feature_names if f in df.columns]

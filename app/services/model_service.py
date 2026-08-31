@@ -236,19 +236,27 @@ class ModelService:
         metrics = info.get("metrics", {})
         overall = metrics.get("overall", {})
 
+        # Get per-horizon metrics if available
+        val_metrics = info.get("metrics", {}).get("val", {})
+        test_metrics = info.get("metrics", {}).get("test", {})
+        model_comparison = info.get("model_comparison", {})
+
         return {
             "model_name": info.get("model_name", "unknown"),
             "model_version": info.get("model_version", "v1.0.0"),
             "status": "production",
             "approval_status": "approved",
             "training_date": info.get("training_date", "unknown"),
-            "dataset_type": info.get("dataset", "real_api_data"),
-            "feature_version": info.get("feature_version", "1.0"),
+            "dataset_type": info.get("dataset_type", "real_api_data"),
+            "feature_version": info.get("feature_version", "2.0"),
             "metrics": {
-                "mae": overall.get("mae", 21.32),
-                "rmse": overall.get("rmse", 30.89),
-                "r2": overall.get("r2", 0.6065),
+                "mae": overall.get("mae", val_metrics.get("mae", 0)),
+                "rmse": overall.get("rmse", val_metrics.get("rmse", 0)),
+                "r2": overall.get("r2", val_metrics.get("r2", 0)),
             },
+            "val_metrics": val_metrics,
+            "test_metrics": test_metrics,
+            "model_comparison": model_comparison,
             "feature_columns": info.get("feature_columns", []),
             "target_columns": info.get("target_columns", []),
             "model_params": info.get("model_params", {}),
