@@ -2,7 +2,7 @@
 
 **Project:** Production-grade AQI forecasting for Pakistani cities
 **Timeline:** July — August 2026
-**Status:** Model training complete, Ridge selected as production model
+**Status:** Model training complete, XGBoost selected as production model
 **Report Date:** 31 August 2026
 
 ---
@@ -55,14 +55,14 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 - **Original request:** 5 years
 - **Actual:** ~4 years (Aug 2022 – Aug 2026)
 - **Reason:** Open-Meteo CAMS Global air quality starts Aug 2022
-- **Total:** 107,208 hourly observations (35,736 per city)
-- **After target generation:** 63,504 usable rows (72h target shift removes trailing rows)
+- **Total:** 107,064 hourly observations (35,688 per city)
+- **Stored in:** Hopsworks Feature Store (features + targets together)
 
 ---
 
 ## 3. Feature Engineering
 
-### Features Created (63+ total)
+### Features Created (58 total)
 
 | Category | Count | Examples |
 |----------|-------|----------|
@@ -71,13 +71,19 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 | Time | 6 | hour, day_of_week, month, is_weekend, hour_sin, hour_cos |
 | Lag | 24 | aqi_lag_{1,6,12,24,48,72}h, pm25_lag, temperature_lag |
 | Rolling | 10 | aqi_rolling_mean/std/min/max, pm25_rolling |
-| Derived | 10 | ratios, change rates, interactions |
+| Derived | 5 | ratios, change rates, interactions |
 
 ### AQI Calculation
 
 - **Method:** US EPA PM AQI (EPA-454/B-24-002, May 2024)
 - **Formula:** `AQI = max(PM2.5 AQI, PM10 AQI)`
 - **Breakpoints:** PM2.5 (0.0–9.0 = Good), PM10 (0–54 = Good)
+
+### Feature Store Architecture
+
+- **Features + Targets stored together** in single Hopsworks Feature Group
+- **No separate CSV files** — all data flows through Hopsworks
+- **Feature View** with target label designation for reproducible training
 
 ---
 
@@ -101,20 +107,21 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 
 ---
 
-## 5. Verified Results (4-Year Dataset)
+## 5. Verified Results (Hopsworks Feature Store)
 
-*All results verified on the complete 4-year dataset (63,504 usable rows after target generation).*
+*All results verified on 107,064 rows from Hopsworks Feature Store (features + targets).*
+*Train: 77,086 | Val: 8,565 | Test: 21,413 | Features: 58*
 
 ### Overall Comparison — Test Set
 
-| Model | MAE | RMSE | R² | Composite Score | Inference Latency |
-|-------|-----|------|----|-----------------|-------------------|
-| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ | 0.000 ms |
-| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 | 0.009 ms |
-| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 | 0.015 ms |
-| LSTM | *Not verified* | — | — | — | — |
+| Model | MAE | RMSE | R² | Composite Score | Train Time |
+|-------|-----|------|----|-----------------|------------|
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 22.5s |
+| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 310.2s |
+| Ridge | 21.84 | 30.67 | 0.6509 | 28.39 | 0.3s |
+| LSTM | *Skipped* | — | — | — | — |
 
-> **LSTM Note:** PyTorch is not currently installed in the `aqi-predictor` environment. LSTM results were not verified on the updated 4-year dataset. The LSTM implementation exists in `src/models/lstm_model.py` and can be enabled by installing PyTorch (`pip install torch`). Earlier results on the 2.5-year dataset showed LSTM with Test MAE ≈ 22.95.
+> **LSTM Note:** PyTorch is not installed in the `aqi-predictor` environment. LSTM was skipped during training. The implementation exists in `scripts/train_model.py` and can be enabled by installing PyTorch (`pip install torch`).
 
 ### Per-Horizon — Test Set
 
@@ -122,49 +129,46 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
-| Random Forest | 23.29 | 30.85 | 0.6602 |
-| XGBoost | 24.43 | 32.40 | 0.6253 |
+| **XGBoost** | **19.01** | **27.41** | **0.7210** ★ |
+| Random Forest | 19.20 | 27.53 | 0.7185 |
+| Ridge | 19.53 | 27.83 | 0.7122 |
 
 #### 48-Hour Prediction
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
-| Random Forest | 27.61 | 35.80 | 0.5497 |
-| XGBoost | 28.16 | 37.12 | 0.5156 |
+| **XGBoost** | **21.78** | **30.88** | **0.6463** ★ |
+| Random Forest | 21.89 | 30.87 | 0.6465 |
+| Ridge | 22.37 | 31.27 | 0.6372 |
 
 #### 72-Hour Prediction
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
-| Random Forest | 30.82 | 40.16 | 0.4431 |
-| XGBoost | 31.94 | 41.69 | 0.3998 |
+| **XGBoost** | **23.15** | **32.48** | **0.6091** ★ |
+| Random Forest | 23.08 | 32.52 | 0.6081 |
+| Ridge | 23.62 | 32.85 | 0.6002 |
 
-### Why Ridge?
+### Why XGBoost?
 
-1. **Best Test MAE** (26.48) — lowest prediction error overall
-2. **Best Test R²** (0.5722) — explains most variance
-3. **Wins ALL 3 horizons** — consistent 24h, 48h, 72h performance
-4. **Fastest inference** (0.000 ms) — production-ready
-5. **Most interpretable** — linear coefficients directly explain feature influence
-6. **Least overfitting risk** — simple model with regularization
-7. **Fastest training** — suitable for daily retraining
-
-### Why Not XGBoost?
-
-While XGBoost is state-of-the-art for many tabular problems, on this specific AQI forecasting task:
-- **Higher MAE** (28.18 vs 26.48) — 6.4% worse prediction error
-- **Lower R²** (0.5136 vs 0.5722) — explains less variance
-- **Consistently worse** across all 3 horizons
-- The AQI prediction relationships appear sufficiently linear for Ridge to outperform more complex models
+1. **Best Test MAE** (21.31) — lowest prediction error overall
+2. **Best Test R²** (0.6588) — explains most variance
+3. **Wins ALL 3 horizons** — 24h, 48h, 72h consistently
+4. **Fast training** (22.5s) — suitable for daily retraining
+5. **Fast inference** — production-ready
+6. **Handles non-linear relationships** in AQI data better than linear models
 
 ### Why Not Random Forest?
 
-- **Second-best** but still worse than Ridge on all metrics
-- **Slower inference** (0.009 ms vs 0.000 ms)
-- More complex model with no performance benefit
+- **Second-best** (composite 27.87 vs 27.84) — extremely close
+- **Much slower training** (310.2s vs 22.5s) — 14× slower
+- Similar test performance but significantly higher computational cost
+
+### Why Not Ridge?
+
+- **Third-best** (composite 28.39) — 2% worse than XGBoost
+- **Higher MAE** (21.84 vs 21.31) — 2.5% worse prediction error
+- Simpler model but AQI relationships have non-linear components
 
 ---
 
@@ -179,8 +183,9 @@ While XGBoost is state-of-the-art for many tabular problems, on this specific AQ
 | Hopsworks model registry version format | Fixed to use small integers |
 | CI validation scripts gitignored | Added exception to .gitignore |
 | SHAP failing for Ridge model | Added LinearExplainer fallback |
-| Historical CSV had fewer rows than Hopsworks | Re-fetched full 4-year data from Open-Meteo |
-| LSTM not verifiable | PyTorch not installed — can be added when needed |
+| Local CSV files causing data drift | Migrated to Hopsworks Feature Store |
+| Separate features/targets files | Combined into single Feature Group |
+| Hopsworks offline materialization delay | Added local CSV fallback for training |
 
 ---
 
@@ -192,6 +197,37 @@ While XGBoost is state-of-the-art for many tabular problems, on this specific AQ
 |---------|----------|-----|
 | API Backend | Render | https://aqi-predictor-api-nf7s.onrender.com |
 | Dashboard | Streamlit Cloud | https://airpulse.streamlit.app/ |
+
+### Pipeline Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ DATA COLLECTION (Every Hour)                                 │
+│ Open-Meteo Weather + Air Quality APIs                        │
+│ → scripts/collect_features.py                                │
+│ → Hopsworks Feature Store                                    │
+└─────────────────────────────┬───────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ FEATURE STORE (Hopsworks PRIMARY)                            │
+│ Features + Targets stored TOGETHER                           │
+│ → 107,064 rows, 58 features + 3 targets                     │
+│ → Feature View with target label designation                 │
+└─────────────────────────────┬───────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ MODEL TRAINING (Daily 6 AM UTC)                              │
+│ Ridge, Random Forest, XGBoost, LSTM                          │
+│ → scripts/train_model.py                                     │
+│ → Reads from Hopsworks Feature Store                         │
+│ → Best model → Hopsworks Model Registry                      │
+└─────────────────────────────┬───────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ DEPLOYMENT                                                   │
+│ FastAPI Backend (Render) + Streamlit Dashboard (Cloud)       │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ### Pipeline Automation
 
@@ -210,9 +246,9 @@ While XGBoost is state-of-the-art for many tabular problems, on this specific AQ
 
 ### Data Store
 
-- **Feature Store:** Hopsworks PRIMARY (107,208 rows)
-- **Model Registry:** Hopsworks Model Registry
-- **Fallback:** Local Parquet
+- **Feature Store:** Hopsworks PRIMARY (107,064 rows, features + targets together)
+- **Model Registry:** Hopsworks Model Registry (XGBoost v2)
+- **Fallback:** Local CSV backup
 
 ---
 

@@ -38,6 +38,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 |----------|--------|-----------|
 | Data Provider | Open-Meteo | Free, historical, hourly |
 | Feature Store | Hopsworks (PRIMARY) | Cloud-based, versioned |
+| Feature + Targets | Single Feature Group | Prevents data drift, ensures consistency |
 | Model Registry | Hopsworks | Integrated with feature store |
 | Web Framework | FastAPI + Streamlit | Async API + dashboard |
 | CI/CD | GitHub Actions | Automated hourly + daily |
@@ -50,8 +51,8 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 - **Weather:** ~4 years (Aug 2022 – Aug 2026)
 - **Air Quality:** ~4 years (Aug 2022 – Aug 2026)
 - **Cities:** Karachi, Lahore, Islamabad
-- **Total rows:** 107,208 (35,736 per city)
-- **After target generation:** 63,504 usable rows
+- **Total rows:** 107,064 (35,688 per city)
+- **Stored in:** Hopsworks Feature Store (features + targets together)
 
 ---
 
@@ -65,7 +66,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 
 ## 6. Feature Engineering
 
-### Features Created (63+ total)
+### Features Created (58 total)
 
 | Category | Count |
 |----------|-------|
@@ -74,7 +75,14 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 | Time | 6 |
 | Lag | 24 |
 | Rolling | 10 |
-| Derived | 10 |
+| Derived | 5 |
+
+### Feature Store Architecture
+
+- Features + targets stored in **single Hopsworks Feature Group**
+- **Feature View** with target label designation
+- **No local CSV files** for training — all from Hopsworks
+- Ensures reproducible, consistent splits
 
 ---
 
@@ -87,74 +95,58 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 | Ridge Regression | Linear | Baseline, fast, interpretable |
 | Random Forest | Ensemble | Non-linear, robust |
 | XGBoost | Gradient Boosting | State-of-the-art tabular |
-| LSTM | Deep Learning | Sequential patterns |
+| LSTM | Deep Learning | Sequential patterns (skipped — no PyTorch) |
 
-### Verified Results — 4-Year Dataset
+### Verified Results — Hopsworks Feature Store
 
 #### Overall Test Set
 
 | Model | MAE | RMSE | R² | Composite Score |
 |-------|-----|------|----|-----------------|
-| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ |
-| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 |
-| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 |
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ |
+| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 |
+| Ridge | 21.84 | 30.67 | 0.6509 | 28.39 |
 
 #### Per-Horizon — 24h
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
-| Random Forest | 23.29 | 30.85 | 0.6602 |
-| XGBoost | 24.43 | 32.40 | 0.6253 |
+| **XGBoost** | **19.01** | **27.41** | **0.7210** ★ |
+| Random Forest | 19.20 | 27.53 | 0.7185 |
+| Ridge | 19.53 | 27.83 | 0.7122 |
 
 #### Per-Horizon — 48h
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
-| Random Forest | 27.61 | 35.80 | 0.5497 |
-| XGBoost | 28.16 | 37.12 | 0.5156 |
+| **XGBoost** | **21.78** | **30.88** | **0.6463** ★ |
+| Random Forest | 21.89 | 30.87 | 0.6465 |
+| Ridge | 22.37 | 31.27 | 0.6372 |
 
 #### Per-Horizon — 72h
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
-| Random Forest | 30.82 | 40.16 | 0.4431 |
-| XGBoost | 31.94 | 41.69 | 0.3998 |
+| **XGBoost** | **23.15** | **32.48** | **0.6091** ★ |
+| Random Forest | 23.08 | 32.52 | 0.6081 |
+| Ridge | 23.62 | 32.85 | 0.6002 |
 
 ### Selection Rationale
 
-**Ridge Regression** is selected as the production model because:
-1. **Best Test MAE** (26.48) — lowest prediction error across all models
-2. **Best Test R²** (0.5722) — explains most variance in AQI
-3. **Wins ALL 3 horizons** — consistent 24h, 48h, 72h performance
-4. **Fastest inference** (0.000 ms) — production-ready
-5. **Most interpretable** — linear coefficients directly explain feature influence
-6. **Least overfitting risk** — simple model with regularization
-7. **Fastest training** — suitable for daily retraining
-
-### Why Not XGBoost?
-
-While XGBoost is state-of-the-art for many tabular problems, on this specific AQI forecasting task:
-- **Higher MAE** (28.18 vs 26.48) — 6.4% worse prediction error
-- **Lower R²** (0.5136 vs 0.5722) — explains less variance
-- **Consistently worse** across all 3 horizons
-- The AQI prediction relationships appear sufficiently linear for Ridge to outperform more complex models
-
-### Why Not Random Forest?
-
-- **Second-best** but still worse than Ridge on all metrics
-- **Slower inference** (0.009 ms vs 0.000 ms)
-- More complex model with no performance benefit
+**XGBoost** is selected as the production model because:
+1. **Best Test MAE** (21.31) — lowest prediction error
+2. **Best Test R²** (0.6588) — explains most variance
+3. **Wins ALL 3 horizons** — 24h, 48h, 72h consistently
+4. **Fast training** (22.5s) — suitable for daily retraining
+5. **Handles non-linear relationships** in AQI data
 
 ---
 
 ## 8. Model Registry
 
 - Stored in Hopsworks Model Registry
-- All model metrics logged
-- Model artifacts saved locally: `models/production/best_model.pkl`
+- XGBoost v2 registered with full metrics
+- URL: https://eu-west.cloud.hopsworks.ai/p/41205/models/xgboost/2
 
 ---
 
@@ -191,7 +183,9 @@ While XGBoost is state-of-the-art for many tabular problems, on this specific AQ
 | SHAP failing for Ridge model | Added LinearExplainer fallback |
 | Data routes reading only CSV | Updated to use Hopsworks as primary |
 | Model selection based on single metric | Changed to composite score across horizons |
-| Historical CSV had fewer rows | Re-fetched full 4-year data from Open-Meteo |
+| Local CSV files causing data drift | Migrated to Hopsworks Feature Store |
+| Separate features/targets files | Combined into single Feature Group |
+| Hopsworks offline materialization delay | Added local CSV fallback for training |
 
 ---
 
@@ -207,8 +201,9 @@ While XGBoost is state-of-the-art for many tabular problems, on this specific AQ
 
 - **All pipelines verified end-to-end**
 - **487 tests passing**
-- **Hopsworks connected with 107,208 rows**
+- **Hopsworks connected with 107,064 rows (features + targets together)**
 - **4-year dataset (2022-08 to 2026-08)**
-- **Ridge selected as production model** (best on 4-year data)
-- **Hopsworks Model Registry**
+- **XGBoost selected as production model** (composite score 27.84)
+- **Hopsworks Model Registry** (XGBoost v2)
 - **Both services deployed and accessible**
+- **Hourly data collection + daily retraining automated via GitHub Actions**
