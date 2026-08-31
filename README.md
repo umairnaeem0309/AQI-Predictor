@@ -65,18 +65,20 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 ## Verified Model Performance
 
-*All results verified on 4-year dataset (2026-08-31).*
+*All results verified on 4-year dataset (Aug 2022 – Aug 2026).*
 
 ### Model Comparison — Overall (Test Set)
 
 | Model | MAE | RMSE | R² | Inference Latency |
 |-------|-----|------|----|-------------------|
-| **Random Forest** | **21.58** | **29.45** | **0.6543** | 0.048 ms/sample |
-| XGBoost | 21.89 | 29.78 | 0.6465 | 0.012 ms/sample |
-| Ridge Regression | 22.41 | 30.12 | 0.6383 | 0.001 ms/sample |
-| LSTM | 22.85 | 30.56 | 0.6275 | 0.159 ms/sample |
+| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms/sample |
+| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms/sample |
+| Ridge Regression | 21.73 | 30.64 | 0.6520 | 0.0003 ms/sample |
+| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms/sample |
 
-**Selected Model:** Random Forest (composite score: 0.4×MAE + 0.3×RMSE + 0.3×(1-R²)×100)
+**Selected Model:** Random Forest (validation composite: 0.4×MAE + 0.3×RMSE + 0.3×(1-R²)×100)
+
+**Note:** XGBoost has the best test MAE (21.34) and R² (0.6584), but RandomForest was selected based on validation composite to avoid overfitting.
 
 ---
 
