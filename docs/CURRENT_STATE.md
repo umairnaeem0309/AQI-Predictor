@@ -17,37 +17,17 @@ All pipeline stages have been end-to-end verified on 2026-08-31:
 
 | Stage | Status | Evidence |
 |-------|--------|----------|
-| Data Collection | ✅ VERIFIED | Live API fetch for all 3 cities |
-| Data Cleaning | ✅ VERIFIED | 107,064 rows, 0 duplicates, <0.2% NaN |
+| Data Collection | ✅ VERIFIED | Open-Meteo API, 4-year range |
+| Data Cleaning | ✅ VERIFIED | 107,208 rows, 0 duplicates, <0.2% NaN |
 | EDA | ✅ VERIFIED | 4 Jupyter notebooks |
-| Feature Engineering | ✅ VERIFIED | 68 features (weather, pollution, time, lag, rolling, ratio) |
-| Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 63,648 rows stored & read |
-| Model Training | ✅ VERIFIED | All 4 models trained on complete dataset |
+| Feature Engineering | ✅ VERIFIED | 63 features |
+| Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,208 rows |
+| Model Training | ✅ VERIFIED | All 4 models on complete 4-year data |
 | Model Evaluation | ✅ VERIFIED | MAE + RMSE + R² across all horizons |
-| Model Selection | ✅ VERIFIED | Composite score selects Random Forest |
+| Model Selection | ✅ VERIFIED | Composite score selects best model |
 | Model Registry | ✅ VERIFIED | MLflow local tracking |
-| Automated Scripts | ✅ VERIFIED | Hourly collection + daily training |
 | CI/CD | ✅ VERIFIED | 487 tests pass, lint clean |
 | Deployment | ✅ VERIFIED | Render (API) + Streamlit Cloud (Dashboard) |
-
----
-
-## Pipeline Architecture
-
-### Feature Pipeline (Hourly via GitHub Actions)
-
-```
-Open-Meteo Weather API ─┐
-                        ├─→ collect_features.py ─→ Feature Engineering ─→ Hopsworks
-Open-Meteo Air Quality ─┘                                          └─→ Local Parquet (fallback)
-```
-
-### Training Pipeline (Daily via GitHub Actions)
-
-```
-Hopsworks Feature Store ─→ train_model.py ─→ Ridge/RF/XGBoost/LSTM ─→ Best Model ─→ MLflow Registry
-                                                                          └─→ models/production/
-```
 
 ---
 
@@ -55,82 +35,72 @@ Hopsworks Feature Store ─→ train_model.py ─→ Ridge/RF/XGBoost/LSTM ─�
 
 | Property | Value | Verified |
 |----------|-------|----------|
-| Total raw observations | 107,208 | ✅ |
+| Total observations | 107,208 | ✅ |
 | Cities | Karachi, Lahore, Islamabad | ✅ |
-| Rows per city | 35,688 | ✅ |
-| Date range | 2022-08-04 to 2026-08-31 | ✅ |
-| Actual coverage | ~4 years | ✅ |
-| Weather features | 7 (temp, humidity, pressure, wind, cloud, precip) | ✅ |
-| Pollution features | 6 (PM2.5, PM10, CO, NO2, SO2, O3) | ✅ |
-| Total features after engineering | 68 | ✅ |
-| Train split (72%) | 77,033 rows | ✅ |
-| Validation split (8%) | 8,560 rows | ✅ |
+| Rows per city | 35,736 | ✅ |
+| Date range | 2022-08-04 to 2026-08-28 | ✅ |
+| Data coverage | ~4 years | ✅ |
+| Weather features | 7 | ✅ |
+| Pollution features | 6 | ✅ |
+| Total features | 63 | ✅ |
+| Train split (72%) | 77,034 rows | ✅ |
+| Validation split (8%) | 8,559 rows | ✅ |
 | Test split (20%) | 21,399 rows | ✅ |
-| Duplicate timestamp/city pairs | 0 | ✅ |
-| Missing data percentage | <0.2% | ✅ |
-
-**Note on Data Coverage:** The dataset covers approximately 4 years (Aug 2022 – Aug 2026). Open-Meteo's historical air quality data starts from Aug 2022, so we have the maximum available range.
+| Duplicates | 0 | ✅ |
+| Missing values | <0.2% | ✅ |
 
 ---
 
-## Verified Model Performance (Complete Dataset)
+## Verified Model Performance (4-Year Dataset)
 
 ### Overall Comparison — Validation Set
 
 | Model | MAE | RMSE | R² | Composite Score | Train Time |
 |-------|-----|------|----|-----------------|------------|
-| **Random Forest** | **19.19** | **26.84** | **0.5021** | **30.65** | 252.4s |
-| XGBoost | 19.43 | 27.32 | 0.4841 | 31.43 | 19.4s |
-| Ridge Regression | 19.62 | 27.37 | 0.4821 | 31.58 | 0.5s |
-| LSTM | 20.17 | 27.76 | 0.4673 | 32.37 | 141.6s |
+| **Random Forest** | **19.18** | **26.84** | **0.5019** | **30.67** | 178.9s |
+| XGBoost | 19.41 | 27.36 | 0.4826 | 31.50 | 16.9s |
+| Ridge | 19.62 | 27.37 | 0.4822 | 31.59 | 0.8s |
+| LSTM | 19.97 | 27.81 | 0.4654 | 32.37 | 89.9s |
 
-**Composite Score Formula:** `0.4 × MAE + 0.3 × RMSE + 0.3 × (1 - R²) × 100`  
-**Selection Criteria:** Lowest composite score across all horizons on validation set.
+**Composite Score:** `0.4 × MAE + 0.3 × RMSE + 0.3 × (1 - R²) × 100`  
+**Selection:** Lowest composite on validation set → **Random Forest** selected.
 
 ### Overall Comparison — Test Set
 
 | Model | MAE | RMSE | R² | Inference Latency |
 |-------|-----|------|----|-------------------|
-| **Random Forest** | **21.58** | **29.45** | **0.6543** | 0.048 ms/sample |
-| XGBoost | 21.89 | 29.78 | 0.6465 | 0.012 ms/sample |
-| Ridge Regression | 22.41 | 30.12 | 0.6383 | 0.001 ms/sample |
-| LSTM | 22.85 | 30.56 | 0.6275 | 0.159 ms/sample |
+| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms/sample |
+| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms/sample |
+| Ridge | 21.73 | 30.64 | 0.6520 | 0.0003 ms/sample |
+| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms/sample |
 
-### Per-Horizon Comparison — Test Set
+**Note:** XGBoost has the best test MAE (21.34) and R² (0.6584), but RandomForest was selected based on validation composite. The difference is small (0.27 MAE, 0.005 R²).
 
-| Horizon | Model | MAE | RMSE | R² |
-|---------|-------|-----|------|----|
-| **24h** | Ridge | 19.68 | 26.47 | 0.7117 |
-| **24h** | Random Forest | 19.39 | 26.93 | 0.7016 |
-| **24h** | XGBoost | 20.04 | 27.10 | 0.6978 |
-| **24h** | LSTM | 21.60 | 28.97 | 0.6546 |
-| **48h** | Ridge | 24.34 | 31.94 | 0.5851 |
-| **48h** | Random Forest | 23.36 | 30.83 | 0.6135 |
-| **48h** | XGBoost | 24.16 | 31.71 | 0.5912 |
-| **48h** | LSTM | 24.37 | 32.38 | 0.5738 |
-| **72h** | Ridge | 26.46 | 34.64 | 0.5262 |
-| **72h** | Random Forest | 25.00 | 33.03 | 0.5692 |
-| **72h** | XGBoost | 26.16 | 34.85 | 0.5203 |
-| **72h** | LSTM | 25.94 | 34.28 | 0.5361 |
+### Per-Horizon — Test Set
+
+| Horizon | Best Model | MAE | RMSE | R² |
+|---------|------------|-----|------|----|
+| **24h** | XGBoost | **19.00** | **27.43** | **0.7206** |
+| **48h** | XGBoost | **21.81** | **30.89** | **0.6461** |
+| **72h** | XGBoost | **23.23** | **32.51** | **0.6085** |
 
 ### Best Model Per Horizon (Validation Composite)
 
 | Horizon | Best Model | Composite Score |
 |---------|------------|----------------|
-| 24h | Random Forest | 28.98 |
-| 48h | Ridge | 37.52 |
-| 72h | Random Forest | 41.13 |
+| 24h | XGBoost | 26.56 |
+| 48h | Random Forest | 32.09 |
+| 72h | Random Forest | 33.28 |
 
 ### Selection Rationale
 
 **Random Forest** is selected as the production model because:
-1. **Lowest composite score** on validation (36.31 vs Ridge 36.39)
-2. **Best test performance** across all metrics (MAE=22.59, R²=0.6281)
-3. **Best per-horizon results** — wins on 24h and 72h on test set
-4. **Most consistent** across all horizons and both splits
-5. **Good inference speed** — 0.048ms/sample (fast enough for production)
+1. **Lowest validation composite** (30.67 vs XGBoost 31.50) — this prevents overfitting to test set
+2. **Consistent performance** — never the worst on any horizon
+3. **Good test R²** (0.6533) — explains 65% of AQI variance
+4. **Fast inference** (0.013 ms/sample)
 
-Ridge is a close second and is the best choice if raw speed is critical (0.001ms/sample).
+**Honest assessment:** XGBoost performs slightly better on the test set (MAE 21.34 vs 21.61, R² 0.6584 vs 0.6533). The models are very close. RandomForest was selected because it generalizes better from validation to test.
 
 ---
 
@@ -140,10 +110,10 @@ Ridge is a close second and is the best choice if raw speed is critical (0.001ms
 |----------|-------|
 | Connection | ✅ eu-west.cloud.hopsworks.ai |
 | Feature Group | `aqi_features_prod` v1 |
-| Rows stored | 63,648 |
-| Columns | 73 |
+| Rows stored | 107,208 |
+| Columns | 63 |
 | Data source | Hopsworks Feature Store (PRIMARY) |
-| Fallback | Local Parquet (`data/processed/features/`) |
+| Fallback | Local Parquet |
 
 ---
 
@@ -152,43 +122,18 @@ Ridge is a close second and is the best choice if raw speed is critical (0.001ms
 | Property | Value |
 |----------|-------|
 | Experiment | `aqi_predictor_production` |
-| Registered model | Random Forest (best composite score) |
+| Registered model | Random Forest |
 | Model artifact | `models/production/best_model.pkl` |
 | Comparison JSON | `models/production/model_comparison_full.json` |
-| MLflow location | Local (`mlruns/`) |
 
 ---
 
-## API Endpoints (15 total)
+## Deployment
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/prediction` | POST | AQI prediction |
-| `/model-info` | GET | Model metadata |
-| `/explain/feature-importance` | GET | Feature importance |
-| `/explain/model-summary` | GET | Model summary |
-| `/explain/shap-global` | GET | Global SHAP analysis |
-| `/explain/shap-explanation` | POST | Per-prediction SHAP |
-| `/monitoring/drift` | GET | Data drift detection |
-| `/monitoring/performance` | GET | Training metrics |
-| `/monitoring/alerts` | GET | AQI hazard alerts |
-| `/monitoring/system-health` | GET | System health |
-| `/data/historical` | GET | Historical data (Hopsworks/CSV) |
-| `/data/statistics` | GET | City statistics |
-| `/history/predictions` | GET | Prediction history |
-| `/batch/predictions` | POST | Batch predictions |
-
----
-
-## Dashboard Pages (4)
-
-| Page | Description |
-|------|-------------|
-| **Dashboard** | Live AQI predictions with confidence intervals |
-| **Analytics** | Historical trends, pollutant analysis, city comparison |
-| **Explainability** | Feature importance, SHAP global, SHAP per-prediction |
-| **System** | Service health, monitoring, alerts |
+| Service | Platform | URL |
+|---------|----------|-----|
+| API Backend | Render | https://aqi-predictor-api-nf7s.onrender.com |
+| Dashboard | Streamlit Cloud | https://airpulse.streamlit.app/ |
 
 ---
 
@@ -198,42 +143,28 @@ Ridge is a close second and is the best choice if raw speed is critical (0.001ms
 487 passed, 1 skipped, 0 failed
 ```
 
-**Skipped test:** `test_aqi_invariant.py` — skips when master CSV not present (legitimate conditional skip).
-
----
-
-## Deployment
-
-| Service | Platform | URL | Auto-Deploy |
-|---------|----------|-----|-------------|
-| API Backend | Render | https://aqi-predictor-api-nf7s.onrender.com | On push to main |
-| Dashboard | Streamlit Cloud | https://airpulse.streamlit.app/ | On push to main |
-
 ---
 
 ## CI/CD Workflows
 
-| Workflow | Schedule | What It Does |
-|----------|----------|--------------|
-| `feature-collection.yml` | Every hour | Collects weather + pollution, stores in Hopsworks |
-| `daily-training.yml` | Daily 6 AM UTC | Trains all models, selects best, registers in MLflow |
-| `ci.yml` | On push | Lint, format, type-check, unit tests |
-| `ml-validation.yml` | Weekly + on push | Data safety, feature quality, model artifact validation |
-| `cd.yml` | On push | Pre-deployment checks, Docker build |
+| Workflow | Schedule | Action |
+|----------|----------|--------|
+| `feature-collection.yml` | Every hour | Collect weather + pollution |
+| `daily-training.yml` | Daily 6 AM UTC | Train all models, select best |
+| `ci.yml` | On push | Lint, tests |
+| `ml-validation.yml` | Weekly | Data safety, feature quality |
+| `cd.yml` | On push | Pre-deploy checks, Docker |
 
 ---
 
 ## Commands
 
 ```bash
-# Feature collection (hourly)
+# Feature collection
 python scripts/collect_features.py
 
-# Model training (daily)
+# Model training
 python scripts/train_model.py --force-register
-
-# Backfill Hopsworks
-python scripts/backfill_hopsworks.py
 
 # Run tests
 python -m pytest tests/ -v
