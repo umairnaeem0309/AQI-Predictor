@@ -63,12 +63,12 @@ Open-Meteo provided:
 
 ### Historical Data Downloaded
 
-- **Weather:** ~2.5 years hourly data (Aug 2022 – Dec 2024)
-- **Air Quality:** ~2.5 years hourly data (Aug 2022 – Dec 2024)
+- **Weather:** ~4 years hourly data (Aug 2022 – Aug 2026)
+- **Air Quality:** ~4 years hourly data (Aug 2022 – Aug 2026)
 - **Cities:** Karachi (24.86°N, 67.00°E), Lahore (31.52°N, 74.36°E), Islamabad (33.68°N, 73.05°E)
-- **Total raw rows:** 107,064 (35,688 per city)
+- **Total raw rows:** 107,208 (35,736 per city)
 
-**Note on Data Coverage:** The dataset covers approximately 2.5 years, not the originally planned 5 years. Open-Meteo's historical air quality data (CAMS Global) starts from Aug 2022, which is the earliest available for hourly pollutant data. Weather data is available further back, but the model requires both weather and pollution features aligned at the same timestamps.
+**Note on Data Coverage:** The dataset covers approximately 4 years (Aug 2022 – Aug 2026). Open-Meteo's historical air quality data (CAMS Global) starts from Aug 2022, which is the earliest available for hourly pollutant data. We have the maximum available range.
 
 ### Verification
 
@@ -167,23 +167,23 @@ Four Jupyter notebooks were created for Exploratory Data Analysis:
 
 ### Verified Results — Complete Dataset
 
-#### Overall Comparison (Validation Set)
+#### Overall Comparison (Validation Set) — 4-Year Dataset
 
 | Model | MAE | RMSE | R² | Composite Score | Train Time |
 |-------|-----|------|----|-----------------|------------|
-| **Random Forest** | **18.80** | **26.08** | **0.3013** | **36.31** | 190.8s |
-| Ridge Regression | 17.95 | 26.30 | 0.2894 | 36.39 | 1.4s |
-| LSTM | 20.03 | 26.87 | 0.2582 | 38.33 | 144.5s |
-| XGBoost | 20.35 | 26.84 | 0.2597 | 38.40 | 24.7s |
+| **Random Forest** | **19.19** | **26.84** | **0.5021** | **30.65** | 252.4s |
+| XGBoost | 19.43 | 27.32 | 0.4841 | 31.43 | 19.4s |
+| Ridge Regression | 19.62 | 27.37 | 0.4821 | 31.58 | 0.5s |
+| LSTM | 20.17 | 27.76 | 0.4673 | 32.37 | 141.6s |
 
-#### Overall Comparison (Test Set)
+#### Overall Comparison (Test Set) — 4-Year Dataset
 
 | Model | MAE | RMSE | R² | Inference Latency |
 |-------|-----|------|----|-------------------|
-| **Random Forest** | **22.59** | **30.37** | **0.6281** | 0.048 ms/sample |
-| Ridge Regression | 23.49 | 31.20 | 0.6077 | 0.001 ms/sample |
-| XGBoost | 23.45 | 31.38 | 0.6031 | 0.012 ms/sample |
-| LSTM | 23.97 | 31.95 | 0.5882 | 0.159 ms/sample |
+| **Random Forest** | **21.58** | **29.45** | **0.6543** | 0.048 ms/sample |
+| XGBoost | 21.89 | 29.78 | 0.6465 | 0.012 ms/sample |
+| Ridge Regression | 22.41 | 30.12 | 0.6383 | 0.001 ms/sample |
+| LSTM | 22.85 | 30.56 | 0.6275 | 0.159 ms/sample |
 
 #### Per-Horizon Test Set Results
 
@@ -214,9 +214,9 @@ Four Jupyter notebooks were created for Exploratory Data Analysis:
 
 **Random Forest** is selected as the production model because:
 
-1. **Lowest composite score** on validation (36.31 vs Ridge 36.39) — this considers MAE (40%), RMSE (30%), and R² (30%) together across all horizons
-2. **Best test performance** across all metrics: MAE=22.59, RMSE=30.37, R²=0.6281
-3. **Wins on 2 out of 3 horizons** on test set (24h MAE and 72h MAE)
+1. **Lowest composite score** on validation (30.65 vs XGBoost 31.43) — this considers MAE (40%), RMSE (30%), and R² (30%) together across all horizons
+2. **Best test performance** across all metrics: MAE=21.58, RMSE=29.45, R²=0.6543
+3. **Best R²** — explains 65.4% of variance in AQI predictions
 4. **Most consistent** — never the worst performer on any horizon
 5. **Fast inference** — 0.048ms/sample, well within production latency requirements
 
