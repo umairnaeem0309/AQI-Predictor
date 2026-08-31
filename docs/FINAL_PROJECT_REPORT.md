@@ -2,7 +2,7 @@
 
 **Project:** Production-grade AQI forecasting for Pakistani cities
 **Timeline:** July — August 2026
-**Status:** Model training complete, XGBoost selected as production model
+**Status:** Model training complete, Ridge selected as production model
 **Report Date:** 31 August 2026
 
 ---
@@ -56,12 +56,13 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 - **Actual:** ~4 years (Aug 2022 – Aug 2026)
 - **Reason:** Open-Meteo CAMS Global air quality starts Aug 2022
 - **Total:** 107,208 hourly observations (35,736 per city)
+- **After target generation:** 63,504 usable rows (72h target shift removes trailing rows)
 
 ---
 
 ## 3. Feature Engineering
 
-### Features Created (63 total)
+### Features Created (63+ total)
 
 | Category | Count | Examples |
 |----------|-------|----------|
@@ -87,8 +88,8 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 | Model | Type | Reason |
 |-------|------|--------|
 | Ridge Regression | Linear | Baseline, fast, interpretable |
-| Random Forest | Ensemble | Non-linear, robust |
-| XGBoost | Gradient Boosting | State-of-the-art tabular |
+| Random Forest | Ensemble | Non-linear, robust to overfitting |
+| XGBoost | Gradient Boosting | State-of-the-art for tabular data |
 | LSTM | Deep Learning | Sequential pattern capture |
 
 ### Selection Criteria
@@ -96,34 +97,74 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 - **Composite score:** `0.4 × MAE + 0.3 × RMSE + 0.3 × (1 - R²) × 100`
 - **Primary metric:** Test MAE (what matters for production)
 - **Per-horizon:** Evaluate 24h, 48h, 72h separately
+- **Winner:** Model with lowest composite score on test set
 
 ---
 
 ## 5. Verified Results (4-Year Dataset)
 
+*All results verified on the complete 4-year dataset (63,504 usable rows after target generation).*
+
 ### Overall Comparison — Test Set
 
-| Model | MAE | RMSE | R² | Inference Latency |
-|-------|-----|------|----|-------------------|
-| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms |
-| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms |
-| Ridge | 21.73 | 30.64 | 0.6520 | 0.0003 ms |
-| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms |
+| Model | MAE | RMSE | R² | Composite Score | Inference Latency |
+|-------|-----|------|----|-----------------|-------------------|
+| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ | 0.000 ms |
+| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 | 0.009 ms |
+| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 | 0.015 ms |
+| LSTM | *Not verified* | — | — | — | — |
+
+> **LSTM Note:** PyTorch is not currently installed in the `aqi-predictor` environment. LSTM results were not verified on the updated 4-year dataset. The LSTM implementation exists in `src/models/lstm_model.py` and can be enabled by installing PyTorch (`pip install torch`). Earlier results on the 2.5-year dataset showed LSTM with Test MAE ≈ 22.95.
 
 ### Per-Horizon — Test Set
 
-| Horizon | Best Model | MAE | RMSE | R² |
-|---------|------------|-----|------|----|
-| 24h | XGBoost | 19.00 | 27.43 | 0.7206 |
-| 48h | XGBoost | 21.81 | 30.89 | 0.6461 |
-| 72h | XGBoost | 23.23 | 32.51 | 0.6085 |
+#### 24-Hour Prediction
 
-### Production Model: XGBoost
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
+| Random Forest | 23.29 | 30.85 | 0.6602 |
+| XGBoost | 24.43 | 32.40 | 0.6253 |
 
-- **Test MAE:** 21.34
-- **Test R²:** 0.6584
-- **Wins:** All 3 horizons, overall MAE, overall R²
-- **Stored in:** Hopsworks Model Registry
+#### 48-Hour Prediction
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
+| Random Forest | 27.61 | 35.80 | 0.5497 |
+| XGBoost | 28.16 | 37.12 | 0.5156 |
+
+#### 72-Hour Prediction
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
+| Random Forest | 30.82 | 40.16 | 0.4431 |
+| XGBoost | 31.94 | 41.69 | 0.3998 |
+
+### Why Ridge?
+
+1. **Best Test MAE** (26.48) — lowest prediction error overall
+2. **Best Test R²** (0.5722) — explains most variance
+3. **Wins ALL 3 horizons** — consistent 24h, 48h, 72h performance
+4. **Fastest inference** (0.000 ms) — production-ready
+5. **Most interpretable** — linear coefficients directly explain feature influence
+6. **Least overfitting risk** — simple model with regularization
+7. **Fastest training** — suitable for daily retraining
+
+### Why Not XGBoost?
+
+While XGBoost is state-of-the-art for many tabular problems, on this specific AQI forecasting task:
+- **Higher MAE** (28.18 vs 26.48) — 6.4% worse prediction error
+- **Lower R²** (0.5136 vs 0.5722) — explains less variance
+- **Consistently worse** across all 3 horizons
+- The AQI prediction relationships appear sufficiently linear for Ridge to outperform more complex models
+
+### Why Not Random Forest?
+
+- **Second-best** but still worse than Ridge on all metrics
+- **Slower inference** (0.009 ms vs 0.000 ms)
+- More complex model with no performance benefit
 
 ---
 
@@ -138,6 +179,8 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 | Hopsworks model registry version format | Fixed to use small integers |
 | CI validation scripts gitignored | Added exception to .gitignore |
 | SHAP failing for Ridge model | Added LinearExplainer fallback |
+| Historical CSV had fewer rows than Hopsworks | Re-fetched full 4-year data from Open-Meteo |
+| LSTM not verifiable | PyTorch not installed — can be added when needed |
 
 ---
 

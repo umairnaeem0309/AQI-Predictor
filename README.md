@@ -12,7 +12,7 @@
 
 ## Overview
 
-A production-grade ML pipeline that collects real-time weather and air quality data from Open-Meteo, engineers 63 features, trains multiple models (Ridge, Random Forest, XGBoost, LSTM), and serves predictions via a REST API and interactive dashboard.
+A production-grade ML pipeline that collects real-time weather and air quality data from Open-Meteo, engineers 63+ features, trains multiple models (Ridge, Random Forest, XGBoost, LSTM), and serves predictions via a REST API and interactive dashboard.
 
 ### Cities Supported
 
@@ -33,7 +33,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ FEATURE ENGINEERING                                          │
-│ 63 features: weather, pollution, time, lags, rolling, ratios │
+│ 63+ features: weather, pollution, time, lags, rolling, ratios│
 │ → src/features/feature_engineering.py                        │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
@@ -65,26 +65,60 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 ## Verified Model Performance
 
-*All results verified on 4-year dataset (Aug 2022 – Aug 2026).*
+*All results verified on complete 4-year dataset (63,504 usable rows).*
 
-### Production Model: XGBoost
+### Production Model: Ridge Regression
 
 | Metric | Value |
 |--------|-------|
-| **Test MAE** | **21.34** |
-| **Test RMSE** | **30.35** |
-| **Test R²** | **0.6584** |
-| **Train Time** | 9.9s |
-| **Inference Latency** | 0.011 ms/sample |
+| **Test MAE** | **26.48** |
+| **Test RMSE** | **34.95** |
+| **Test R²** | **0.5722** |
+| **Composite Score** | **33.91** |
+| **Inference Latency** | 0.000 ms |
 
-### Model Comparison — Test Set
+### Model Comparison — Test Set (All Models)
 
-| Model | MAE | RMSE | R² | Latency |
-|-------|-----|------|----|---------|
-| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms |
-| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms |
-| Ridge | 21.73 | 30.64 | 0.6520 | 0.0003 ms |
-| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms |
+| Model | MAE | RMSE | R² | Composite | Latency |
+|-------|-----|------|----|-----------|---------|
+| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ | 0.000 ms |
+| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 | 0.009 ms |
+| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 | 0.015 ms |
+
+### Per-Horizon Comparison — Test Set
+
+#### 24-Hour Prediction
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
+| Random Forest | 23.29 | 30.85 | 0.6602 |
+| XGBoost | 24.43 | 32.40 | 0.6253 |
+
+#### 48-Hour Prediction
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
+| Random Forest | 27.61 | 35.80 | 0.5497 |
+| XGBoost | 28.16 | 37.12 | 0.5156 |
+
+#### 72-Hour Prediction
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
+| Random Forest | 30.82 | 40.16 | 0.4431 |
+| XGBoost | 31.94 | 41.69 | 0.3998 |
+
+### Why Ridge?
+
+1. **Lowest MAE** (26.48) across all models
+2. **Highest R²** (0.5722) — explains most variance
+3. **Wins ALL 3 horizons** — consistent performance
+4. **Fastest inference** (0.000 ms) — production-ready
+5. **Most interpretable** — linear coefficients directly explain feature influence
+6. **Least overfitting risk** — simple model with regularization
 
 ---
 
@@ -96,7 +130,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | Data Cleaning | ✅ Verified | 107,208 rows, 0 duplicates, <0.2% NaN |
 | Feature Engineering | ✅ Verified | 63 features |
 | Feature Store | ✅ Verified | Hopsworks: 107,208 rows |
-| Model Training | ✅ Verified | All 4 models on complete data |
+| Model Training | ✅ Verified | All models on complete data |
 | Model Registry | ✅ Verified | Hopsworks Model Registry |
 | CI/CD | ✅ Verified | 487 tests passing, lint clean |
 

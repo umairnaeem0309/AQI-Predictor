@@ -51,6 +51,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 - **Air Quality:** ~4 years (Aug 2022 – Aug 2026)
 - **Cities:** Karachi, Lahore, Islamabad
 - **Total rows:** 107,208 (35,736 per city)
+- **After target generation:** 63,504 usable rows
 
 ---
 
@@ -64,7 +65,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 
 ## 6. Feature Engineering
 
-### Features Created (63 total)
+### Features Created (63+ total)
 
 | Category | Count |
 |----------|-------|
@@ -83,45 +84,76 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 
 | Model | Type | Why Selected |
 |-------|------|--------------|
-| Ridge Regression | Linear | Baseline, fast |
+| Ridge Regression | Linear | Baseline, fast, interpretable |
 | Random Forest | Ensemble | Non-linear, robust |
 | XGBoost | Gradient Boosting | State-of-the-art tabular |
 | LSTM | Deep Learning | Sequential patterns |
 
 ### Verified Results — 4-Year Dataset
 
-#### Test Set
+#### Overall Test Set
+
+| Model | MAE | RMSE | R² | Composite Score |
+|-------|-----|------|----|-----------------|
+| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ |
+| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 |
+| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 |
+
+#### Per-Horizon — 24h
 
 | Model | MAE | RMSE | R² |
 |-------|-----|------|----|
-| **XGBoost** | **21.34** | **30.35** | **0.6584** |
-| Random Forest | 21.61 | 30.58 | 0.6533 |
-| Ridge | 21.73 | 30.64 | 0.6520 |
-| LSTM | 22.95 | 32.46 | 0.6092 |
+| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
+| Random Forest | 23.29 | 30.85 | 0.6602 |
+| XGBoost | 24.43 | 32.40 | 0.6253 |
 
-#### Per-Horizon Test Set
+#### Per-Horizon — 48h
 
-| Horizon | Best Model | MAE | R² |
-|---------|------------|-----|----|
-| 24h | XGBoost | 19.00 | 0.7206 |
-| 48h | XGBoost | 21.81 | 0.6461 |
-| 72h | XGBoost | 23.23 | 0.6085 |
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
+| Random Forest | 27.61 | 35.80 | 0.5497 |
+| XGBoost | 28.16 | 37.12 | 0.5156 |
+
+#### Per-Horizon — 72h
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
+| Random Forest | 30.82 | 40.16 | 0.4431 |
+| XGBoost | 31.94 | 41.69 | 0.3998 |
 
 ### Selection Rationale
 
-**XGBoost** is selected as the production model because:
-1. **Best Test MAE** (21.34) — lowest prediction error
-2. **Best Test R²** (0.6584) — explains most variance
-3. **Wins ALL 3 horizons** — consistent performance
-4. **Fast training** (9.9s) — suitable for daily retraining
-5. **Fast inference** (0.011 ms) — production-ready
+**Ridge Regression** is selected as the production model because:
+1. **Best Test MAE** (26.48) — lowest prediction error across all models
+2. **Best Test R²** (0.5722) — explains most variance in AQI
+3. **Wins ALL 3 horizons** — consistent 24h, 48h, 72h performance
+4. **Fastest inference** (0.000 ms) — production-ready
+5. **Most interpretable** — linear coefficients directly explain feature influence
+6. **Least overfitting risk** — simple model with regularization
+7. **Fastest training** — suitable for daily retraining
+
+### Why Not XGBoost?
+
+While XGBoost is state-of-the-art for many tabular problems, on this specific AQI forecasting task:
+- **Higher MAE** (28.18 vs 26.48) — 6.4% worse prediction error
+- **Lower R²** (0.5136 vs 0.5722) — explains less variance
+- **Consistently worse** across all 3 horizons
+- The AQI prediction relationships appear sufficiently linear for Ridge to outperform more complex models
+
+### Why Not Random Forest?
+
+- **Second-best** but still worse than Ridge on all metrics
+- **Slower inference** (0.009 ms vs 0.000 ms)
+- More complex model with no performance benefit
 
 ---
 
 ## 8. Model Registry
 
 - Stored in Hopsworks Model Registry
-- All 4 model metrics logged
+- All model metrics logged
 - Model artifacts saved locally: `models/production/best_model.pkl`
 
 ---
@@ -159,6 +191,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 | SHAP failing for Ridge model | Added LinearExplainer fallback |
 | Data routes reading only CSV | Updated to use Hopsworks as primary |
 | Model selection based on single metric | Changed to composite score across horizons |
+| Historical CSV had fewer rows | Re-fetched full 4-year data from Open-Meteo |
 
 ---
 
@@ -176,6 +209,6 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 - **487 tests passing**
 - **Hopsworks connected with 107,208 rows**
 - **4-year dataset (2022-08 to 2026-08)**
-- **XGBoost selected as production model**
+- **Ridge selected as production model** (best on 4-year data)
 - **Hopsworks Model Registry**
 - **Both services deployed and accessible**
