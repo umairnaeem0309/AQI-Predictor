@@ -497,19 +497,20 @@ def train_all_models(df, feature_columns):
     }
 
 
-def register_in_mlflow(result, force=False, min_improvement=0.0):
+def register_in_hopsworks(result, force=False, min_improvement=0.0):
     """
-    Register model in MLflow if performance improved.
+    Register model in Hopsworks Model Registry if performance improved.
 
     Returns:
-        (run_id, registered) tuple
+        (registered) tuple
     """
     try:
-        import mlflow
-        import mlflow.sklearn
+        from src.models.hopsworks_registry import get_model_registry
     except ImportError:
-        logger.warning("MLflow not installed, skipping registration")
-        return None, False
+        logger.warning("Hopsworks registry not available, skipping registration")
+        return False
+
+    registry = get_model_registry()
 
     # Check if we should register
     should_register = force
@@ -541,67 +542,46 @@ def register_in_mlflow(result, force=False, min_improvement=0.0):
             logger.info("No previous model found, registering first model...")
 
     if not should_register:
-        return None, False
+        return False
 
-    # Register in MLflow
-    mlflow.set_experiment("aqi_predictor_production")
-    run_name = f"{result['model_key']}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}"
+    # Register in Hopsworks
+    try:
+        success = registry.store_model(
+            model_name=result["model_key"],
+            model=result["model"],
+            metrics={
+                "val_mae": result["val_metrics"]["mae"],
+                "val_rmse": result["val_metrics"]["rmse"],
+                "val_r2": result["val_metrics"]["r2"],
+                "test_mae": result["test_metrics"]["mae"],
+                "test_rmse": result["test_metrics"]["rmse"],
+                "test_r2": result["test_metrics"]["r2"],
+            },
+            metadata={
+                "model_name": result["model_name"],
+                "training_date": datetime.now(timezone.utc).isoformat(),
+                "dataset_type": "real_api_data",
+                "train_rows": result["train_rows"],
+                "val_rows": result["val_rows"],
+                "test_rows": result["test_rows"],
+                "n_features": len(result["feature_columns"]),
+                "model_comparison": {
+                    k: {"val_mae": v["val_metrics"]["mae"], "test_mae": v["test_metrics"]["mae"]}
+                    for k, v in result["all_results"].items()
+                },
+            },
+        )
 
-    with mlflow.start_run(run_name=run_name) as run:
-        # Tags
-        mlflow.set_tag("model_name", result["model_name"])
-        mlflow.set_tag("model_key", result["model_key"])
-        mlflow.set_tag("training_date", datetime.now(timezone.utc).isoformat())
-        mlflow.set_tag("dataset_type", "real_api_data")
-        mlflow.set_tag("approved_for_training", "true")
-        mlflow.set_tag("training_pipeline", "daily_auto")
+        if success:
+            logger.info(f"✅ Registered in Hopsworks: {result['model_name']}")
+        else:
+            logger.warning("Hopsworks registration failed")
 
-        # Log comparison of all models
-        for key, r in result["all_results"].items():
-            mlflow.log_metric(f"{key}_val_mae", r["val_metrics"]["mae"])
-            mlflow.log_metric(f"{key}_val_rmse", r["val_metrics"]["rmse"])
-            mlflow.log_metric(f"{key}_val_r2", r["val_metrics"]["r2"])
-            mlflow.log_metric(f"{key}_test_mae", r["test_metrics"]["mae"])
-            mlflow.log_metric(f"{key}_train_time", r["train_time"])
+        return success
 
-        # Best model params
-        mlflow.log_param("best_model", result["model_name"])
-        mlflow.log_param("train_rows", result["train_rows"])
-        mlflow.log_param("val_rows", result["val_rows"])
-        mlflow.log_param("test_rows", result["test_rows"])
-        mlflow.log_param("n_features", len(result["feature_columns"]))
-
-        # Best model metrics
-        for key, value in result["val_metrics"].items():
-            mlflow.log_metric(f"val_{key}", value)
-        for key, value in result["test_metrics"].items():
-            mlflow.log_metric(f"test_{key}", value)
-        mlflow.log_metric("train_time_s", result["train_time"])
-
-        # Log best model
-        mlflow.sklearn.log_model(result["model"], "model")
-
-        # Residual stats for confidence intervals
-        mlflow.log_dict(result["residual_stats"], "residual_stats.json")
-
-        # Feature list
-        mlflow.log_dict({"features": result["feature_columns"]}, "feature_list.json")
-
-        # Log full comparison as JSON
-        comparison = {
-            k: {
-                "val_mae": v["val_metrics"]["mae"],
-                "test_mae": v["test_metrics"]["mae"],
-                "time": v["train_time"],
-            }
-            for k, v in result["all_results"].items()
-        }
-        mlflow.log_dict(comparison, "model_comparison.json")
-
-        run_id = run.info.run_id
-        logger.info(f"✅ Registered in MLflow: {result['model_name']} (run={run_id})")
-
-    return run_id, True
+    except Exception as e:
+        logger.error(f"Hopsworks registration failed: {e}")
+        return False
 
 
 def save_model_locally(result, run_id=None):
@@ -662,7 +642,6 @@ def save_model_locally(result, run_id=None):
         "val_rows": result["val_rows"],
         "test_rows": result["test_rows"],
         "n_features": len(result["feature_columns"]),
-        "mlflow_run_id": run_id,
     }
 
     meta_path = MODELS_DIR / "model_metadata.json"
@@ -746,15 +725,15 @@ def main():
         # 4. Train ALL models, select best
         result = train_all_models(df, feature_columns)
 
-        # 5. Register in MLflow
-        run_id, registered = register_in_mlflow(
+        # 5. Register in Hopsworks
+        registered = register_in_hopsworks(
             result,
             force=args.force_register,
             min_improvement=args.min_improvement,
         )
 
         # 6. Save locally (always)
-        save_model_locally(result, run_id)
+        save_model_locally(result)
 
         # 7. Print summary
         logger.info("=" * 60)
@@ -765,7 +744,6 @@ def main():
         logger.info(f"  Test R²:        {result['test_metrics']['r2']:.4f}")
         logger.info(f"  Training time:  {result['train_time']:.1f}s")
         logger.info(f"  Registered:     {registered}")
-        logger.info(f"  MLflow run:     {run_id}")
         logger.info("=" * 60)
 
         return 0
