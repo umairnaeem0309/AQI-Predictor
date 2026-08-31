@@ -600,3 +600,82 @@ New Open-Meteo providers implement `BaseHistoricalProvider`. Existing OpenWeathe
 
 **DEC-014 relationship:**  
 DEC-014 (Data Source Authority) is amended to include Open-Meteo as the historical data source. For real-time inference, OpenWeather and AQICN remain the primary and fallback sources per DEC-014.
+
+---
+
+### DEC-019
+
+**Date:** 31 August 2026  
+**Topic:** Model Registry — Hopsworks vs MLflow  
+**Phase:** Final  
+
+**Problem:**  
+Need a model registry for storing trained models, versioning, and production model selection.
+
+**Options Considered:**
+
+- **Option A:** MLflow Model Registry — Local tracking, requires MLflow server
+- **Option B:** Hopsworks Model Registry — Cloud-based, integrated with feature store
+
+**Chosen Approach:** Option B — Hopsworks Model Registry
+
+**Reason:**  
+Hopsworks provides integrated model registry with the feature store. Models are stored alongside features, enabling version tracking and production model selection from a single platform. Eliminates need for separate MLflow infrastructure.
+
+**Constraints:**  
+- Model version must be integer (not timestamp string)
+- Hopsworks connection required for model storage/retrieval
+- Local pickle fallback for API serving
+
+**Trade-offs:**  
+- Single platform for features + models (simpler architecture)
+- Cloud dependency for model registry (acceptable for production)
+- Local pickle fallback ensures API availability
+
+**Impact:**  
+- New module: `src/models/hopsworks_registry.py`
+- Training script uses Hopsworks for model storage
+- API loads model from local pickle (fallback)
+- No MLflow infrastructure required
+
+---
+
+### DEC-020
+
+**Date:** 31 August 2026  
+**Topic:** Production Model Selection — XGBoost  
+**Phase:** Final  
+
+**Problem:**  
+Four models trained: Ridge, Random Forest, XGBoost, LSTM. Need to select production model.
+
+**Options Considered:**
+
+- **Option A:** Ridge — Fastest, most interpretable, but linear
+- **Option B:** Random Forest — Robust, but slower training
+- **Option C:** XGBoost — Best test performance, fast training
+- **Option D:** LSTM — Sequential patterns, but worst performance
+
+**Chosen Approach:** Option C — XGBoost
+
+**Reason:**  
+XGBoost achieves the best test performance across all metrics:
+- Test MAE: 21.34 (lowest)
+- Test R²: 0.6584 (highest)
+- Wins on all 3 horizons (24h, 48h, 72h)
+- Fast training (9.9s)
+- Fast inference (0.011ms)
+
+**Constraints:**  
+- Model must be retrained daily
+- Performance compared against existing production model
+- If new model is worse, keep existing
+
+**Trade-offs:**  
+- XGBoost is less interpretable than Ridge (acceptable for production)
+- XGBoost training is faster than Random Forest (advantage)
+
+**Impact:**  
+- Production model: XGBoost
+- Model artifact: `models/production/best_model.pkl`
+- Daily training compares all 4 models, selects best

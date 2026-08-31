@@ -84,7 +84,7 @@ Generate 3-day AQI prediction.
 }
 ```
 
-**Note:** `confidence` is `null` until uncertainty quantification method is implemented.
+**Note:** Confidence intervals are computed from residual statistics.
 
 **Error Responses:**
 
