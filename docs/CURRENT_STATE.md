@@ -20,9 +20,9 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | EDA | ✅ VERIFIED | 4 Jupyter notebooks |
 | Feature Engineering | ✅ VERIFIED | 63 features |
 | Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,208 rows |
-| Model Training | ✅ VERIFIED | All 4 models on complete 4-year data |
+| Model Training | ✅ VERIFIED | All models on complete 4-year data |
 | Model Evaluation | ✅ VERIFIED | MAE + RMSE + R² across all horizons |
-| Model Selection | ✅ VERIFIED | XGBoost selected (best test metrics) |
+| Model Selection | ✅ VERIFIED | Ridge selected (best test metrics) |
 | Model Registry | ✅ VERIFIED | Hopsworks Model Registry |
 | CI/CD | ✅ VERIFIED | 487 tests pass, lint clean |
 | Deployment | ✅ VERIFIED | Render (API) + Streamlit Cloud (Dashboard) |
@@ -41,9 +41,9 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Weather features | 7 | ✅ |
 | Pollution features | 6 | ✅ |
 | Total features | 63 | ✅ |
-| Train split (72%) | 77,034 rows | ✅ |
-| Validation split (8%) | 8,559 rows | ✅ |
-| Test split (20%) | 21,399 rows | ✅ |
+| Train split | 45,370 rows | ✅ |
+| Validation split | 5,042 rows | ✅ |
+| Test split | 12,603 rows | ✅ |
 | Duplicates | 0 | ✅ |
 | Missing values | <0.2% | ✅ |
 
@@ -51,40 +51,48 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 ## Verified Model Performance (4-Year Dataset)
 
-### Production Model: XGBoost
-
-| Metric | Value |
-|--------|-------|
-| **Test MAE** | **21.34** |
-| **Test RMSE** | **30.35** |
-| **Test R²** | **0.6584** |
-| **Train Time** | 9.9s |
-| **Inference Latency** | 0.011 ms/sample |
-
 ### Overall Comparison — Test Set
 
-| Model | MAE | RMSE | R² | Latency |
-|-------|-----|------|----|---------|
-| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms |
-| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms |
-| Ridge | 21.73 | 30.64 | 0.6520 | 0.0003 ms |
-| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms |
+| Model | MAE | RMSE | R² | Composite | Inference Latency |
+|-------|-----|------|----|-----------|-------------------|
+| **Ridge** | **26.48** | **34.95** | **0.5722** | **33.91** ★ | 0.000 ms |
+| Random Forest | 27.24 | 35.80 | 0.5510 | 35.11 | 0.009 ms |
+| XGBoost | 28.18 | 37.26 | 0.5136 | 37.04 | 0.015 ms |
 
 ### Per-Horizon — Test Set
 
-| Horizon | Best Model | MAE | R² |
-|---------|------------|-----|----|
-| 24h | XGBoost | 19.00 | 0.7206 |
-| 48h | XGBoost | 21.81 | 0.6461 |
-| 72h | XGBoost | 23.23 | 0.6085 |
+#### 24-Hour Prediction
 
-### Why XGBoost
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **22.50** | **29.72** | **0.6847** ★ |
+| Random Forest | 23.29 | 30.85 | 0.6602 |
+| XGBoost | 24.43 | 32.40 | 0.6253 |
 
-1. **Best Test MAE** (21.34) — lowest prediction error
-2. **Best Test R²** (0.6584) — explains most variance
-3. **Wins ALL 3 horizons** — 24h, 48h, 72h
-4. **Fast training** (9.9s) — suitable for daily retraining
-5. **Fast inference** (0.011 ms) — production-ready
+#### 48-Hour Prediction
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **27.21** | **35.64** | **0.5536** ★ |
+| Random Forest | 27.61 | 35.80 | 0.5497 |
+| XGBoost | 28.16 | 37.12 | 0.5156 |
+
+#### 72-Hour Prediction
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| **Ridge** | **29.72** | **38.86** | **0.4784** ★ |
+| Random Forest | 30.82 | 40.16 | 0.4431 |
+| XGBoost | 31.94 | 41.69 | 0.3998 |
+
+### Why Ridge (Updated)
+
+1. **Best Test MAE** (26.48) — lowest prediction error overall
+2. **Best Test R²** (0.5722) — explains most variance
+3. **Wins ALL 3 horizons** — 24h, 48h, 72h consistently
+4. **Fastest inference** (0.000 ms) — production-ready
+5. **Simplest model** — most interpretable, least prone to overfitting
+6. **Fast training** — suitable for daily retraining
 
 ---
 
@@ -106,7 +114,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Property | Value |
 |----------|-------|
 | Platform | Hopsworks Model Registry |
-| Registered model | XGBoost |
+| Registered model | Ridge (updated) |
 | Model artifact | `models/production/best_model.pkl` |
 | Comparison JSON | `models/production/model_comparison_full.json` |
 
