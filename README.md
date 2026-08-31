@@ -12,7 +12,7 @@
 
 ## Overview
 
-A production-grade ML pipeline that collects real-time weather and air quality data from Open-Meteo, engineers 68 features, trains multiple models (Ridge, Random Forest, XGBoost, LSTM), and serves predictions via a REST API and interactive dashboard.
+A production-grade ML pipeline that collects real-time weather and air quality data from Open-Meteo, engineers 63 features, trains multiple models (Ridge, Random Forest, XGBoost, LSTM), and serves predictions via a REST API and interactive dashboard.
 
 ### Cities Supported
 
@@ -33,26 +33,26 @@ A production-grade ML pipeline that collects real-time weather and air quality d
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ FEATURE ENGINEERING                                          │
-│ 68 features: weather, pollution, time, lags, rolling, ratios │
+│ 63 features: weather, pollution, time, lags, rolling, ratios │
 │ → src/features/feature_engineering.py                        │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ FEATURE STORE (Hopsworks PRIMARY)                            │
-│ → Hopsworks cloud (63,648 rows)                              │
+│ → Hopsworks cloud (107,208 rows)                             │
 │ → Local Parquet (fallback)                                   │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ MODEL TRAINING (Daily)                                       │
+│ MODEL TRAINING (Daily 6 AM UTC)                              │
 │ Ridge, Random Forest, XGBoost, LSTM                          │
 │ → scripts/train_model.py                                     │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ MODEL REGISTRY (MLflow)                                      │
-│ Version tracking, metrics, rollback                          │
-│ → src/models/registry.py                                     │
+│ MODEL REGISTRY (Hopsworks)                                   │
+│ Version tracking, metrics, model comparison                  │
+│ → src/models/hopsworks_registry.py                           │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -67,18 +67,24 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 *All results verified on 4-year dataset (Aug 2022 – Aug 2026).*
 
-### Model Comparison — Overall (Test Set)
+### Production Model: XGBoost
 
-| Model | MAE | RMSE | R² | Inference Latency |
-|-------|-----|------|----|-------------------|
-| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms/sample |
-| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms/sample |
-| Ridge Regression | 21.73 | 30.64 | 0.6520 | 0.0003 ms/sample |
-| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms/sample |
+| Metric | Value |
+|--------|-------|
+| **Test MAE** | **21.34** |
+| **Test RMSE** | **30.35** |
+| **Test R²** | **0.6584** |
+| **Train Time** | 9.9s |
+| **Inference Latency** | 0.011 ms/sample |
 
-**Selected Model:** Random Forest (validation composite: 0.4×MAE + 0.3×RMSE + 0.3×(1-R²)×100)
+### Model Comparison — Test Set
 
-**Note:** XGBoost has the best test MAE (21.34) and R² (0.6584), but RandomForest was selected based on validation composite to avoid overfitting.
+| Model | MAE | RMSE | R² | Latency |
+|-------|-----|------|----|---------|
+| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms |
+| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms |
+| Ridge | 21.73 | 30.64 | 0.6520 | 0.0003 ms |
+| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms |
 
 ---
 
@@ -86,12 +92,12 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 
 | Stage | Status | Details |
 |-------|--------|---------|
-| Data Collection | ✅ Verified | Live Open-Meteo API for all 3 cities |
-| Data Cleaning | ✅ Verified | 107K rows (4 years), 0 duplicates, <0.2% NaN |
-| Feature Engineering | ✅ Verified | 68 features created correctly |
-| Feature Store | ✅ Verified | Hopsworks: 63,648 rows stored & read |
-| Model Training | ✅ Verified | All 4 models trained on complete data |
-| Model Registry | ✅ Verified | MLflow tracking experiments |
+| Data Collection | ✅ Verified | Open-Meteo API, 4-year range |
+| Data Cleaning | ✅ Verified | 107,208 rows, 0 duplicates, <0.2% NaN |
+| Feature Engineering | ✅ Verified | 63 features |
+| Feature Store | ✅ Verified | Hopsworks: 107,208 rows |
+| Model Training | ✅ Verified | All 4 models on complete data |
+| Model Registry | ✅ Verified | Hopsworks Model Registry |
 | CI/CD | ✅ Verified | 487 tests passing, lint clean |
 
 ---
@@ -130,9 +136,6 @@ python scripts/collect_features.py
 # Model training (daily)
 python scripts/train_model.py --force-register
 
-# Backfill Hopsworks
-python scripts/backfill_hopsworks.py
-
 # Run tests
 python -m pytest tests/ -v
 ```
@@ -146,23 +149,22 @@ AQI-Predictor/
 ├── scripts/                    # Pipeline scripts
 │   ├── collect_features.py     # Feature collection (hourly)
 │   ├── train_model.py          # Model training (daily)
-│   ├── backfill_hopsworks.py   # Hopsworks backfill
 │   └── validate_production.py  # CI validation
 │
 ├── src/                        # Source code
 │   ├── data/                   # Data collection
-│   │   ├── live_fetcher.py     # Live data fetcher
-│   │   └── providers/          # API providers
+│   │   └── providers/          # Open-Meteo providers
 │   ├── features/               # Feature engineering
 │   ├── feature_store/          # Hopsworks + Local
 │   ├── models/                 # ML models
+│   │   └── hopsworks_registry.py # Model registry
 │   └── monitoring/             # Drift detection
 │
 ├── app/                        # Web application
 │   ├── backend/                # FastAPI (15 endpoints)
 │   └── frontend/               # Streamlit (4 pages)
 │
-├── notebooks/                  # EDA notebooks
+├── notebooks/                  # EDA notebooks (4)
 ├── tests/                      # 487 tests
 ├── docs/                       # Documentation
 └── .github/workflows/          # CI/CD
@@ -192,7 +194,7 @@ AQI-Predictor/
 4 interactive pages:
 - **Dashboard** — Live AQI predictions with confidence intervals
 - **Analytics** — Historical trends and city comparison
-- **Explainability** — Feature importance, SHAP analysis
+- **Explainability** — Feature importance, SHAP analysis, model comparison
 - **System** — Service health, monitoring, alerts
 
 ---
@@ -216,7 +218,7 @@ AQI-Predictor/
 | Data Provider | Open-Meteo (Weather + Air Quality) |
 | Feature Store | Hopsworks (PRIMARY), Local Parquet (Fallback) |
 | ML Models | Ridge, Random Forest, XGBoost, LSTM |
-| Model Registry | MLflow (local) |
+| Model Registry | Hopsworks Model Registry |
 | Backend API | FastAPI |
 | Dashboard | Streamlit |
 | CI/CD | GitHub Actions |

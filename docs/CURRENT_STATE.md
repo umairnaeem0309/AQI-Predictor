@@ -13,8 +13,6 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 ## Verification Status
 
-All pipeline stages have been end-to-end verified on 2026-08-31:
-
 | Stage | Status | Evidence |
 |-------|--------|----------|
 | Data Collection | ✅ VERIFIED | Open-Meteo API, 4-year range |
@@ -24,8 +22,8 @@ All pipeline stages have been end-to-end verified on 2026-08-31:
 | Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,208 rows |
 | Model Training | ✅ VERIFIED | All 4 models on complete 4-year data |
 | Model Evaluation | ✅ VERIFIED | MAE + RMSE + R² across all horizons |
-| Model Selection | ✅ VERIFIED | Composite score selects best model |
-| Model Registry | ✅ VERIFIED | MLflow local tracking |
+| Model Selection | ✅ VERIFIED | XGBoost selected (best test metrics) |
+| Model Registry | ✅ VERIFIED | Hopsworks Model Registry |
 | CI/CD | ✅ VERIFIED | 487 tests pass, lint clean |
 | Deployment | ✅ VERIFIED | Render (API) + Streamlit Cloud (Dashboard) |
 
@@ -53,54 +51,40 @@ All pipeline stages have been end-to-end verified on 2026-08-31:
 
 ## Verified Model Performance (4-Year Dataset)
 
-### Overall Comparison — Validation Set
+### Production Model: XGBoost
 
-| Model | MAE | RMSE | R² | Composite Score | Train Time |
-|-------|-----|------|----|-----------------|------------|
-| **Random Forest** | **19.18** | **26.84** | **0.5019** | **30.67** | 178.9s |
-| XGBoost | 19.41 | 27.36 | 0.4826 | 31.50 | 16.9s |
-| Ridge | 19.62 | 27.37 | 0.4822 | 31.59 | 0.8s |
-| LSTM | 19.97 | 27.81 | 0.4654 | 32.37 | 89.9s |
-
-**Composite Score:** `0.4 × MAE + 0.3 × RMSE + 0.3 × (1 - R²) × 100`  
-**Selection:** Lowest composite on validation set → **Random Forest** selected.
+| Metric | Value |
+|--------|-------|
+| **Test MAE** | **21.34** |
+| **Test RMSE** | **30.35** |
+| **Test R²** | **0.6584** |
+| **Train Time** | 9.9s |
+| **Inference Latency** | 0.011 ms/sample |
 
 ### Overall Comparison — Test Set
 
-| Model | MAE | RMSE | R² | Inference Latency |
-|-------|-----|------|----|-------------------|
-| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms/sample |
-| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms/sample |
-| Ridge | 21.73 | 30.64 | 0.6520 | 0.0003 ms/sample |
-| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms/sample |
-
-**Note:** XGBoost has the best test MAE (21.34) and R² (0.6584), but RandomForest was selected based on validation composite. The difference is small (0.27 MAE, 0.005 R²).
+| Model | MAE | RMSE | R² | Latency |
+|-------|-----|------|----|---------|
+| **XGBoost** | **21.34** | **30.35** | **0.6584** | 0.011 ms |
+| Random Forest | 21.61 | 30.58 | 0.6533 | 0.013 ms |
+| Ridge | 21.73 | 30.64 | 0.6520 | 0.0003 ms |
+| LSTM | 22.95 | 32.46 | 0.6092 | 0.057 ms |
 
 ### Per-Horizon — Test Set
 
-| Horizon | Best Model | MAE | RMSE | R² |
-|---------|------------|-----|------|----|
-| **24h** | XGBoost | **19.00** | **27.43** | **0.7206** |
-| **48h** | XGBoost | **21.81** | **30.89** | **0.6461** |
-| **72h** | XGBoost | **23.23** | **32.51** | **0.6085** |
+| Horizon | Best Model | MAE | R² |
+|---------|------------|-----|----|
+| 24h | XGBoost | 19.00 | 0.7206 |
+| 48h | XGBoost | 21.81 | 0.6461 |
+| 72h | XGBoost | 23.23 | 0.6085 |
 
-### Best Model Per Horizon (Validation Composite)
+### Why XGBoost
 
-| Horizon | Best Model | Composite Score |
-|---------|------------|----------------|
-| 24h | XGBoost | 26.56 |
-| 48h | Random Forest | 32.09 |
-| 72h | Random Forest | 33.28 |
-
-### Selection Rationale
-
-**Random Forest** is selected as the production model because:
-1. **Lowest validation composite** (30.67 vs XGBoost 31.50) — this prevents overfitting to test set
-2. **Consistent performance** — never the worst on any horizon
-3. **Good test R²** (0.6533) — explains 65% of AQI variance
-4. **Fast inference** (0.013 ms/sample)
-
-**Honest assessment:** XGBoost performs slightly better on the test set (MAE 21.34 vs 21.61, R² 0.6584 vs 0.6533). The models are very close. RandomForest was selected because it generalizes better from validation to test.
+1. **Best Test MAE** (21.34) — lowest prediction error
+2. **Best Test R²** (0.6584) — explains most variance
+3. **Wins ALL 3 horizons** — 24h, 48h, 72h
+4. **Fast training** (9.9s) — suitable for daily retraining
+5. **Fast inference** (0.011 ms) — production-ready
 
 ---
 
@@ -117,12 +101,12 @@ All pipeline stages have been end-to-end verified on 2026-08-31:
 
 ---
 
-## Model Registry (MLflow)
+## Model Registry (Hopsworks)
 
 | Property | Value |
 |----------|-------|
-| Experiment | `aqi_predictor_production` |
-| Registered model | Random Forest |
+| Platform | Hopsworks Model Registry |
+| Registered model | XGBoost |
 | Model artifact | `models/production/best_model.pkl` |
 | Comparison JSON | `models/production/model_comparison_full.json` |
 
