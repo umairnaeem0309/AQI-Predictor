@@ -162,13 +162,12 @@ async def get_alerts(
     """
     Check current predictions for hazardous AQI levels.
 
-    Returns alerts for any city where predicted AQI exceeds thresholds.
+    Uses Open-Meteo Air Quality API (no API key required).
+    Returns alerts for any city where AQI exceeds thresholds.
     """
-    try:
-        from src.data.providers.open_meteo_air_quality import (
-            OpenMeteoAirQualityProvider,
-        )
+    import requests as _requests
 
+    try:
         alerts = []
         cities = {
             "karachi": {"lat": 24.8607, "lon": 67.0011},
@@ -176,63 +175,60 @@ async def get_alerts(
             "islamabad": {"lat": 33.6844, "lon": 73.0479},
         }
 
-        provider = OpenMeteoAirQualityProvider()
+        # Open-Meteo current air quality endpoint (no API key needed)
+        base_url = "https://air-quality-api.open-meteo.com/v1/air-quality"
 
         for city, coords in cities.items():
             try:
-                data = provider.fetch_current(
-                    latitude=coords["lat"],
-                    longitude=coords["lon"],
+                params = {
+                    "latitude": coords["lat"],
+                    "longitude": coords["lon"],
+                    "current": "pm2_5,pm10,us_aqi",
+                    "timezone": "auto",
+                }
+                resp = _requests.get(base_url, params=params, timeout=10)
+                resp.raise_for_status()
+                data = resp.json()
+
+                current = data.get("current", {})
+                pm25 = current.get("pm2_5", 0) or 0
+                pm10 = current.get("pm10", 0) or 0
+                ow_aqi = current.get("us_aqi", 0) or 0
+
+                # Calculate US EPA AQI from PM2.5 using EPA breakpoints
+                aqi = _calculate_pm25_aqi(pm25)
+
+                category = _get_aqi_category(aqi)
+
+                alert_level = "none"
+                if aqi > 200:
+                    alert_level = "critical"
+                elif aqi > 150:
+                    alert_level = "warning"
+                elif aqi > 100:
+                    alert_level = "caution"
+
+                alerts.append(
+                    {
+                        "city": city.title(),
+                        "aqi": aqi,
+                        "pm25": round(pm25, 1),
+                        "pm10": round(pm10, 1),
+                        "category": category,
+                        "alert_level": alert_level,
+                        "recommendation": _get_recommendation(aqi),
+                        "source": "open-meteo",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
                 )
-                if data and "current" in data:
-                    current = data["current"]
-                    pm25 = current.get("pm2_5", 0)
-                    pm10 = current.get("pm10", 0)
-
-                    # Simple AQI estimation from PM2.5
-                    if pm25 <= 9.0:
-                        aqi = int(pm25 * 50 / 9.0)
-                    elif pm25 <= 35.4:
-                        aqi = int(50 + (pm25 - 9.0) * 49 / 26.4)
-                    elif pm25 <= 55.4:
-                        aqi = int(100 + (pm25 - 35.4) * 49 / 20.0)
-                    elif pm25 <= 150.4:
-                        aqi = int(150 + (pm25 - 55.4) * 49 / 95.0)
-                    elif pm25 <= 250.4:
-                        aqi = int(200 + (pm25 - 150.4) * 99 / 100.0)
-                    else:
-                        aqi = int(300 + (pm25 - 250.4) * 199 / 249.6)
-
-                    category = _get_aqi_category(aqi)
-
-                    alert_level = "none"
-                    if aqi > 200:
-                        alert_level = "critical"
-                    elif aqi > 150:
-                        alert_level = "warning"
-                    elif aqi > 100:
-                        alert_level = "caution"
-
-                    if alert_level != "none":
-                        alerts.append(
-                            {
-                                "city": city.title(),
-                                "aqi": aqi,
-                                "pm25": pm25,
-                                "pm10": pm10,
-                                "category": category,
-                                "alert_level": alert_level,
-                                "recommendation": _get_recommendation(aqi),
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                            }
-                        )
 
             except Exception as e:
                 logger.warning(f"Failed to fetch data for {city}: {e}")
 
         return {
-            "alerts": alerts,
-            "total_alerts": len(alerts),
+            "alerts": [a for a in alerts if a["alert_level"] != "none"],
+            "all_cities": alerts,
+            "total_alerts": len([a for a in alerts if a["alert_level"] != "none"]),
             "checked_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -244,6 +240,26 @@ async def get_alerts(
             "error": str(e),
             "checked_at": datetime.now(timezone.utc).isoformat(),
         }
+
+
+def _calculate_pm25_aqi(pm25: float) -> int:
+    """Calculate US EPA AQI from PM2.5 concentration (μg/m³).
+    
+    Uses EPA breakpoints (May 2024 revision).
+    """
+    breakpoints = [
+        (0.0, 9.0, 0, 50),
+        (9.1, 35.4, 51, 100),
+        (35.5, 55.4, 101, 150),
+        (55.5, 125.4, 151, 200),
+        (125.5, 225.4, 201, 300),
+        (225.5, 325.4, 301, 400),
+        (325.5, 500.4, 401, 500),
+    ]
+    for c_lo, c_hi, i_lo, i_hi in breakpoints:
+        if c_lo <= pm25 <= c_hi:
+            return int((i_hi - i_lo) / (c_hi - c_lo) * (pm25 - c_lo) + i_lo)
+    return 500 if pm25 > 500.4 else 0
 
 
 def _get_recommendation(aqi: int) -> str:
