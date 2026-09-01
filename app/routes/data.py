@@ -24,20 +24,27 @@ router = APIRouter(prefix="/data", tags=["data"])
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "processed")
 
 
+_hopsworks_cache = None
+
+
 def _load_dataset():
     """Load dataset from Hopsworks (primary) or local CSV (fallback).
 
     Returns DataFrame or None if no data available.
     """
-    import os as _os
+    global _hopsworks_cache
 
-    # Try Hopsworks first — use direct connection
+    # Return cached data if available (avoid re-connecting every request)
+    if _hopsworks_cache is not None and not _hopsworks_cache.empty:
+        return _hopsworks_cache
+
+    # Try Hopsworks first — direct connection with env vars
     try:
         import hopsworks
 
-        host = _os.environ.get("HOPSWORKS_HOST")
-        api_key = _os.environ.get("HOPSWORKS_API_KEY")
-        project_name = _os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
+        host = os.environ.get("HOPSWORKS_HOST")
+        api_key = os.environ.get("HOPSWORKS_API_KEY")
+        project_name = os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
 
         if host and api_key:
             project = hopsworks.login(
@@ -56,9 +63,12 @@ def _load_dataset():
                                 df["timestamp"], utc=True, errors="coerce"
                             )
                         logger.info(f"Loaded {len(df)} rows from Hopsworks")
+                        _hopsworks_cache = df
                         return df
                 except Exception:
                     continue
+        else:
+            logger.warning("HOPSWORKS_HOST and HOPSWORKS_API_KEY not set")
     except Exception as e:
         logger.warning(f"Hopsworks connection failed: {e}")
 
@@ -68,6 +78,7 @@ def _load_dataset():
         df = pd.read_csv(csv_path)
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+        _hopsworks_cache = df
         return df
 
     return None
