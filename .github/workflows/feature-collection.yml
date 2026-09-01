@@ -2,7 +2,7 @@ name: Hourly Feature Collection
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour
+    - cron: '0 * * * *'  # Every hour at :00
   workflow_dispatch:
     inputs:
       city:
@@ -25,7 +25,7 @@ jobs:
   collect:
     name: Collect Features
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     
     steps:
       - name: Checkout code
@@ -43,7 +43,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Collect features
+      - name: Collect features from Open-Meteo
+        id: collect
         run: |
           ARGS=""
           if [ -n "${{ github.event.inputs.city }}" ]; then
@@ -58,23 +59,26 @@ jobs:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
           HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
 
-      - name: Report collection results
+      - name: Report results
         if: always()
         run: |
-          echo "## Feature Collection Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 🌐 Feature Collection Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f "data/collection_health.json" ]; then
             python -c "
-          import json
-          with open('data/collection_health.json') as f:
-              log = json.load(f)
-          if log:
-              latest = log[-1]
-              print(f'- **Cities attempted:** {latest.get(\"cities_attempted\", \"N/A\")}')
-              print(f'- **Observations:** {latest.get(\"observations_collected\", \"N/A\")}')
-              print(f'- **Training valid:** {latest.get(\"training_valid_observations\", \"N/A\")}')
-              print(f'- **Status:** {latest.get(\"status\", \"N/A\")}')
-          " >> $GITHUB_STEP_SUMMARY
+import json
+with open('data/collection_health.json') as f:
+    log = json.load(f)
+if log:
+    latest = log[-1]
+    print(f'**Cities attempted:** {latest.get(\"cities_attempted\", \"N/A\")}')
+    print(f'**Observations:** {latest.get(\"observations_collected\", \"N/A\")}')
+    print(f'**Training valid:** {latest.get(\"training_valid_observations\", \"N/A\")}')
+    print(f'**Hopsworks:** {\"✅\" if latest.get(\"hopsworks_persisted\") else \"❌\"}')
+    print(f'**Status:** {latest.get(\"status\", \"N/A\")}')
+" >> $GITHUB_STEP_SUMMARY
           else
             echo "No collection log available" >> $GITHUB_STEP_SUMMARY
           fi
