@@ -40,6 +40,8 @@ class APIClient:
         api_key: Optional[str] = None,
         mock_mode: bool = False,
         timeout: int = 10,
+        max_retries: int = 3,
+        retry_delay: float = 2.0,
     ):
         """
         Initialize API client.
@@ -49,11 +51,15 @@ class APIClient:
             api_key: API key for authentication
             mock_mode: Enable mock mode for development
             timeout: Request timeout in seconds
+            max_retries: Maximum number of retries for connection errors
+            retry_delay: Initial delay between retries (doubles each retry)
         """
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.mock_mode = mock_mode
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
 
     @classmethod
     def from_env(cls) -> "APIClient":
@@ -67,12 +73,52 @@ class APIClient:
             api_key = os.getenv("API_KEY")
 
         mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+        
+        # Increase timeout for Render (free tier needs wake-up time)
+        timeout = int(os.getenv("API_TIMEOUT", "30"))
 
         return cls(
             base_url=os.getenv("API_BASE_URL", "http://localhost:8000"),
             api_key=api_key,
             mock_mode=mock_mode,
+            timeout=timeout,
+            max_retries=3,
+            retry_delay=3.0,
         )
+
+    def _request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
+        """
+        Make HTTP request with retry logic for connection errors.
+        
+        Handles Render free-tier sleep/wake by retrying with exponential backoff.
+        """
+        last_error = None
+        delay = self.retry_delay
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = requests.request(method, url, timeout=self.timeout, **kwargs)
+                response.raise_for_status()
+                return response
+            except requests.exceptions.ConnectionError as e:
+                last_error = e
+                if attempt < self.max_retries:
+                    time.sleep(delay)
+                    delay *= 2  # Exponential backoff
+                    continue
+                raise APIConnectionError(
+                    f"Cannot connect to API server after {self.max_retries + 1} attempts. "
+                    f"Render may be waking up from sleep."
+                )
+            except requests.exceptions.Timeout as e:
+                last_error = e
+                if attempt < self.max_retries:
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
+                raise APIConnectionError("API request timed out after retries")
+            except requests.exceptions.RequestException as e:
+                raise APIClientError(f"API error: {e}")
 
     def get_prediction(self, city: str) -> Dict[str, Any]:
         """
@@ -88,20 +134,17 @@ class APIClient:
             return self._mock_prediction(city)
 
         try:
-            response = requests.post(
+            response = self._request_with_retry(
+                "POST",
                 f"{self.base_url}/prediction",
                 json={"city": city},
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=self.timeout,
             )
-            response.raise_for_status()
             return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.Timeout:
-            raise APIConnectionError("API request timed out")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_health(self) -> Dict[str, Any]:
         """
@@ -114,16 +157,15 @@ class APIClient:
             return self._mock_health()
 
         try:
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/health",
-                timeout=self.timeout,
             )
-            response.raise_for_status()
             return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_model_info(self) -> Dict[str, Any]:
         """
@@ -136,17 +178,16 @@ class APIClient:
             return self._mock_model_info()
 
         try:
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/model-info",
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=self.timeout,
             )
-            response.raise_for_status()
             return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_historical_data(
         self, city: str, start_date: str = None, end_date: str = None, limit: int = 500
@@ -173,18 +214,17 @@ class APIClient:
             if end_date:
                 params["end_date"] = end_date
 
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/data/historical",
                 params=params,
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=self.timeout,
             )
-            response.raise_for_status()
             return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_statistics(self, city: str) -> Dict[str, Any]:
         """

@@ -1,0 +1,35 @@
+name: Keep-Alive
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Every 10 minutes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping API
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping Render API
+        run: |
+          echo "Pinging API to keep Render service alive..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            --retry 3 \
+            --retry-delay 5 \
+            "${{ secrets.API_BASE_URL }}/health" 2>/dev/null || echo "000")
+          
+          echo "Health check returned HTTP $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ API is alive"
+          elif [ "$HTTP_CODE" = "000" ]; then
+            echo "⚠️ API may be waking up from sleep (timeout)"
+          else
+            echo "⚠️ API returned HTTP $HTTP_CODE"
+          fi

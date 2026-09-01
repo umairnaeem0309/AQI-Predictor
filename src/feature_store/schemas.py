@@ -11,7 +11,7 @@ Includes:
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DatasetType(str, Enum):
@@ -81,17 +81,16 @@ class LineageMetadata(BaseModel):
 class FeatureGroupMetadata(BaseModel):
     """Complete metadata for a feature group."""
 
+    model_config = ConfigDict(use_enum_values=True, protected_namespaces=())
+
     name: str = Field(..., description="Feature group name")
     version: int = Field(1, description="Feature group version")
-    schema: FeatureSchema = Field(..., description="Feature schema")
+    schema_: FeatureSchema = Field(..., alias="schema", description="Feature schema")
     lineage: Optional[LineageMetadata] = Field(None, description="Lineage tracking")
     description: Optional[str] = Field(None, description="Description")
     online_enabled: bool = Field(
         False, description="Whether online store is enabled (offline only initially)"
     )
-
-    class Config:
-        use_enum_values = True
 
 
 # =============================================================================
