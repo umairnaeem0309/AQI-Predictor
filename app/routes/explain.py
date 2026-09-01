@@ -260,21 +260,28 @@ async def get_shap_explanation(
         import pandas as pd
 
         train_means = {}
-        # Try Hopsworks first
+        # Try Hopsworks first (direct connection)
         try:
-            from src.feature_store import get_feature_store
+            import hopsworks as _hw
 
-            store = get_feature_store()
-            for fg_name in ["aqi_features_prod", "aqi_features_test"]:
-                try:
-                    df_means = store.get_features(fg_name, version=1)
-                    if not df_means.empty:
-                        train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
-                        break
-                except Exception:
-                    continue
+            host = os.environ.get("HOPSWORKS_HOST")
+            api_key = os.environ.get("HOPSWORKS_API_KEY")
+            project_name = os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
+
+            if host and api_key:
+                project = _hw.login(host=host, api_key_value=api_key, project=project_name)
+                fs = project.get_feature_store()
+                for fg_name in ["aqi_features_prod", "aqi_features_test"]:
+                    try:
+                        fg = fs.get_feature_group(name=fg_name, version=1)
+                        df_means = fg.read()
+                        if df_means is not None and not df_means.empty:
+                            train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
+                            break
+                    except Exception:
+                        continue
         except Exception:
-            pass
+            logger.warning(f"Hopsworks SHAP means failed: {e}")
 
         # Fallback to local CSV
         if not train_means:
@@ -434,21 +441,28 @@ async def get_global_shap_importance(
             raise HTTPException(status_code=500, detail="Feature names not found in metadata")
 
         # Load feature-engineered dataset for background sample
-        # Try Hopsworks first, then local CSV files
+        # Try Hopsworks first (direct connection), then local CSV files
         df = None
         try:
-            from src.feature_store import get_feature_store
+            import hopsworks as _hw
 
-            store = get_feature_store()
-            for fg_name in ["aqi_features_prod", "aqi_features_test"]:
-                try:
-                    df = store.get_features(fg_name, version=1)
-                    if not df.empty:
-                        break
-                except Exception:
-                    continue
-        except Exception:
-            pass
+            host = os.environ.get("HOPSWORKS_HOST")
+            api_key = os.environ.get("HOPSWORKS_API_KEY")
+            project_name = os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
+
+            if host and api_key:
+                project = _hw.login(host=host, api_key_value=api_key, project=project_name)
+                fs = project.get_feature_store()
+                for fg_name in ["aqi_features_prod", "aqi_features_test"]:
+                    try:
+                        fg = fs.get_feature_group(name=fg_name, version=1)
+                        df = fg.read()
+                        if df is not None and not df.empty:
+                            break
+                    except Exception:
+                        continue
+        except Exception as e:
+            logger.warning(f"Hopsworks SHAP background failed: {e}")
 
         if df is None or df.empty:
             data_path = os.path.join("data", "processed", "train_features.csv")

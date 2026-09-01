@@ -64,14 +64,50 @@ class ModelService:
 
     def load_production_model_from_registry(self) -> Tuple[Any, Dict]:
         """
-        Load production model from MLflow Model Registry.
+        Load production model.
 
-        Tries MLflow first, falls back to local pickle.
+        Tries Hopsworks Model Registry first, then MLflow, then local pickle.
 
         Returns:
             Tuple of (model, model_info)
         """
-        # Try MLflow first
+        # Try Hopsworks Model Registry first
+        try:
+            import os as _os
+            import hopsworks
+
+            host = _os.environ.get("HOPSWORKS_HOST")
+            api_key = _os.environ.get("HOPSWORKS_API_KEY")
+            project_name = _os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
+
+            if host and api_key:
+                project = hopsworks.login(host=host, api_key_value=api_key, project=project_name)
+                mr = project.get_model_registry()
+
+                # Try to get the best model
+                for model_name in ["xgboost", "random_forest", "ridge", "lstm"]:
+                    try:
+                        model_versions = mr.get_all_model_versions(name=model_name)
+                        if model_versions:
+                            # Get latest version
+                            latest = sorted(model_versions, key=lambda v: v.version, reverse=True)[0]
+                            model = latest.load()
+                            model_info = {
+                                "model_name": model_name,
+                                "model_version": f"v{latest.version}",
+                                "source": "hopsworks_registry",
+                                "metrics": latest.training_metrics or {},
+                            }
+                            self._model = model
+                            self._model_info = model_info
+                            logger.info(f"Loaded model from Hopsworks: {model_name} v{latest.version}")
+                            return model, model_info
+                    except Exception:
+                        continue
+        except Exception as e:
+            logger.warning(f"Hopsworks Model Registry load failed: {e}")
+
+        # Try MLflow next
         try:
             import mlflow
             import mlflow.pyfunc
@@ -84,7 +120,6 @@ class ModelService:
                 model_uri = f"runs:/{prod_version.run_id}/model"
                 model = mlflow.pyfunc.load_model(model_uri)
 
-                # Get metadata from run
                 run = client.get_run(prod_version.run_id)
                 model_info = {
                     "model_name": prod_version.name,
@@ -97,12 +132,8 @@ class ModelService:
 
                 self._model = model
                 self._model_info = model_info
-                logger.info(
-                    f"Loaded model from MLflow Registry: {prod_version.name} v{prod_version.version}"
-                )
+                logger.info(f"Loaded model from MLflow Registry: {prod_version.name} v{prod_version.version}")
                 return model, model_info
-            else:
-                logger.info("No production model in MLflow Registry, trying local pickle")
         except Exception as e:
             logger.warning(f"MLflow Registry load failed: {e}")
 
