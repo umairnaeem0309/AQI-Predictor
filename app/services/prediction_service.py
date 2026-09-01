@@ -159,9 +159,7 @@ class PredictionService:
             try:
                 from src.models.confidence import predict_with_confidence
 
-                ci = predict_with_confidence(
-                    np.array([pred_values]), confidence_level=90
-                )
+                ci = predict_with_confidence(np.array([pred_values]), confidence_level=90)
                 intervals = ci.get("intervals", [])
                 if intervals:
                     confidence = {
@@ -188,7 +186,9 @@ class PredictionService:
                 "category_24h": category_24h,
                 "category_48h": category_48h,
                 "category_72h": category_72h,
-                "model_version": model_info.get("model_version", model_info.get("version", "unknown")),
+                "model_version": model_info.get(
+                    "model_version", model_info.get("version", "unknown")
+                ),
                 "confidence": confidence,
             }
 

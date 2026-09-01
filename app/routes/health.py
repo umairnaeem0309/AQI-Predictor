@@ -36,6 +36,7 @@ async def health_check():
     """
     try:
         import os
+
         model_service = get_model_service()
 
         # Check Hopsworks connection via env vars (fast, no network call)

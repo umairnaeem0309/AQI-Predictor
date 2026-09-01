@@ -186,7 +186,7 @@ def render_system(api_client: APIClient):
                 with col3:
                     st.metric("Test Rows", f"{_meta.get('test_rows', 0):,}")
                 with col4:
-                    st.metric("Features", _meta.get('n_features', 0))
+                    st.metric("Features", _meta.get("n_features", 0))
         except Exception:
             pass
 

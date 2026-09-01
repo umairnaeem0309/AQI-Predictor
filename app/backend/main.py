@@ -84,7 +84,9 @@ async def lifespan(app: FastAPI):
         # then upgrade from registry in background
         try:
             model, info = model_service._load_local_pickle()
-            logger.info(f"Loaded local model: {info.get('model_name', 'unknown')} v{info.get('model_version', '?')}")
+            logger.info(
+                f"Loaded local model: {info.get('model_name', 'unknown')} v{info.get('model_version', '?')}"
+            )
         except Exception as e:
             logger.warning(f"Local pickle load failed: {e}")
             try:
