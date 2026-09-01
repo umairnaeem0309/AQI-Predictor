@@ -25,7 +25,7 @@ class BackendConfig:
 
     # Rate Limiting
     rate_limit_enabled: bool = True
-    rate_limit_requests: int = 100  # requests per window
+    rate_limit_requests: int = 1000  # requests per window
     rate_limit_window_seconds: int = 60  # window duration
 
     # Feature Store

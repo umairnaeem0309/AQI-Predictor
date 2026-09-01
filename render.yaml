@@ -15,5 +15,9 @@ services:
         generateValue: true
       - key: LOG_LEVEL
         value: "info"
+      - key: RATE_LIMIT_REQUESTS
+        value: "1000"
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
     healthCheckPath: /health
     autoDeploy: true
