@@ -257,46 +257,22 @@ async def get_shap_explanation(
         if not feature_names:
             raise HTTPException(status_code=500, detail="Feature names not found in metadata")
 
-        # Compute training means for filling missing features
-        import pandas as pd
-
+        # Use training means from model_metadata.json (fast, no network call)
+        # These are pre-computed and saved during training
         train_means = {}
-        # Try Hopsworks first (direct connection)
-        try:
-            import hopsworks as _hw
-
-            host = os.environ.get("HOPSWORKS_HOST")
-            api_key = os.environ.get("HOPSWORKS_API_KEY")
-            project_name = os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
-
-            if host and api_key:
-                project = _hw.login(host=host, api_key_value=api_key, project=project_name)
-                fs = project.get_feature_store()
-                for fg_name in ["aqi_features_prod", "aqi_features_test"]:
-                    try:
-                        fg = fs.get_feature_group(name=fg_name, version=1)
-                        df_means = fg.read()
-                        if df_means is not None and not df_means.empty:
-                            train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
-                            break
-                    except Exception:
-                        continue
-        except Exception:
-            logger.warning(f"Hopsworks SHAP means failed: {e}")
-
-        # Fallback to local CSV
+        meta_path = os.path.join("models", "production", "model_metadata.json")
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path) as f:
+                    meta = json.load(f)
+                # Use feature columns to build reasonable defaults
+                train_means = meta.get("feature_means", {})
+            except Exception:
+                pass
+        
+        # Fallback: use zeros if no means available
         if not train_means:
-            for candidate in [
-                os.path.join("data", "processed", "train_features.csv"),
-                os.path.join("data", "processed", "raw_observations.csv"),
-            ]:
-                if os.path.exists(candidate):
-                    try:
-                        df_means = pd.read_csv(candidate, nrows=1000)
-                        train_means = df_means.select_dtypes(include=[np.number]).mean().to_dict()
-                    except Exception:
-                        pass
-                    break
+            train_means = {fname: 0.0 for fname in feature_names}
 
         # Build feature vector in correct order, fill missing with training mean
         feature_values = []
@@ -441,60 +417,42 @@ async def get_global_shap_importance(
         if not feature_names:
             raise HTTPException(status_code=500, detail="Feature names not found in metadata")
 
-        # Load feature-engineered dataset for background sample
-        # Try Hopsworks first (direct connection), then local CSV files
-        df = None
-        try:
-            import hopsworks as _hw
-
-            host = os.environ.get("HOPSWORKS_HOST")
-            api_key = os.environ.get("HOPSWORKS_API_KEY")
-            project_name = os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
-
-            if host and api_key:
-                project = _hw.login(host=host, api_key_value=api_key, project=project_name)
-                fs = project.get_feature_store()
-                for fg_name in ["aqi_features_prod", "aqi_features_test"]:
-                    try:
-                        fg = fs.get_feature_group(name=fg_name, version=1)
-                        df = fg.read()
-                        if df is not None and not df.empty:
-                            break
-                    except Exception:
-                        continue
-        except Exception as e:
-            logger.warning(f"Hopsworks SHAP background failed: {e}")
-
-        if df is None or df.empty:
-            data_path = os.path.join("data", "processed", "train_features.csv")
-            if not os.path.exists(data_path):
-                data_path = os.path.join("data", "processed", "raw_observations.csv")
-            if not os.path.exists(data_path):
-                return {
-                    "model_name": model_info.get("model_name", "unknown"),
-                    "method": "LinearExplainer" if not hasattr(model.estimators_[0], "feature_importances_") else "TreeExplainer",
-                    "n_samples": 0,
-                    "total_features": 0,
-                    "features": [],
-                    "message": "Training dataset not available for SHAP background sample.",
-                }
-            df = pd.read_csv(data_path)
-
-        # Select only the feature columns that exist in the data
-        available = [f for f in feature_names if f in df.columns]
-        if len(available) < len(feature_names) * 0.5:
-            raise HTTPException(status_code=500, detail="Insufficient feature columns in dataset")
-
-        # Sample for efficiency
-        sample_size = min(n_samples, len(df))
-        bg_sample = df[available].sample(n=sample_size, random_state=42).values
-
-        # Pad missing features with 0
-        if len(available) < len(feature_names):
-            padding = np.zeros((sample_size, len(feature_names) - len(available)))
-            bg_sample = np.hstack([bg_sample, padding])
-
-        X_bg = bg_sample.astype(np.float64)
+        # Generate synthetic background sample from feature ranges
+        # This avoids loading from Hopsworks on every request
+        # The background sample is deterministic (seed=42) for reproducibility
+        
+        # Use reasonable ranges for each feature category
+        feature_ranges = {
+            "temperature": (15, 45), "humidity": (20, 95), "pressure": (990, 1030),
+            "wind_speed": (0, 25), "wind_direction": (0, 360), "cloud_cover": (0, 100),
+            "precipitation": (0, 5), "pm25": (5, 150), "pm10": (10, 200),
+            "co": (200, 5000), "no2": (5, 80), "so2": (2, 30), "o3": (20, 100),
+            "us_aqi_open_meteo": (20, 200), "us_aqi_pm25_open_meteo": (10, 180),
+            "us_aqi_pm10_open_meteo": (15, 150), "aqi": (20, 200),
+            "hour": (0, 23), "day_of_week": (0, 6), "month": (1, 12),
+            "is_weekend": (0, 1), "season": (0, 3),
+            "hour_sin": (-1, 1), "hour_cos": (-1, 1),
+        }
+        
+        np.random.seed(42)
+        sample_size = min(n_samples, 100)
+        bg_data = {}
+        for fname in feature_names:
+            if fname in feature_ranges:
+                lo, hi = feature_ranges[fname]
+                bg_data[fname] = np.random.uniform(lo, hi, sample_size)
+            else:
+                # Lag/rolling features: use reasonable defaults
+                if "lag" in fname or "rolling" in fname:
+                    bg_data[fname] = np.random.uniform(30, 120, sample_size)
+                elif "ratio" in fname or "interaction" in fname:
+                    bg_data[fname] = np.random.uniform(0.5, 2.0, sample_size)
+                elif "deviation" in fname or "change_rate" in fname or "trend" in fname:
+                    bg_data[fname] = np.random.uniform(-10, 10, sample_size)
+                else:
+                    bg_data[fname] = np.random.uniform(0, 100, sample_size)
+        
+        X_bg = np.column_stack([bg_data[f] for f in feature_names]).astype(np.float64)
 
         # Get target estimator (default 24h)
         target_idx = 0

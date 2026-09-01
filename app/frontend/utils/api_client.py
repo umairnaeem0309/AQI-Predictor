@@ -32,6 +32,10 @@ class APIClient:
     Modes:
     - production: Calls real FastAPI backend
     - mock: Returns mock data for development
+    
+    Features:
+    - Response caching to avoid repeated slow calls during Render cold starts
+    - Retry with exponential backoff for connection errors
     """
 
     def __init__(
@@ -42,6 +46,7 @@ class APIClient:
         timeout: int = 10,
         max_retries: int = 3,
         retry_delay: float = 2.0,
+        cache_ttl: int = 60,
     ):
         """
         Initialize API client.
@@ -53,6 +58,7 @@ class APIClient:
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries for connection errors
             retry_delay: Initial delay between retries (doubles each retry)
+            cache_ttl: Cache time-to-live in seconds (default 60s)
         """
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -60,6 +66,8 @@ class APIClient:
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        self.cache_ttl = cache_ttl
+        self._cache: Dict[str, tuple] = {}  # {key: (timestamp, response)}
 
     @classmethod
     def from_env(cls) -> "APIClient":
@@ -84,7 +92,21 @@ class APIClient:
             timeout=timeout,
             max_retries=3,
             retry_delay=3.0,
+            cache_ttl=60,
         )
+
+    def _get_cached(self, key: str) -> Optional[Dict]:
+        """Get cached response if still valid."""
+        if key in self._cache:
+            ts, data = self._cache[key]
+            if time.time() - ts < self.cache_ttl:
+                return data
+            del self._cache[key]
+        return None
+
+    def _set_cache(self, key: str, data: Dict):
+        """Cache a response."""
+        self._cache[key] = (time.time(), data)
 
     def _request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
         """
@@ -266,19 +288,25 @@ class APIClient:
         if self.mock_mode:
             return self._mock_feature_importance()
 
+        cache_key = f"feature_importance_{top_n}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
         try:
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/explain/feature-importance",
                 params={"top_n": top_n},
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=self.timeout,
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+            data = response.json()
+            self._set_cache(cache_key, data)
+            return data
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_model_summary(self) -> Dict[str, Any]:
         """
@@ -290,18 +318,23 @@ class APIClient:
         if self.mock_mode:
             return self._mock_model_summary()
 
+        cached = self._get_cached("model_summary")
+        if cached:
+            return cached
+
         try:
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/explain/model-summary",
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=self.timeout,
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+            data = response.json()
+            self._set_cache("model_summary", data)
+            return data
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_shap_explanation(
         self, features: Dict[str, float], target: str = "target_aqi_24h"
@@ -346,19 +379,25 @@ class APIClient:
         if self.mock_mode:
             return self._mock_global_shap()
 
+        cache_key = f"global_shap_{top_n}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
         try:
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/explain/shap-global",
                 params={"top_n": top_n},
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=30,
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+            data = response.json()
+            self._set_cache(cache_key, data)
+            return data
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_drift_report(self, n_recent: int = 500) -> Dict[str, Any]:
         """
@@ -373,19 +412,24 @@ class APIClient:
         if self.mock_mode:
             return {"drift_detected": False, "drifted_count": 0, "drift_percentage": 0}
 
+        cached = self._get_cached("drift_report")
+        if cached:
+            return cached
+
         try:
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/monitoring/drift",
                 params={"n_recent": n_recent},
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=30,
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+            data = response.json()
+            self._set_cache("drift_report", data)
+            return data
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_performance(self) -> Dict[str, Any]:
         """
@@ -397,18 +441,23 @@ class APIClient:
         if self.mock_mode:
             return {"status": "healthy", "training_metrics": {}}
 
+        cached = self._get_cached("performance")
+        if cached:
+            return cached
+
         try:
-            response = requests.get(
+            response = self._request_with_retry(
+                "GET",
                 f"{self.base_url}/monitoring/performance",
                 headers={"X-API-Key": self.api_key or ""},
-                timeout=10,
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.ConnectionError:
-            raise APIConnectionError("Cannot connect to API server")
-        except requests.exceptions.RequestException as e:
-            raise APIClientError(f"API error: {e}")
+            data = response.json()
+            self._set_cache("performance", data)
+            return data
+        except APIConnectionError:
+            raise
+        except APIClientError:
+            raise
 
     def get_alerts(self) -> Dict[str, Any]:
         """
