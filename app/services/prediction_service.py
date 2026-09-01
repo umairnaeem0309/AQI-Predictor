@@ -154,7 +154,29 @@ class PredictionService:
                     metadata={"endpoint": "prediction"},
                 )
 
-            # 9. Update last prediction time
+            # 9. Compute confidence intervals from residual stats
+            confidence = None
+            try:
+                from src.models.confidence import predict_with_confidence
+
+                ci = predict_with_confidence(
+                    np.array([pred_values]), confidence_level=90
+                )
+                intervals = ci.get("intervals", [])
+                if intervals:
+                    confidence = {
+                        "level": ci.get("confidence_level", 90),
+                        "method": ci.get("interval_method", "residual_quantile"),
+                        "intervals": {
+                            "24h": intervals[0] if len(intervals) > 0 else None,
+                            "48h": intervals[1] if len(intervals) > 1 else None,
+                            "72h": intervals[2] if len(intervals) > 2 else None,
+                        },
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to compute confidence intervals: {e}")
+
+            # 10. Update last prediction time
             self._last_prediction_time = datetime.now(timezone.utc).isoformat()
 
             return {
@@ -166,8 +188,8 @@ class PredictionService:
                 "category_24h": category_24h,
                 "category_48h": category_48h,
                 "category_72h": category_72h,
-                "model_version": model_info.get("version", "unknown"),
-                "confidence": None,  # Null until uncertainty method implemented
+                "model_version": model_info.get("model_version", model_info.get("version", "unknown")),
+                "confidence": confidence,
             }
 
         except (ModelNotLoadedError, FeatureServiceError) as e:

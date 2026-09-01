@@ -45,10 +45,18 @@ def render_analytics(api_client: APIClient):
         selected_city = st.selectbox("Select City", VALID_CITIES, key="analytics_city")
 
     with col2:
-        start_date = st.date_input("Start Date", key="analytics_start")
+        start_date = st.date_input(
+            "Start Date",
+            value=pd.Timestamp("2024-01-01").date(),
+            key="analytics_start",
+        )
 
     with col3:
-        end_date = st.date_input("End Date", key="analytics_end")
+        end_date = st.date_input(
+            "End Date",
+            value=pd.Timestamp.now().date(),
+            key="analytics_end",
+        )
 
     # Fetch historical data
     try:
