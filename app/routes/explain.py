@@ -166,7 +166,7 @@ async def get_feature_importance(
             category_importance[cat] = round(cat_total, 4)
 
         return {
-            "model_name": model_info.get("model_name", "unknown"),
+            "model_name": model_info.get("model_key") or model_info.get("model_name", "unknown"),
             "total_features": len(importance_list),
             "top_n": top_n,
             "features": top_features,
@@ -199,9 +199,10 @@ async def get_model_summary(
             with open(meta_path) as f:
                 meta = json.load(f)
 
+        mk = model_info.get("model_key") or model_info.get("model_name", "unknown")
         return {
             "model_name": model_info.get("model_name", "unknown"),
-            "model_type": model_info.get("model_key", "unknown") + " (MultiOutputRegressor)",
+            "model_type": mk.title() + " (MultiOutputRegressor)",
             "parameters": meta.get("model_params", {}),
             "metrics": model_info.get("metrics", {}),
             "val_metrics": model_info.get("val_metrics", {}),

@@ -153,7 +153,17 @@ class FeatureService:
         return True
 
     def is_connected(self) -> bool:
-        """Check if any feature store is connected."""
+        """Check if any feature store is connected.
+        
+        Tries to verify Hopsworks connection by checking env vars.
+        Does NOT make a blocking network call.
+        """
+        import os
+        # Quick check: are Hopsworks env vars configured?
+        host = os.environ.get("HOPSWORKS_HOST")
+        api_key = os.environ.get("HOPSWORKS_API_KEY")
+        if host and api_key:
+            return True
         return self.primary_store is not None or (
             self.fallback_enabled and self.fallback_store is not None
         )

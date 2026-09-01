@@ -414,111 +414,163 @@ def render_explainability(api_client: APIClient):
     with tab4:
         try:
             st.subheader("📈 Model Comparison (4-Year Dataset)")
-            st.caption("All models trained on 107,064 hourly observations (Aug 2022 – Aug 2026)")
 
-            # Load comparison data from model_metadata.json (always available)
             import json as _json
             import pandas as _pd
 
             meta_path = os.path.join("models", "production", "model_metadata.json")
             comparison_path = os.path.join("models", "production", "model_comparison_full.json")
 
-            comparison = None
+            models_data = {}
+            best_model = "XGBoost"
+            data_rows = {}
+
+            # Source 1: model_comparison_full.json
             if os.path.exists(comparison_path):
                 with open(comparison_path) as f:
-                    comparison = _json.load(f)
+                    raw = _json.load(f)
+                best_model = raw.get("best_model", "XGBoost")
+                data_rows = raw.get("data_rows", {})
+                raw_models = raw.get("models", {})
+                for name, data in raw_models.items():
+                    test = data.get("test", {})
+                    val = data.get("val", {})
+                    ph = data.get("per_horizon", {})
+                    models_data[name] = {
+                        "test_metrics": {
+                            "mae": test.get("mae", 0),
+                            "rmse": test.get("rmse", 0),
+                            "r2": test.get("r2", 0),
+                        },
+                        "val_metrics": {
+                            "mae": val.get("mae", 0),
+                            "rmse": val.get("rmse", 0),
+                            "r2": val.get("r2", 0),
+                        },
+                        "per_horizon": ph,
+                        "train_time": data.get("train_time", 0),
+                        "composite_score": data.get("composite_score", 0),
+                    }
 
-            # Fallback: build from model_metadata.json
-            if comparison is None and os.path.exists(meta_path):
+            # Source 2: model_metadata.json fallback
+            if not models_data and os.path.exists(meta_path):
                 with open(meta_path) as f:
                     meta = _json.load(f)
+                best_model = meta.get("model_name", "XGBoost")
                 mc = meta.get("model_comparison", {})
-                if mc:
-                    comparison = {"models": {}, "best_model": meta.get("model_name", "XGBoost")}
-                    for key, data in mc.items():
-                        comparison["models"][data.get("name", key)] = {
-                            "test_metrics": {
-                                "mae": data.get("test_mae", 0),
-                                "rmse": data.get("test_rmse", 0),
-                                "r2": data.get("test_r2", 0),
-                            },
-                            "val_metrics": {
-                                "mae": data.get("val_mae", 0),
-                                "rmse": data.get("val_rmse", 0),
-                                "r2": data.get("val_r2", 0),
-                            },
-                            "train_time": data.get("train_time", 0),
-                        }
+                for key, data in mc.items():
+                    name = data.get("name", key)
+                    models_data[name] = {
+                        "test_metrics": {
+                            "mae": data.get("test_mae", 0),
+                            "rmse": data.get("test_rmse", 0),
+                            "r2": data.get("test_r2", 0),
+                        },
+                        "val_metrics": {
+                            "mae": data.get("val_mae", 0),
+                            "rmse": data.get("val_rmse", 0),
+                            "r2": data.get("val_r2", 0),
+                        },
+                        "per_horizon": {},
+                        "train_time": data.get("train_time", 0),
+                    }
 
-            if comparison:
-                models_data = comparison.get("models", {})
+            if models_data:
+                total = sum(data_rows.values()) if data_rows else 0
+                if total:
+                    st.caption(f"Trained on {total:,} hourly observations | {len(models_data)} models compared")
 
-                if models_data:
-                    # Overall comparison table
-                    st.subheader("Overall Performance (Test Set)")
-                    table_data = []
-                    for name, data in models_data.items():
-                        test = data.get("test_metrics", {})
-                        table_data.append({
-                            "Model": name,
-                            "MAE": f"{test.get('mae', 0):.2f}",
-                            "RMSE": f"{test.get('rmse', 0):.2f}",
-                            "R²": f"{test.get('r2', 0):.4f}",
-                            "Train Time": f"{data.get('train_time', 0):.1f}s",
-                        })
-                    st.dataframe(table_data, hide_index=True, use_container_width=True)
+                # Overall comparison table
+                st.subheader("Overall Performance (Test Set)")
+                table_data = []
+                for name, data in models_data.items():
+                    test = data.get("test_metrics", {})
+                    table_data.append({
+                        "Model": name,
+                        "MAE": f"{test.get('mae', 0):.2f}",
+                        "RMSE": f"{test.get('rmse', 0):.2f}",
+                        "R²": f"{test.get('r2', 0):.4f}",
+                        "Train Time": f"{data.get('train_time', 0):.1f}s",
+                    })
+                st.dataframe(table_data, hide_index=True, use_container_width=True)
 
-                    # Bar chart comparison
-                    st.subheader("MAE Comparison (Test Set)")
-                    model_names = list(models_data.keys())
-                    mae_values = [models_data[m].get("test_metrics", {}).get("mae", 0) for m in model_names]
-                    r2_values = [models_data[m].get("test_metrics", {}).get("r2", 0) for m in model_names]
+                # Bar charts
+                st.subheader("Test Set Comparison")
+                model_names = list(models_data.keys())
+                mae_values = [models_data[m]["test_metrics"]["mae"] for m in model_names]
+                r2_values = [models_data[m]["test_metrics"]["r2"] for m in model_names]
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        fig = go.Figure(data=[
-                            go.Bar(x=model_names, y=mae_values, marker_color=['#2ecc71' if m == 'XGBoost' else '#3498db' for m in model_names])
-                        ])
-                        fig.update_layout(title="Test MAE (Lower is Better)", yaxis_title="MAE", height=350)
-                        st.plotly_chart(fig, use_container_width=True)
-
-                    with col2:
-                        fig = go.Figure(data=[
-                            go.Bar(x=model_names, y=r2_values, marker_color=['#2ecc71' if m == 'XGBoost' else '#3498db' for m in model_names])
-                        ])
-                        fig.update_layout(title="Test R² (Higher is Better)", yaxis_title="R²", height=350)
-                        st.plotly_chart(fig, use_container_width=True)
-
-                    # Per-horizon comparison
-                    st.subheader("Per-Horizon Performance (Test Set)")
-                    horizons = ["24h", "48h", "72h"]
-                    horizon_data = []
-                    for h in horizons:
-                        for name in model_names:
-                            m = models_data[name].get("test_metrics", {})
-                            horizon_data.append({
-                                "Horizon": h,
-                                "Model": name,
-                                "MAE": m.get(f"mae_{h}", 0),
-                                "RMSE": m.get(f"rmse_{h}", 0),
-                                "R²": m.get(f"r2_{h}", 0),
-                            })
-
-                    horizon_df = _pd.DataFrame(horizon_data)
-
-                    fig = go.Figure()
-                    for name in model_names:
-                        h_mae = [horizon_df[(horizon_df["Model"] == name) & (horizon_df["Horizon"] == h)]["MAE"].values[0] for h in horizons]
-                        fig.add_trace(go.Bar(name=name, x=horizons, y=h_mae))
-                    fig.update_layout(barmode="group", title="MAE by Horizon (Test Set)", yaxis_title="MAE", height=400)
+                col1, col2 = st.columns(2)
+                with col1:
+                    fig = go.Figure(data=[
+                        go.Bar(x=model_names, y=mae_values,
+                               marker_color=['#2ecc71' if m == best_model else '#3498db' for m in model_names])
+                    ])
+                    fig.update_layout(title="MAE (Lower = Better)", yaxis_title="MAE", height=350)
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # Winner annotation
-                    best_model = comparison.get("best_model", "XGBoost")
-                    best_mae = models_data.get(best_model, {}).get("test_metrics", {}).get("mae", 0)
-                    st.success(f"🏆 **Production Model: {best_model}** — Test MAE: {best_mae:.2f}")
-                else:
-                    st.warning("No model comparison data available.")
+                with col2:
+                    fig = go.Figure(data=[
+                        go.Bar(x=model_names, y=r2_values,
+                               marker_color=['#2ecc71' if m == best_model else '#3498db' for m in model_names])
+                    ])
+                    fig.update_layout(title="R² (Higher = Better)", yaxis_title="R²", height=350)
+                    st.plotly_chart(fig, use_container_width=True)
+
+                # Per-horizon comparison
+                horizons = ["24h", "48h", "72h"]
+                has_per_horizon = any(
+                    models_data[m].get("per_horizon") for m in model_names
+                )
+
+                if has_per_horizon:
+                    st.subheader("Per-Horizon Performance (Test Set)")
+                    horizon_data = []
+                    for name in model_names:
+                        ph = models_data[name].get("per_horizon", {})
+                        for h in horizons:
+                            h_data = ph.get(h, {}).get("test", {})
+                            if h_data:
+                                horizon_data.append({
+                                    "Horizon": h,
+                                    "Model": name,
+                                    "MAE": h_data.get("mae", 0),
+                                    "RMSE": h_data.get("rmse", 0),
+                                    "R²": h_data.get("r2", 0),
+                                })
+
+                    if horizon_data:
+                        horizon_df = _pd.DataFrame(horizon_data)
+
+                        fig = go.Figure()
+                        for name in model_names:
+                            df_m = horizon_df[horizon_df["Model"] == name]
+                            if not df_m.empty:
+                                fig.add_trace(go.Bar(
+                                    name=name,
+                                    x=df_m["Horizon"].tolist(),
+                                    y=df_m["MAE"].tolist(),
+                                ))
+                        fig.update_layout(barmode="group", title="MAE by Horizon", yaxis_title="MAE", height=400)
+                        st.plotly_chart(fig, use_container_width=True)
+
+                        fig2 = go.Figure()
+                        for name in model_names:
+                            df_m = horizon_df[horizon_df["Model"] == name]
+                            if not df_m.empty:
+                                fig2.add_trace(go.Bar(
+                                    name=name,
+                                    x=df_m["Horizon"].tolist(),
+                                    y=df_m["R²"].tolist(),
+                                ))
+                        fig2.update_layout(barmode="group", title="R² by Horizon", yaxis_title="R²", height=400)
+                        st.plotly_chart(fig2, use_container_width=True)
+
+                        st.dataframe(horizon_df, hide_index=True, use_container_width=True)
+
+                # Winner annotation
+                best_mae = models_data.get(best_model, {}).get("test_metrics", {}).get("mae", 0)
+                st.success(f"🏆 **Production Model: {best_model}** — Test MAE: {best_mae:.2f}")
             else:
                 st.info("Model comparison data not found. Run training first.")
 
