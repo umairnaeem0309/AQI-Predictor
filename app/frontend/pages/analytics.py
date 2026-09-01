@@ -47,14 +47,14 @@ def render_analytics(api_client: APIClient):
     with col2:
         start_date = st.date_input(
             "Start Date",
-            value=pd.Timestamp("2024-01-01").date(),
+            value=pd.Timestamp("2026-08-01").date(),
             key="analytics_start",
         )
 
     with col3:
         end_date = st.date_input(
             "End Date",
-            value=pd.Timestamp.now().date(),
+            value=pd.Timestamp("2026-09-01").date(),
             key="analytics_end",
         )
 
