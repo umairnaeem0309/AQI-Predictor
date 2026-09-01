@@ -76,7 +76,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | Ridge | 21.84 | 30.67 | 0.6509 | 28.39 | 0.3s |
 | LSTM | 39.58 | 52.57 | -0.0252 | 62.36 | 92.8s |
 
-> **LSTM Note:** R² = -0.0252 means LSTM performs worse than a naive mean predictor. LSTMs need much more data and careful tuning for tabular time-series. The 3 tree/linear models dominate.
+> **LSTM Note:** R² = -0.0252 means LSTM performs worse than a naive mean predictor. LSTMs need much larger datasets and careful hyperparameter tuning for tabular time-series. With 58 features and 77K training rows, the tree-based models capture the patterns more effectively.
 
 ### Per-Horizon Comparison — Test Set
 
@@ -125,7 +125,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | Data Ingestion | ✅ Verified | Hopsworks Feature Store (features + targets together) |
 | Data Cleaning | ✅ Verified | 107,064 rows, 0 duplicates, <0.2% NaN |
 | Feature Engineering | ✅ Verified | 58 features |
-| Feature Store | ✅ Verified | Hopsworks: 107,064 rows |
+| Feature Store | ✅ Verified | Hopsworks: 107,064 rows (NO CSV fallback) |
 | Feature View | ✅ Verified | Target label designation |
 | Model Training | ✅ Verified | 4 models (Ridge, RF, XGBoost, LSTM) from Hopsworks |
 | Model Registry | ✅ Verified | Hopsworks Model Registry (XGBoost v2) |
@@ -251,7 +251,7 @@ AQI-Predictor/
 | Component | Technology |
 |-----------|------------|
 | Data Provider | Open-Meteo (Weather + Air Quality) |
-| Feature Store | Hopsworks (PRIMARY), Local CSV (Fallback) |
+| Feature Store | Hopsworks (PRIMARY, NO CSV fallback) |
 | ML Models | Ridge, Random Forest, XGBoost, LSTM |
 | Model Registry | Hopsworks Model Registry |
 | Backend API | FastAPI |
