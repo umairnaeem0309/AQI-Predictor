@@ -359,6 +359,20 @@ def get_live_prediction(city_id: str, model) -> Dict[str, Any]:
         logger.warning(f"Failed to compute confidence intervals: {e}")
         confidence = None
 
+    # Read model version from metadata
+    model_version = "xgboost-v1.0"
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+
+        meta_path = _Path("models/production/model_metadata.json")
+        if meta_path.exists():
+            with open(meta_path) as _f:
+                meta = _json.load(_f)
+            model_version = meta.get("model_version", model_version)
+    except Exception:
+        pass
+
     return {
         "city": CITIES[city_id]["name"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -368,6 +382,6 @@ def get_live_prediction(city_id: str, model) -> Dict[str, Any]:
         "category_24h": cat_24h,
         "category_48h": cat_48h,
         "category_72h": cat_72h,
-        "model_version": "xgboost-live-v1.0",
+        "model_version": model_version,
         "confidence": confidence,
     }

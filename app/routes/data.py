@@ -29,22 +29,38 @@ def _load_dataset():
 
     Returns DataFrame or None if no data available.
     """
-    # Try Hopsworks first
-    try:
-        from src.feature_store import get_feature_store
+    import os as _os
 
-        store = get_feature_store()
-        for fg_name in ["aqi_features_prod", "aqi_features_test"]:
-            try:
-                df = store.get_features(fg_name, version=1)
-                if not df.empty:
-                    if "timestamp" in df.columns:
-                        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-                    return df
-            except Exception:
-                continue
+    # Try Hopsworks first — use direct connection
+    try:
+        import hopsworks
+
+        host = _os.environ.get("HOPSWORKS_HOST")
+        api_key = _os.environ.get("HOPSWORKS_API_KEY")
+        project_name = _os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
+
+        if host and api_key:
+            project = hopsworks.login(
+                host=host,
+                api_key_value=api_key,
+                project=project_name,
+            )
+            fs = project.get_feature_store()
+            for fg_name in ["aqi_features_prod", "aqi_features_test"]:
+                try:
+                    fg = fs.get_feature_group(name=fg_name, version=1)
+                    df = fg.read()
+                    if df is not None and not df.empty:
+                        if "timestamp" in df.columns:
+                            df["timestamp"] = pd.to_datetime(
+                                df["timestamp"], utc=True, errors="coerce"
+                            )
+                        logger.info(f"Loaded {len(df)} rows from Hopsworks")
+                        return df
+                except Exception:
+                    continue
     except Exception as e:
-        logger.warning(f"Hopsworks read failed: {e}")
+        logger.warning(f"Hopsworks connection failed: {e}")
 
     # Fallback to local CSV
     csv_path = os.path.join(DATA_DIR, "raw_observations.csv")
