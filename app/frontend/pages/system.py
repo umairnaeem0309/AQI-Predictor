@@ -139,9 +139,8 @@ def render_system(api_client: APIClient):
         # Pipeline Status
         st.subheader("Pipeline Status")
 
-        model_path = Path("models/production/xgboost_model.pkl")
+        model_path = Path("models/production/best_model.pkl")
         metadata_path = Path("models/production/model_metadata.json")
-        dataset_path = Path("data/processed/final_dataset.csv")
 
         col1, col2, col3 = st.columns(3)
 
@@ -162,38 +161,34 @@ def render_system(api_client: APIClient):
             )
 
         with col3:
-            dataset_exists = dataset_path.exists()
+            # Check Hopsworks feature store
+            fs_connected = health.get("feature_store_connected", False) if health else False
             render_status_card(
-                label="Dataset",
-                value="Available" if dataset_exists else "Missing",
-                status="ok" if dataset_exists else "warning",
+                label="Feature Store",
+                value="Hopsworks Connected" if fs_connected else "Not Connected",
+                status="ok" if fs_connected else "warning",
             )
 
-        # Dataset stats
-        if dataset_exists:
-            try:
-                import pandas as pd
+        # Dataset stats from model metadata
+        try:
+            if metadata_path.exists():
+                import json as _json
 
-                df = pd.read_csv(dataset_path)
+                with open(metadata_path) as _f:
+                    _meta = _json.load(_f)
                 st.subheader("Dataset Statistics")
+                st.caption(f"Source: {_meta.get('data_source', 'hopsworks_feature_store')}")
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("Total Rows", f"{len(df):,}")
+                    st.metric("Train Rows", f"{_meta.get('train_rows', 0):,}")
                 with col2:
-                    cities = df["city"].nunique() if "city" in df.columns else "N/A"
-                    st.metric("Cities", cities)
+                    st.metric("Val Rows", f"{_meta.get('val_rows', 0):,}")
                 with col3:
-                    if "timestamp" in df.columns:
-                        st.metric(
-                            "Date Range",
-                            f"{df['timestamp'].min()[:10]} → {df['timestamp'].max()[:10]}",
-                        )
-                    else:
-                        st.metric("Date Range", "N/A")
+                    st.metric("Test Rows", f"{_meta.get('test_rows', 0):,}")
                 with col4:
-                    st.metric("Columns", len(df.columns))
-            except Exception:
-                st.info("Could not load dataset statistics.")
+                    st.metric("Features", _meta.get('n_features', 0))
+        except Exception:
+            pass
 
         # Data Freshness
         st.subheader("Data Freshness")

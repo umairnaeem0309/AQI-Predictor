@@ -414,15 +414,43 @@ def render_explainability(api_client: APIClient):
     with tab4:
         try:
             st.subheader("📈 Model Comparison (4-Year Dataset)")
-            st.caption("All models trained on 107,208 hourly observations (Aug 2022 – Aug 2026)")
+            st.caption("All models trained on 107,064 hourly observations (Aug 2022 – Aug 2026)")
 
-            # Load comparison data
-            import json
+            # Load comparison data from model_metadata.json (always available)
+            import json as _json
+            import pandas as _pd
+
+            meta_path = os.path.join("models", "production", "model_metadata.json")
             comparison_path = os.path.join("models", "production", "model_comparison_full.json")
+
+            comparison = None
             if os.path.exists(comparison_path):
                 with open(comparison_path) as f:
-                    comparison = json.load(f)
+                    comparison = _json.load(f)
 
+            # Fallback: build from model_metadata.json
+            if comparison is None and os.path.exists(meta_path):
+                with open(meta_path) as f:
+                    meta = _json.load(f)
+                mc = meta.get("model_comparison", {})
+                if mc:
+                    comparison = {"models": {}, "best_model": meta.get("model_name", "XGBoost")}
+                    for key, data in mc.items():
+                        comparison["models"][data.get("name", key)] = {
+                            "test_metrics": {
+                                "mae": data.get("test_mae", 0),
+                                "rmse": data.get("test_rmse", 0),
+                                "r2": data.get("test_r2", 0),
+                            },
+                            "val_metrics": {
+                                "mae": data.get("val_mae", 0),
+                                "rmse": data.get("val_rmse", 0),
+                                "r2": data.get("val_r2", 0),
+                            },
+                            "train_time": data.get("train_time", 0),
+                        }
+
+            if comparison:
                 models_data = comparison.get("models", {})
 
                 if models_data:
@@ -476,7 +504,7 @@ def render_explainability(api_client: APIClient):
                                 "R²": m.get(f"r2_{h}", 0),
                             })
 
-                    horizon_df = pd.DataFrame(horizon_data)
+                    horizon_df = _pd.DataFrame(horizon_data)
 
                     fig = go.Figure()
                     for name in model_names:

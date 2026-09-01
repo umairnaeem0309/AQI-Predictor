@@ -252,16 +252,28 @@ class ModelService:
         """
         Get model metadata.
 
+        Always reads from model_metadata.json for full info,
+        regardless of where the model was loaded from.
+
         Returns:
         Model metadata dictionary with standardized fields.
 
         Raises:
-        ModelNotLoadedError: If model info not available
+            ModelNotLoadedError: If model info not available
         """
-        if self._model_info is None:
-            raise ModelNotLoadedError("Model info not available")
+        import json as _json
+        from pathlib import Path as _Path
 
-        info = self._model_info
+        # Always read from model_metadata.json for full details
+        meta_path = _Path("models/production/model_metadata.json")
+        info = None
+        if meta_path.exists():
+            with open(meta_path) as f:
+                info = _json.load(f)
+        if info is None and self._model_info is not None:
+            info = self._model_info
+        if info is None:
+            raise ModelNotLoadedError("Model info not available")
 
         # Build response with expected fields
         metrics = info.get("metrics", {})
