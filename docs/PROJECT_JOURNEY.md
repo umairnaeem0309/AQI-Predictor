@@ -81,7 +81,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 
 - Features + targets stored in **single Hopsworks Feature Group**
 - **Feature View** with target label designation
-- **No local CSV files** for training — all from Hopsworks
+- **No local CSV files** for training — ALL data from Hopsworks Feature Store (no fallback)
 - Ensures reproducible, consistent splits
 
 ---
@@ -95,7 +95,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 | Ridge Regression | Linear | Baseline, fast, interpretable |
 | Random Forest | Ensemble | Non-linear, robust |
 | XGBoost | Gradient Boosting | State-of-the-art tabular |
-| LSTM | Deep Learning | Sequential patterns (skipped — no PyTorch) |
+| LSTM | Deep Learning | Sequential pattern capture |
 
 ### Verified Results — Hopsworks Feature Store
 
@@ -130,6 +130,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 | **XGBoost** | **23.15** | **32.48** | **0.6091** ★ |
 | Random Forest | 23.08 | 32.52 | 0.6081 |
 | Ridge | 23.62 | 32.85 | 0.6002 |
+| LSTM | 46.34 | 57.68 | -0.0798 |
 
 ### Selection Rationale
 
@@ -185,7 +186,7 @@ Build a production-grade AQI forecasting system that predicts Air Quality Index 
 | Model selection based on single metric | Changed to composite score across horizons |
 | Local CSV files causing data drift | Migrated to Hopsworks Feature Store |
 | Separate features/targets files | Combined into single Feature Group |
-| Hopsworks offline materialization delay | Added local CSV fallback for training |
+
 
 ---
 

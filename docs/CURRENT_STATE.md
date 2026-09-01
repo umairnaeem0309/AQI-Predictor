@@ -22,7 +22,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Feature Engineering | ✅ VERIFIED | 58 features |
 | Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,064 rows |
 | Feature View | ✅ VERIFIED | Target label designation |
-| Model Training | ✅ VERIFIED | 3 models on complete 4-year data from Hopsworks |
+| Model Training | ✅ VERIFIED | 4 models on complete 4-year data from Hopsworks |
 | Model Evaluation | ✅ VERIFIED | MAE + RMSE + R² across all horizons |
 | Model Selection | ✅ VERIFIED | XGBoost selected (best composite score) |
 | Model Registry | ✅ VERIFIED | Hopsworks Model Registry |
@@ -60,6 +60,9 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 22.5s |
 | Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 310.2s |
 | Ridge | 21.84 | 30.67 | 0.6509 | 28.39 | 0.3s |
+| LSTM | 39.58 | 52.57 | -0.0252 | 62.36 | 92.8s |
+
+> **LSTM Note:** R² = -0.0252 means LSTM performs worse than a naive mean predictor. LSTMs need much larger datasets and careful tuning for tabular time-series. The tree/linear models dominate.
 
 ### Per-Horizon — Test Set
 
@@ -86,6 +89,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | **XGBoost** | **23.15** | **32.48** | **0.6091** ★ |
 | Random Forest | 23.08 | 32.52 | 0.6081 |
 | Ridge | 23.62 | 32.85 | 0.6002 |
+| LSTM | 46.34 | 57.68 | -0.0798 |
 
 ### Why XGBoost (Updated)
 
@@ -108,8 +112,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Targets | 3 (target_aqi_24h, 48h, 72h) |
 | Storage | Features + Targets TOGETHER |
 | Feature View | `aqi_feature_view` v1 |
-| Data source | Hopsworks Feature Store (PRIMARY) |
-| Fallback | Local CSV backup |
+| Data source | Hopsworks Feature Store (PRIMARY, NO CSV fallback) |
 
 ---
 

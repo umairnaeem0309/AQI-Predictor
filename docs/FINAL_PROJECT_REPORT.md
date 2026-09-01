@@ -57,6 +57,7 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 - **Reason:** Open-Meteo CAMS Global air quality starts Aug 2022
 - **Total:** 107,064 hourly observations (35,688 per city)
 - **Stored in:** Hopsworks Feature Store (features + targets together)
+- **No local CSV files** — all training data from Hopsworks
 
 ---
 
@@ -257,7 +258,7 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 
 - **Feature Store:** Hopsworks PRIMARY (107,064 rows, features + targets together)
 - **Model Registry:** Hopsworks Model Registry (XGBoost v3)
-- **Fallback:** Local CSV backup
+
 
 ---
 
