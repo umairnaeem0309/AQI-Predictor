@@ -38,9 +38,9 @@ FROM dependencies AS app
 # Copy source code
 COPY src/ ./src/
 COPY app/ ./app/
-COPY pipelines/ ./pipelines/
 COPY config.yaml .
 COPY models/ ./models/
+COPY scripts/ ./scripts/
 
 # Copy environment template (actual .env is mounted at runtime)
 COPY .env.example .env
