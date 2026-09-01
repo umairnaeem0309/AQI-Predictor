@@ -413,50 +413,31 @@ def render_explainability(api_client: APIClient):
     # ── Tab 4: Model Comparison ──
     with tab4:
         try:
-            st.subheader("📈 Model Comparison (4-Year Dataset)")
+            st.subheader("📈 Model Comparison")
 
             import json as _json
             import pandas as _pd
 
             meta_path = os.path.join("models", "production", "model_metadata.json")
-            comparison_path = os.path.join("models", "production", "model_comparison_full.json")
 
             models_data = {}
             best_model = "XGBoost"
-            data_rows = {}
+            train_rows = 0
+            val_rows = 0
+            test_rows = 0
+            n_features = 0
 
-            # Source 1: model_comparison_full.json
-            if os.path.exists(comparison_path):
-                with open(comparison_path) as f:
-                    raw = _json.load(f)
-                best_model = raw.get("best_model", "XGBoost")
-                data_rows = raw.get("data_rows", {})
-                raw_models = raw.get("models", {})
-                for name, data in raw_models.items():
-                    test = data.get("test", {})
-                    val = data.get("val", {})
-                    ph = data.get("per_horizon", {})
-                    models_data[name] = {
-                        "test_metrics": {
-                            "mae": test.get("mae", 0),
-                            "rmse": test.get("rmse", 0),
-                            "r2": test.get("r2", 0),
-                        },
-                        "val_metrics": {
-                            "mae": val.get("mae", 0),
-                            "rmse": val.get("rmse", 0),
-                            "r2": val.get("r2", 0),
-                        },
-                        "per_horizon": ph,
-                        "train_time": data.get("train_time", 0),
-                        "composite_score": data.get("composite_score", 0),
-                    }
-
-            # Source 2: model_metadata.json fallback
-            if not models_data and os.path.exists(meta_path):
+            # ALWAYS use model_metadata.json (authoritative from Hopsworks training)
+            if os.path.exists(meta_path):
                 with open(meta_path) as f:
                     meta = _json.load(f)
                 best_model = meta.get("model_name", "XGBoost")
+                train_rows = meta.get("train_rows", 0)
+                val_rows = meta.get("val_rows", 0)
+                test_rows = meta.get("test_rows", 0)
+                n_features = meta.get("n_features", 0)
+                total = train_rows + val_rows + test_rows
+
                 mc = meta.get("model_comparison", {})
                 for key, data in mc.items():
                     name = data.get("name", key)
@@ -471,14 +452,13 @@ def render_explainability(api_client: APIClient):
                             "rmse": data.get("val_rmse", 0),
                             "r2": data.get("val_r2", 0),
                         },
-                        "per_horizon": {},
                         "train_time": data.get("train_time", 0),
                     }
 
             if models_data:
-                total = sum(data_rows.values()) if data_rows else 0
-                if total:
-                    st.caption(f"Trained on {total:,} hourly observations | {len(models_data)} models compared")
+                st.caption(
+                    f"Source: Hopsworks Feature Store | {total:,} rows ({train_rows:,} train + {val_rows:,} val + {test_rows:,} test) | {n_features} features | {len(models_data)} models"
+                )
 
                 # Overall comparison table
                 st.subheader("Overall Performance (Test Set)")

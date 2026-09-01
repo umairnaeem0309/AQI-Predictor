@@ -35,13 +35,18 @@ async def health_check():
     - **version**: API version
     """
     try:
+        import os
         model_service = get_model_service()
-        feature_service = get_feature_service()
+
+        # Check Hopsworks connection via env vars (fast, no network call)
+        hopsworks_connected = bool(
+            os.environ.get("HOPSWORKS_HOST") and os.environ.get("HOPSWORKS_API_KEY")
+        )
 
         return HealthResponse(
             status="healthy",
             model_loaded=model_service.is_loaded(),
-            feature_store_connected=feature_service.is_connected(),
+            feature_store_connected=hopsworks_connected,
             last_prediction=None,
             version="1.0.0",
         )
