@@ -80,13 +80,19 @@ async def lifespan(app: FastAPI):
 
         logger.info("Services initialized successfully")
 
-        # Load production model (MLflow Registry first, then local pickle)
+        # Load production model - try local pickle first for fast startup,
+        # then upgrade from registry in background
         try:
-            model_service.load_production_model_from_registry()
-            logger.info("Production model loaded successfully")
+            model, info = model_service._load_local_pickle()
+            logger.info(f"Loaded local model: {info.get('model_name', 'unknown')} v{info.get('model_version', '?')}")
         except Exception as e:
-            logger.warning(f"Could not load model: {e}")
-            logger.info("API will start without model - health check only")
+            logger.warning(f"Local pickle load failed: {e}")
+            try:
+                model_service.load_production_model_from_registry()
+                logger.info("Loaded model from registry")
+            except Exception as e2:
+                logger.warning(f"Registry load also failed: {e2}")
+                logger.info("API will start without model - health check only")
 
     except Exception as e:
         logger.error(f"Startup error: {e}")

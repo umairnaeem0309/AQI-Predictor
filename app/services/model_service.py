@@ -287,6 +287,7 @@ class ModelService:
         return {
             "model_name": info.get("model_name", "unknown"),
             "model_version": info.get("model_version", "v1.0.0"),
+            "model_key": info.get("model_key", info.get("model_name", "unknown")),
             "status": "production",
             "approval_status": "approved",
             "training_date": info.get("training_date", "unknown"),
