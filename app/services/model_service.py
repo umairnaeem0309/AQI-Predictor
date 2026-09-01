@@ -78,19 +78,19 @@ class ModelService:
 
             host = _os.environ.get("HOPSWORKS_HOST")
             api_key = _os.environ.get("HOPSWORKS_API_KEY")
-            project_name = _os.environ.get("HOPSWORKS_PROJECT", "AQI_Predictor")
+            project_name = _os.environ.get("HOPSWORKS_PROJECT")
 
             if host and api_key:
                 project = hopsworks.login(host=host, api_key_value=api_key, project=project_name)
                 mr = project.get_model_registry()
 
-                # Try to get the best model
+                # Try to get the best model by name
                 for model_name in ["xgboost", "random_forest", "ridge", "lstm"]:
                     try:
-                        model_versions = mr.get_all_model_versions(name=model_name)
+                        model_versions = mr.get_models(model_name)
                         if model_versions:
                             # Get latest version
-                            latest = sorted(model_versions, key=lambda v: v.version, reverse=True)[0]
+                            latest = sorted(model_versions, key=lambda m: m.version, reverse=True)[0]
                             model = latest.load()
                             model_info = {
                                 "model_name": model_name,
