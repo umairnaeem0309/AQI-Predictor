@@ -281,7 +281,9 @@ class HopsworksModelRegistry:
             return ""
 
         # Use test MAE as primary metric
-        best_model = min(model_results.keys(), key=lambda m: model_results[m].get("mae", float("inf")))
+        best_model = min(
+            model_results.keys(), key=lambda m: model_results[m].get("mae", float("inf"))
+        )
 
         return best_model
 

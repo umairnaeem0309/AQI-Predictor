@@ -98,8 +98,6 @@ def load_training_data_from_hopsworks():
     return df
 
 
-
-
 def prepare_data_from_dataframe(df):
     """Prepare features and targets from a Hopsworks DataFrame.
 

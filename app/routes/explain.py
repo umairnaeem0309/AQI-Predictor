@@ -269,7 +269,7 @@ async def get_shap_explanation(
                 train_means = meta.get("feature_means", {})
             except Exception:
                 pass
-        
+
         # Fallback: use zeros if no means available
         if not train_means:
             train_means = {fname: 0.0 for fname in feature_names}
@@ -420,20 +420,35 @@ async def get_global_shap_importance(
         # Generate synthetic background sample from feature ranges
         # This avoids loading from Hopsworks on every request
         # The background sample is deterministic (seed=42) for reproducibility
-        
+
         # Use reasonable ranges for each feature category
         feature_ranges = {
-            "temperature": (15, 45), "humidity": (20, 95), "pressure": (990, 1030),
-            "wind_speed": (0, 25), "wind_direction": (0, 360), "cloud_cover": (0, 100),
-            "precipitation": (0, 5), "pm25": (5, 150), "pm10": (10, 200),
-            "co": (200, 5000), "no2": (5, 80), "so2": (2, 30), "o3": (20, 100),
-            "us_aqi_open_meteo": (20, 200), "us_aqi_pm25_open_meteo": (10, 180),
-            "us_aqi_pm10_open_meteo": (15, 150), "aqi": (20, 200),
-            "hour": (0, 23), "day_of_week": (0, 6), "month": (1, 12),
-            "is_weekend": (0, 1), "season": (0, 3),
-            "hour_sin": (-1, 1), "hour_cos": (-1, 1),
+            "temperature": (15, 45),
+            "humidity": (20, 95),
+            "pressure": (990, 1030),
+            "wind_speed": (0, 25),
+            "wind_direction": (0, 360),
+            "cloud_cover": (0, 100),
+            "precipitation": (0, 5),
+            "pm25": (5, 150),
+            "pm10": (10, 200),
+            "co": (200, 5000),
+            "no2": (5, 80),
+            "so2": (2, 30),
+            "o3": (20, 100),
+            "us_aqi_open_meteo": (20, 200),
+            "us_aqi_pm25_open_meteo": (10, 180),
+            "us_aqi_pm10_open_meteo": (15, 150),
+            "aqi": (20, 200),
+            "hour": (0, 23),
+            "day_of_week": (0, 6),
+            "month": (1, 12),
+            "is_weekend": (0, 1),
+            "season": (0, 3),
+            "hour_sin": (-1, 1),
+            "hour_cos": (-1, 1),
         }
-        
+
         np.random.seed(42)
         sample_size = min(n_samples, 100)
         bg_data = {}
@@ -451,7 +466,7 @@ async def get_global_shap_importance(
                     bg_data[fname] = np.random.uniform(-10, 10, sample_size)
                 else:
                     bg_data[fname] = np.random.uniform(0, 100, sample_size)
-        
+
         X_bg = np.column_stack([bg_data[f] for f in feature_names]).astype(np.float64)
 
         # Get target estimator (default 24h)

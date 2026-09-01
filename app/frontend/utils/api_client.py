@@ -32,7 +32,7 @@ class APIClient:
     Modes:
     - production: Calls real FastAPI backend
     - mock: Returns mock data for development
-    
+
     Features:
     - Response caching to avoid repeated slow calls during Render cold starts
     - Retry with exponential backoff for connection errors
@@ -81,7 +81,7 @@ class APIClient:
             api_key = os.getenv("API_KEY")
 
         mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
-        
+
         # Increase timeout for Render (free tier needs wake-up time)
         timeout = int(os.getenv("API_TIMEOUT", "30"))
 
@@ -111,12 +111,12 @@ class APIClient:
     def _request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
         """
         Make HTTP request with retry logic for connection errors.
-        
+
         Handles Render free-tier sleep/wake by retrying with exponential backoff.
         """
         last_error = None
         delay = self.retry_delay
-        
+
         for attempt in range(self.max_retries + 1):
             try:
                 response = requests.request(method, url, timeout=self.timeout, **kwargs)

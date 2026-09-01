@@ -244,7 +244,7 @@ async def get_alerts(
 
 def _calculate_pm25_aqi(pm25: float) -> int:
     """Calculate US EPA AQI from PM2.5 concentration (μg/m³).
-    
+
     Uses EPA breakpoints (May 2024 revision).
     """
     breakpoints = [
@@ -295,7 +295,11 @@ async def get_system_health(
         if model_service.is_loaded():
             checks["model"] = {"status": "healthy", "loaded": True}
         else:
-            checks["model"] = {"status": "degraded", "loaded": False, "message": "Model loaded from local pickle"}
+            checks["model"] = {
+                "status": "degraded",
+                "loaded": False,
+                "message": "Model loaded from local pickle",
+            }
     except Exception:
         checks["model"] = {"status": "degraded", "loaded": False}
 

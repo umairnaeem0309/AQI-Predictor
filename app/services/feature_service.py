@@ -154,11 +154,12 @@ class FeatureService:
 
     def is_connected(self) -> bool:
         """Check if any feature store is connected.
-        
+
         Tries to verify Hopsworks connection by checking env vars.
         Does NOT make a blocking network call.
         """
         import os
+
         # Quick check: are Hopsworks env vars configured?
         host = os.environ.get("HOPSWORKS_HOST")
         api_key = os.environ.get("HOPSWORKS_API_KEY")

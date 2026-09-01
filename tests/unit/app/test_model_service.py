@@ -40,6 +40,7 @@ class TestModelService:
         # Model not loaded, metadata file check should still raise
         # if model_metadata.json doesn't exist in test context
         import os
+
         meta_path = os.path.join("models", "production", "model_metadata.json")
         if not os.path.exists(meta_path):
             with pytest.raises(ModelNotLoadedError):

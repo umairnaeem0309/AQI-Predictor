@@ -90,7 +90,9 @@ class ModelService:
                         model_versions = mr.get_models(model_name)
                         if model_versions:
                             # Get latest version
-                            latest = sorted(model_versions, key=lambda m: m.version, reverse=True)[0]
+                            latest = sorted(model_versions, key=lambda m: m.version, reverse=True)[
+                                0
+                            ]
                             model = latest.load()
                             model_info = {
                                 "model_name": model_name,
@@ -100,7 +102,9 @@ class ModelService:
                             }
                             self._model = model
                             self._model_info = model_info
-                            logger.info(f"Loaded model from Hopsworks: {model_name} v{latest.version}")
+                            logger.info(
+                                f"Loaded model from Hopsworks: {model_name} v{latest.version}"
+                            )
                             return model, model_info
                     except Exception:
                         continue
@@ -132,7 +136,9 @@ class ModelService:
 
                 self._model = model
                 self._model_info = model_info
-                logger.info(f"Loaded model from MLflow Registry: {prod_version.name} v{prod_version.version}")
+                logger.info(
+                    f"Loaded model from MLflow Registry: {prod_version.name} v{prod_version.version}"
+                )
                 return model, model_info
         except Exception as e:
             logger.warning(f"MLflow Registry load failed: {e}")

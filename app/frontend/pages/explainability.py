@@ -465,13 +465,15 @@ def render_explainability(api_client: APIClient):
                 table_data = []
                 for name, data in models_data.items():
                     test = data.get("test_metrics", {})
-                    table_data.append({
-                        "Model": name,
-                        "MAE": f"{test.get('mae', 0):.2f}",
-                        "RMSE": f"{test.get('rmse', 0):.2f}",
-                        "R²": f"{test.get('r2', 0):.4f}",
-                        "Train Time": f"{data.get('train_time', 0):.1f}s",
-                    })
+                    table_data.append(
+                        {
+                            "Model": name,
+                            "MAE": f"{test.get('mae', 0):.2f}",
+                            "RMSE": f"{test.get('rmse', 0):.2f}",
+                            "R²": f"{test.get('r2', 0):.4f}",
+                            "Train Time": f"{data.get('train_time', 0):.1f}s",
+                        }
+                    )
                 st.dataframe(table_data, hide_index=True, use_container_width=True)
 
                 # Bar charts
@@ -482,26 +484,38 @@ def render_explainability(api_client: APIClient):
 
                 col1, col2 = st.columns(2)
                 with col1:
-                    fig = go.Figure(data=[
-                        go.Bar(x=model_names, y=mae_values,
-                               marker_color=['#2ecc71' if m == best_model else '#3498db' for m in model_names])
-                    ])
+                    fig = go.Figure(
+                        data=[
+                            go.Bar(
+                                x=model_names,
+                                y=mae_values,
+                                marker_color=[
+                                    "#2ecc71" if m == best_model else "#3498db" for m in model_names
+                                ],
+                            )
+                        ]
+                    )
                     fig.update_layout(title="MAE (Lower = Better)", yaxis_title="MAE", height=350)
                     st.plotly_chart(fig, use_container_width=True)
 
                 with col2:
-                    fig = go.Figure(data=[
-                        go.Bar(x=model_names, y=r2_values,
-                               marker_color=['#2ecc71' if m == best_model else '#3498db' for m in model_names])
-                    ])
+                    fig = go.Figure(
+                        data=[
+                            go.Bar(
+                                x=model_names,
+                                y=r2_values,
+                                marker_color=[
+                                    "#2ecc71" if m == best_model else "#3498db" for m in model_names
+                                ],
+                            )
+                        ]
+                    )
                     fig.update_layout(title="R² (Higher = Better)", yaxis_title="R²", height=350)
                     st.plotly_chart(fig, use_container_width=True)
 
                 # Per-horizon comparison
                 horizons = ["24h", "48h", "72h"]
-                has_per_horizon = any(
-                    models_data[m].get("per_horizon") for m in model_names
-                )
+                has_per_horizon = any(models_data[m].get("per_horizon") for m in model_names)
 
                 if has_per_horizon:
                     st.subheader("Per-Horizon Performance (Test Set)")
@@ -511,13 +525,15 @@ def render_explainability(api_client: APIClient):
                         for h in horizons:
                             h_data = ph.get(h, {}).get("test", {})
                             if h_data:
-                                horizon_data.append({
-                                    "Horizon": h,
-                                    "Model": name,
-                                    "MAE": h_data.get("mae", 0),
-                                    "RMSE": h_data.get("rmse", 0),
-                                    "R²": h_data.get("r2", 0),
-                                })
+                                horizon_data.append(
+                                    {
+                                        "Horizon": h,
+                                        "Model": name,
+                                        "MAE": h_data.get("mae", 0),
+                                        "RMSE": h_data.get("rmse", 0),
+                                        "R²": h_data.get("r2", 0),
+                                    }
+                                )
 
                     if horizon_data:
                         horizon_df = _pd.DataFrame(horizon_data)
@@ -526,24 +542,32 @@ def render_explainability(api_client: APIClient):
                         for name in model_names:
                             df_m = horizon_df[horizon_df["Model"] == name]
                             if not df_m.empty:
-                                fig.add_trace(go.Bar(
-                                    name=name,
-                                    x=df_m["Horizon"].tolist(),
-                                    y=df_m["MAE"].tolist(),
-                                ))
-                        fig.update_layout(barmode="group", title="MAE by Horizon", yaxis_title="MAE", height=400)
+                                fig.add_trace(
+                                    go.Bar(
+                                        name=name,
+                                        x=df_m["Horizon"].tolist(),
+                                        y=df_m["MAE"].tolist(),
+                                    )
+                                )
+                        fig.update_layout(
+                            barmode="group", title="MAE by Horizon", yaxis_title="MAE", height=400
+                        )
                         st.plotly_chart(fig, use_container_width=True)
 
                         fig2 = go.Figure()
                         for name in model_names:
                             df_m = horizon_df[horizon_df["Model"] == name]
                             if not df_m.empty:
-                                fig2.add_trace(go.Bar(
-                                    name=name,
-                                    x=df_m["Horizon"].tolist(),
-                                    y=df_m["R²"].tolist(),
-                                ))
-                        fig2.update_layout(barmode="group", title="R² by Horizon", yaxis_title="R²", height=400)
+                                fig2.add_trace(
+                                    go.Bar(
+                                        name=name,
+                                        x=df_m["Horizon"].tolist(),
+                                        y=df_m["R²"].tolist(),
+                                    )
+                                )
+                        fig2.update_layout(
+                            barmode="group", title="R² by Horizon", yaxis_title="R²", height=400
+                        )
                         st.plotly_chart(fig2, use_container_width=True)
 
                         st.dataframe(horizon_df, hide_index=True, use_container_width=True)
