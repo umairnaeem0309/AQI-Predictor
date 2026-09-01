@@ -7,11 +7,29 @@ Pydantic models for API responses.
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PredictionResponse(BaseModel):
     """Response model for prediction endpoint."""
+
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
+            "example": {
+                "city": "Karachi",
+                "timestamp": "2026-08-17T10:00:00Z",
+                "aqi_24h": 142,
+                "aqi_48h": 138,
+                "aqi_72h": 145,
+                "category_24h": "Unhealthy for Sensitive Groups",
+                "category_48h": "Unhealthy for Sensitive Groups",
+                "category_72h": "Unhealthy for Sensitive Groups",
+                "model_version": "1.0.0",
+                "confidence": None,
+            }
+        },
+    )
 
     city: str = Field(..., description="City name")
     timestamp: str = Field(..., description="Prediction timestamp (UTC)")
@@ -27,34 +45,13 @@ class PredictionResponse(BaseModel):
         description="Prediction confidence intervals (level, method, per-horizon bounds)",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "city": "Karachi",
-                "timestamp": "2026-08-17T10:00:00Z",
-                "aqi_24h": 142,
-                "aqi_48h": 138,
-                "aqi_72h": 145,
-                "category_24h": "Unhealthy for Sensitive Groups",
-                "category_48h": "Unhealthy for Sensitive Groups",
-                "category_72h": "Unhealthy for Sensitive Groups",
-                "model_version": "1.0.0",
-                "confidence": None,
-            }
-        }
-
 
 class FeatureResponse(BaseModel):
     """Response model for feature retrieval endpoint."""
 
-    city: str = Field(..., description="City name")
-    timestamp: str = Field(..., description="Feature timestamp (UTC)")
-    features: Dict[str, Any] = Field(..., description="Feature values")
-    feature_count: int = Field(..., description="Number of features returned")
-    feature_version: str = Field(..., description="Feature version")
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
             "example": {
                 "city": "Karachi",
                 "timestamp": "2026-08-17T10:00:00Z",
@@ -66,11 +63,31 @@ class FeatureResponse(BaseModel):
                 "feature_count": 3,
                 "feature_version": "1.0.0",
             }
-        }
+        },
+    )
+
+    city: str = Field(..., description="City name")
+    timestamp: str = Field(..., description="Feature timestamp (UTC)")
+    features: Dict[str, Any] = Field(..., description="Feature values")
+    feature_count: int = Field(..., description="Number of features returned")
+    feature_version: str = Field(..., description="Feature version")
 
 
 class HealthResponse(BaseModel):
     """Response model for health check endpoint."""
+
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
+            "example": {
+                "status": "healthy",
+                "model_loaded": True,
+                "feature_store_connected": True,
+                "last_prediction": "2026-08-17T10:00:00Z",
+                "version": "1.0.0",
+            }
+        },
+    )
 
     status: str = Field(..., description="Service status")
     model_loaded: bool = Field(..., description="Whether model is loaded")
@@ -81,32 +98,13 @@ class HealthResponse(BaseModel):
     )
     version: str = Field(..., description="API version")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "status": "healthy",
-                "model_loaded": True,
-                "feature_store_connected": True,
-                "last_prediction": "2026-08-17T10:00:00Z",
-                "version": "1.0.0",
-            }
-        }
-
 
 class ModelInfoResponse(BaseModel):
     """Response model for model info endpoint."""
 
-    model_name: str = Field(..., description="Model name")
-    model_version: str = Field(..., description="Model version")
-    status: str = Field(..., description="Model lifecycle status")
-    approval_status: str = Field(..., description="Approval status")
-    training_date: str = Field(..., description="Training date")
-    dataset_type: str = Field(..., description="Dataset type used for training")
-    feature_version: str = Field(..., description="Feature version")
-    metrics: Dict[str, float] = Field(..., description="Model metrics")
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
             "example": {
                 "model_name": "xgboost_v1",
                 "model_version": "1.0.0",
@@ -117,19 +115,31 @@ class ModelInfoResponse(BaseModel):
                 "feature_version": "1.0.0",
                 "metrics": {"mae": 15.2, "rmse": 20.1, "r2": 0.85},
             }
-        }
+        },
+    )
+
+    model_name: str = Field(..., description="Model name")
+    model_version: str = Field(..., description="Model version")
+    status: str = Field(..., description="Model lifecycle status")
+    approval_status: str = Field(..., description="Approval status")
+    training_date: str = Field(..., description="Training date")
+    dataset_type: str = Field(..., description="Dataset type used for training")
+    feature_version: str = Field(..., description="Feature version")
+    metrics: Dict[str, float] = Field(..., description="Model metrics")
 
 
 class ErrorResponse(BaseModel):
     """Error response model."""
 
-    detail: str = Field(..., description="Error message")
-    type: str = Field(..., description="Error type")
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
             "example": {
                 "detail": "Invalid city: Islamabad",
                 "type": "InvalidCityError",
             }
-        }
+        },
+    )
+
+    detail: str = Field(..., description="Error message")
+    type: str = Field(..., description="Error type")
