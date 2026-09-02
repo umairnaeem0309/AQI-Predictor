@@ -25,13 +25,13 @@ The AQI Predictor is a production-grade MLOps system that forecasts Air Quality 
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ FEATURE ENGINEERING                                          │
-│ 63 features: weather, pollution, time, lags, rolling, ratios │
+│ 58 features: weather, pollution, time, lags, rolling, ratios │
 │ → src/features/feature_engineering.py                        │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ FEATURE STORE (Hopsworks PRIMARY)                            │
-│ → Hopsworks cloud (107,208 rows)                             │
+│ → Hopsworks cloud (107,064 rows)                             │
 │ → Local Parquet (fallback)                                   │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
@@ -125,4 +125,4 @@ AQI-Predictor/
 
 ---
 
-**Document generated:** 31 August 2026
+**Document generated:** 2 September 2026

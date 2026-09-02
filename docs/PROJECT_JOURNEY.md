@@ -164,6 +164,16 @@ The system must include:
 4. **Fast training** (23.7s) — suitable for daily retraining
 5. **Handles non-linear relationships** in AQI data
 
+### Baseline Comparison
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| Mean Predictor | 40.42 | 51.95 | -0.0013 |
+| Persistence (lag-24h) | 26.38 | 38.95 | 0.4361 |
+| **XGBoost** | **21.31** | **30.33** | **0.6588** ★ |
+
+XGBoost is 47% better than mean predictor and 19% better than persistence.
+
 ---
 
 ## 8. Model Registry

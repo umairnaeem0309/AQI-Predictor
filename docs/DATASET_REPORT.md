@@ -103,4 +103,4 @@ python scripts/train_model.py --force-register
 
 ---
 
-**Report generated:** 31 August 2026
+**Report generated:** 2 September 2026
