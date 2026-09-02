@@ -14,11 +14,7 @@ import pandas as pd
 import pytest
 
 from src.feature_store.local_store import LocalStore
-from src.feature_store.schemas import (
-    DatasetMetadata,
-    DatasetType,
-    get_feature_group_name,
-)
+from src.feature_store.schemas import DatasetMetadata, DatasetType, get_feature_group_name
 from src.features.feature_engineering import engineer_features
 
 # =============================================================================

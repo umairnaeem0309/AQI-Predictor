@@ -12,12 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import plotly.graph_objects as go
 
-from app.frontend.utils.aqi_theme import (
-    AQI_COLORS,
-    CHART_COLORS,
-    get_aqi_color,
-    get_city_color,
-)
+from app.frontend.utils.aqi_theme import AQI_COLORS, CHART_COLORS, get_aqi_color, get_city_color
 
 
 def create_forecast_chart(

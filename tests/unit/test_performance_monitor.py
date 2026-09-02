@@ -10,11 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.monitoring.performance import (
-    PerformanceMetric,
-    PerformanceMonitor,
-    PerformanceReport,
-)
+from src.monitoring.performance import PerformanceMetric, PerformanceMonitor, PerformanceReport
 
 
 class TestPerformanceMonitor:
