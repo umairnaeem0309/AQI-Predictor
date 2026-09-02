@@ -111,6 +111,18 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 ---
 
+## Baseline Comparison
+
+| Model | MAE | RMSE | R² | Improvement vs XGBoost |
+|-------|-----|------|----|------------------------|
+| Mean Predictor | 40.42 | 51.95 | -0.0013 | XGBoost is **47% better** |
+| Persistence (lag-24h) | 26.38 | 38.95 | 0.4361 | XGBoost is **19% better** |
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | ★ Production model |
+
+XGBoost significantly outperforms both naive baselines, confirming it learns meaningful predictive patterns from the 58 engineered features.
+
+---
+
 ## Feature Store (Hopsworks)
 
 | Property | Value |

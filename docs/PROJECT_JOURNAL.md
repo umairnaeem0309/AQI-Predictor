@@ -525,3 +525,49 @@ tests/unit/test_environment.py
 - Monitor AQICN freshness over multiple collection cycles
 - After 21+ days, run quality gate for training readiness
 - Wait for project-owner approval before Phase 18
+
+---
+
+## Entry 011
+
+**Date:** 2 September 2026  
+**Phase:** Final — Pipeline Verification and Documentation  
+
+### Work Completed
+- Verified Render API health: model loaded, feature store connected
+- Verified predictions for all 3 cities (Karachi: 62, Lahore: 156, Islamabad: 111)
+- Verified Hopsworks Feature Store: 107,064 rows, 64 columns, 3 cities
+- Verified Hopsworks Model Registry: XGBoost v4 registered
+- Fixed YAML syntax errors in feature-collection.yml and daily-training.yml
+- Fixed Hopsworks Model Registry model loading (download() + pickle)
+- Computed baseline comparisons (Mean Predictor, Persistence Model)
+- Updated all documentation with baseline results
+- Fixed CRLF line endings and added .gitattributes
+- All 487 tests passing
+
+### Key Findings
+- XGBoost is 47% better than Mean Predictor (MAE 21.31 vs 40.42)
+- XGBoost is 19% better than Persistence Model (MAE 21.31 vs 26.38)
+- GitHub Actions YAML had syntax errors in embedded Python reporting (fixed)
+- Hopsworks Model Registry uses download() + pickle, not load()
+
+### Commits Created
+1. `fix: fix YAML workflow syntax, Hopsworks model loading, and update all docs`
+
+### Files Modified
+- .github/workflows/feature-collection.yml — Fixed YAML syntax
+- .github/workflows/daily-training.yml — Fixed YAML syntax
+- scripts/report_collection.py — NEW: Collection health reporter
+- scripts/report_training.py — NEW: Training results reporter
+- src/models/hopsworks_registry.py — Fixed download() + pickle loading
+- README.md — Updated with full project details and baselines
+- docs/CURRENT_STATE.md — Updated with latest results and baselines
+- docs/PROJECT_JOURNEY.md — Updated with complete journey and baselines
+- docs/FINAL_PROJECT_REPORT.md — Updated with baselines
+- docs/DECISIONS.md — Added DEC-021 baseline comparison
+- docs/ARCHITECTURE.md — Fixed feature count, date
+
+### Next Step
+- Verify CI/CD pipeline passes after push
+- Monitor daily training automation
+- Project complete and ready for submission

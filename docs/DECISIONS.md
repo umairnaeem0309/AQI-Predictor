@@ -679,3 +679,41 @@ XGBoost achieves the best test performance across all metrics:
 - Production model: XGBoost
 - Model artifact: `models/production/best_model.pkl`
 - Daily training compares all 4 models, selects best
+
+---
+
+### DEC-021
+
+**Date:** 2 September 2026  
+**Topic:** Baseline Model Comparison  
+**Phase:** Final  
+
+**Problem:**  
+Need to validate that trained models learn meaningful patterns, not just memorize or predict the mean.
+
+**Options Considered:**
+
+- **Option A:** No baseline comparison — Cannot validate model learning
+- **Option B:** Mean predictor + Persistence model — Two standard baselines for time-series
+
+**Chosen Approach:** Option B — Mean predictor and Persistence model
+
+**Reason:**  
+Mean predictor (R² ≈ 0) and Persistence model (predict last known value) are standard baselines for time-series forecasting. If models cannot beat these, they are not learning.
+
+**Results:**
+
+| Model | MAE | RMSE | R² |
+|-------|-----|------|----|
+| Mean Predictor | 40.42 | 51.95 | -0.0013 |
+| Persistence (lag-24h) | 26.38 | 38.95 | 0.4361 |
+| XGBoost | 21.31 | 30.33 | 0.6588 |
+
+XGBoost is 47% better than mean predictor and 19% better than persistence.
+
+**Trade-offs:**  
+- Additional evaluation time (minimal)
+- Provides confidence in model quality (significant)
+
+**Impact:**  
+All model comparison documentation includes baseline results.

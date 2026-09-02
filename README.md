@@ -122,6 +122,16 @@ A production-grade ML pipeline that collects historical weather and air quality 
 4. **Fast training** (22.5s) — suitable for daily retraining
 5. **Handles non-linear relationships** in AQI data
 
+### Baseline Comparison
+
+| Model | MAE | RMSE | R² | vs XGBoost |
+|-------|-----|------|----|------------|
+| Mean Predictor | 40.42 | 51.95 | -0.0013 | XGBoost is **47% better** |
+| Persistence (lag-24h) | 26.38 | 38.95 | 0.4361 | XGBoost is **19% better** |
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | ★ Production model |
+
+XGBoost significantly outperforms both naive baselines, confirming it learns meaningful predictive patterns.
+
 ---
 
 ## Verified Data Pipeline

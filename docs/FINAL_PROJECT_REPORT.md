@@ -181,6 +181,41 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 
 ---
 
+## Baseline Comparison
+
+To validate that the trained models learn meaningful patterns (not just memorizing or predicting the mean), two baseline models were evaluated on the same test set:
+
+### Baseline 1: Mean Predictor
+Always predicts the training-set mean AQI. This is the simplest possible model.
+
+| Metric | Value |
+|--------|-------|
+| MAE | 40.42 |
+| RMSE | 51.95 |
+| R² | -0.0013 |
+
+R² ≈ 0 confirms this is a naive baseline — it explains essentially zero variance.
+
+### Baseline 2: Persistence Model (lag-24h)
+Predicts the AQI value from 24 hours ago. This is the strongest simple baseline for time-series forecasting.
+
+| Metric | 24h | 48h | 72h | Overall |
+|--------|-----|-----|-----|--------|
+| MAE | 24.49 | 26.52 | 28.14 | 26.38 |
+| RMSE | 37.00 | 38.98 | 40.87 | 38.95 |
+| R² | 0.4914 | 0.4361 | 0.3808 | 0.4361 |
+
+### Improvement Over Baselines
+
+| Comparison | MAE Improvement | R² Improvement |
+|------------|-----------------|----------------|
+| XGBoost vs Mean Predictor | **47% better** (21.31 vs 40.42) | +0.6601 (0.6588 vs -0.0013) |
+| XGBoost vs Persistence | **19% better** (21.31 vs 26.38) | +0.2227 (0.6588 vs 0.4361) |
+
+XGBoost significantly outperforms both baselines, confirming it learns meaningful predictive patterns from the 58 engineered features.
+
+---
+
 ## 6. Blockers and Solutions
 
 | Blocker | Solution |
