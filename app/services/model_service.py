@@ -74,6 +74,7 @@ class ModelService:
         # Try Hopsworks Model Registry first
         try:
             import os as _os
+
             import hopsworks
 
             host = _os.environ.get("HOPSWORKS_HOST")

@@ -63,10 +63,11 @@ def compute_residual_stats(
         lower_q = alpha / 2
         upper_q = 1 - alpha / 2
 
-        stats[f"interval_{int(level*100)}_lower"] = float(np.percentile(residuals, lower_q * 100))
-        stats[f"interval_{int(level*100)}_upper"] = float(np.percentile(residuals, upper_q * 100))
-        stats[f"interval_{int(level*100)}_width"] = (
-            stats[f"interval_{int(level*100)}_upper"] - stats[f"interval_{int(level*100)}_lower"]
+        stats[f"interval_{int(level * 100)}_lower"] = float(np.percentile(residuals, lower_q * 100))
+        stats[f"interval_{int(level * 100)}_upper"] = float(np.percentile(residuals, upper_q * 100))
+        stats[f"interval_{int(level * 100)}_width"] = (
+            stats[f"interval_{int(level * 100)}_upper"]
+            - stats[f"interval_{int(level * 100)}_lower"]
         )
 
     # Per-horizon stats (if 2D)
@@ -89,10 +90,10 @@ def compute_residual_stats(
             }
             for level in confidence_levels:
                 alpha = 1 - level
-                h_stats[f"interval_{int(level*100)}_lower"] = float(
+                h_stats[f"interval_{int(level * 100)}_lower"] = float(
                     np.percentile(h_resid, alpha / 2 * 100)
                 )
-                h_stats[f"interval_{int(level*100)}_upper"] = float(
+                h_stats[f"interval_{int(level * 100)}_upper"] = float(
                     np.percentile(h_resid, (1 - alpha / 2) * 100)
                 )
 

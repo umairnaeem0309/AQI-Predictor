@@ -9,12 +9,7 @@ import pandas as pd
 import pytest
 
 from src.feature_store.schemas import DatasetMetadata, DatasetType
-from src.models.training import (
-    TARGET_COLUMNS,
-    get_model,
-    train_model,
-    validate_training_data,
-)
+from src.models.training import TARGET_COLUMNS, get_model, train_model, validate_training_data
 
 # =============================================================================
 # Test Fixtures

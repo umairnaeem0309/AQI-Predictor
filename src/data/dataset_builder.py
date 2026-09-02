@@ -20,15 +20,8 @@ import numpy as np
 import pandas as pd
 
 from src.data.validators import drop_duplicates, full_validation
-from src.features.feature_engineering import (
-    FEATURE_VERSION,
-    SCHEMA_VERSION,
-    engineer_features,
-)
-from src.features.feature_validation import (
-    check_no_future_leakage,
-    get_feature_availability,
-)
+from src.features.feature_engineering import FEATURE_VERSION, SCHEMA_VERSION, engineer_features
+from src.features.feature_validation import check_no_future_leakage, get_feature_availability
 
 logger = logging.getLogger(__name__)
 

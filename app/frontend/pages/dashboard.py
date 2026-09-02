@@ -21,11 +21,7 @@ from app.frontend.components.metrics import (
     render_warning_state,
 )
 from app.frontend.utils.api_client import APIClient, APIClientError
-from app.frontend.utils.aqi_theme import (
-    get_aqi_category,
-    get_aqi_color,
-    get_dashboard_css,
-)
+from app.frontend.utils.aqi_theme import get_aqi_category, get_aqi_color, get_dashboard_css
 from app.frontend.utils.formatters import format_time_ago, format_timestamp
 
 # Valid cities

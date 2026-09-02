@@ -17,10 +17,7 @@ from src.features.feature_engineering import (
     engineer_features,
     get_feature_metadata,
 )
-from src.features.feature_validation import (
-    full_feature_validation,
-    get_feature_availability,
-)
+from src.features.feature_validation import full_feature_validation, get_feature_availability
 
 # =============================================================================
 # Test Fixtures
