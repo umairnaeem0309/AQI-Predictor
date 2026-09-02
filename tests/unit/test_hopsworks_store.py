@@ -187,7 +187,6 @@ class TestHopsworksFallback:
         mock_hops = MagicMock()
         mock_hops.login.side_effect = Exception("Connection failed")
         with patch.dict("sys.modules", {"hopsworks": mock_hops}):
-
             from src.feature_store import get_feature_store
 
             store = get_feature_store()

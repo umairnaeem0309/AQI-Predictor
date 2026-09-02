@@ -12,16 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.backend.config import default_config
-from app.routes import (
-    batch,
-    data,
-    explain,
-    health,
-    history,
-    model,
-    monitoring,
-    prediction,
-)
+from app.routes import batch, data, explain, health, history, model, monitoring, prediction
 from app.services.feature_service import FeatureService, init_feature_service
 from app.services.model_service import (
     ModelApprovalError,

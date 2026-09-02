@@ -7,11 +7,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from src.models.registry import (
-    ModelRegistry,
-    generate_model_name,
-    validate_for_production,
-)
+from src.models.registry import ModelRegistry, generate_model_name, validate_for_production
 from src.models.selection import (
     ModelApprovalStatus,
     ModelEvaluation,
