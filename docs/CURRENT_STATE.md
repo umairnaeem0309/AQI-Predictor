@@ -1,6 +1,6 @@
 # AQI Predictor — Current State
 
-**Last Updated:** 2026-08-31  
+**Last Updated:** 2026-09-02
 **Status:** Production Ready — All Pipelines Verified
 
 ---
@@ -11,11 +11,20 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 ---
 
+## Live Services
+
+| Service | Platform | URL | Status |
+|---------|----------|-----|--------|
+| API Backend | Render | https://aqi-predictor-api-nf7s.onrender.com | ✅ Live |
+| Dashboard | Streamlit Cloud | https://airpulse.streamlit.app/ | ✅ Live |
+
+---
+
 ## Verification Status
 
 | Stage | Status | Evidence |
 |-------|--------|----------|
-| Data Collection | ✅ VERIFIED | Open-Meteo API, 4-year range |
+| Data Collection | ✅ VERIFIED | Open-Meteo API, 4-year range (Aug 2022 – Aug 2026) |
 | Data Ingestion | ✅ VERIFIED | Hopsworks Feature Store (features + targets together) |
 | Data Cleaning | ✅ VERIFIED | 107,064 rows, 0 duplicates, <0.2% NaN |
 | EDA | ✅ VERIFIED | 4 Jupyter notebooks |
@@ -25,9 +34,10 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Model Training | ✅ VERIFIED | 4 models on complete 4-year data from Hopsworks |
 | Model Evaluation | ✅ VERIFIED | MAE + RMSE + R² across all horizons |
 | Model Selection | ✅ VERIFIED | XGBoost selected (best composite score) |
-| Model Registry | ✅ VERIFIED | Hopsworks Model Registry |
+| Model Registry | ✅ VERIFIED | Hopsworks Model Registry (XGBoost v4) |
 | CI/CD | ✅ VERIFIED | 487 tests pass, lint clean |
 | Deployment | ✅ VERIFIED | Render (API) + Streamlit Cloud (Dashboard) |
+| Automation | ✅ VERIFIED | Hourly collection + daily retraining |
 
 ---
 
@@ -41,7 +51,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Date range | 2022-08-03 to 2026-08-28 | ✅ |
 | Data coverage | ~4 years | ✅ |
 | Features | 58 | ✅ |
-| Targets | 3 (24h, 48h, 72h) | ✅ |
+| Targets | 3 (target_aqi_24h, 48h, 72h) | ✅ |
 | Train split | 77,086 rows | ✅ |
 | Validation split | 8,565 rows | ✅ |
 | Test split | 21,413 rows | ✅ |
@@ -57,8 +67,8 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 | Model | MAE | RMSE | R² | Composite | Train Time |
 |-------|-----|------|----|-----------|------------|
-| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 22.5s |
-| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 310.2s |
+| **XGBoost** | **21.31** | **30.33** | **0.6588** | **27.84** ★ | 23.7s |
+| Random Forest | 21.39 | 30.33 | 0.6588 | 27.87 | 281.9s |
 | Ridge | 21.84 | 30.67 | 0.6509 | 28.39 | 0.3s |
 | LSTM | 39.58 | 52.57 | -0.0252 | 62.36 | 92.8s |
 
@@ -96,7 +106,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 1. **Best Test MAE** (21.31) — lowest prediction error
 2. **Best Test R²** (0.6588) — explains most variance
 3. **Wins ALL 3 horizons** — consistent performance
-4. **Fast training** (22.5s) — suitable for daily retraining
+4. **Fast training** (23.7s) — suitable for daily retraining
 5. **Handles non-linear relationships** better than linear models
 
 ---
@@ -121,8 +131,8 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Property | Value |
 |----------|-------|
 | Platform | Hopsworks Model Registry |
-| Registered model | XGBoost v2 |
-| URL | https://eu-west.cloud.hopsworks.ai/p/41205/models/xgboost/2 |
+| Registered model | XGBoost v4 |
+| URL | https://eu-west.cloud.hopsworks.ai/p/41205/models/xgboost/4 |
 | Model artifact | `models/production/best_model.pkl` |
 | Model comparison | `models/production/model_metadata.json` |
 
@@ -149,11 +159,11 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 | Workflow | Schedule | Action |
 |----------|----------|--------|
-| `feature-collection.yml` | Every hour | Collect weather + pollution |
-| `daily-training.yml` | Daily 6 AM UTC | Train all models, select best |
-| `ci.yml` | On push | Lint, tests |
-| `ml-validation.yml` | Weekly | Data safety, feature quality |
-| `cd.yml` | On push | Pre-deploy checks |
+| `feature-collection.yml` | Every hour at :00 | Collect weather + pollution from Open-Meteo |
+| `daily-training.yml` | Daily 6 AM UTC | Train all models, select best, register |
+| `keep-alive.yml` | Every 10 min | Ping Render API to prevent sleep |
+| `ci.yml` | On push | Lint, type-check, tests, Docker build, security |
+| `cd.yml` | On push | Validate, build Docker, deploy |
 
 ---
 
@@ -168,6 +178,9 @@ python scripts/collect_features.py
 
 # Model training (daily)
 python scripts/train_model.py --force-register
+
+# Register model in Hopsworks Model Registry
+python scripts/register_model.py
 
 # Run tests
 python -m pytest tests/ -v
