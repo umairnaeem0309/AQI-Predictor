@@ -62,23 +62,12 @@ jobs:
       - name: Report results
         if: always()
         run: |
-          echo "## 🌐 Feature Collection Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f "data/collection_health.json" ]; then
-            python -c "
-import json
-with open('data/collection_health.json') as f:
-    log = json.load(f)
-if log:
-    latest = log[-1]
-    print(f'**Cities attempted:** {latest.get(\"cities_attempted\", \"N/A\")}')
-    print(f'**Observations:** {latest.get(\"observations_collected\", \"N/A\")}')
-    print(f'**Training valid:** {latest.get(\"training_valid_observations\", \"N/A\")}')
-    print(f'**Hopsworks:** {\"✅\" if latest.get(\"hopsworks_persisted\") else \"❌\"}')
-    print(f'**Status:** {latest.get(\"status\", \"N/A\")}')
-" >> $GITHUB_STEP_SUMMARY
+          echo '## Feature Collection Results' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          if [ -f data/collection_health.json ]; then
+            python scripts/report_collection.py >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo 'Report script not found'
           else
-            echo "No collection log available" >> $GITHUB_STEP_SUMMARY
+            echo 'No collection log available' >> $GITHUB_STEP_SUMMARY
           fi

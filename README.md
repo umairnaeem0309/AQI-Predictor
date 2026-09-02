@@ -12,7 +12,14 @@
 
 ## Overview
 
-A production-grade ML pipeline that collects real-time weather and air quality data from Open-Meteo, engineers 58 features, trains multiple models (Ridge, Random Forest, XGBoost, LSTM), and serves predictions via a REST API and interactive dashboard.
+A production-grade ML pipeline that collects historical weather and air quality data from Open-Meteo (4 years, 107K+ observations), engineers 58 features, trains and compares 4 models (Ridge Regression, Random Forest, XGBoost, LSTM), and serves real-time predictions via a FastAPI backend and interactive Streamlit dashboard.
+
+**Key facts:**
+- Data source: Open-Meteo (free, no API key required)
+- Feature Store: Hopsworks (cloud-hosted, versioned)
+- Model Registry: Hopsworks (automated versioning)
+- Deployment: Render (API) + Streamlit Cloud (Dashboard)
+- Automation: GitHub Actions (hourly collection + daily retraining)
 
 ### Cities Supported
 
@@ -128,7 +135,7 @@ A production-grade ML pipeline that collects real-time weather and air quality d
 | Feature Store | ✅ Verified | Hopsworks: 107,064 rows (NO CSV fallback) |
 | Feature View | ✅ Verified | Target label designation |
 | Model Training | ✅ Verified | 4 models (Ridge, RF, XGBoost, LSTM) from Hopsworks |
-| Model Registry | ✅ Verified | Hopsworks Model Registry (XGBoost v2) |
+| Model Registry | ✅ Verified | Hopsworks Model Registry (XGBoost v4) |
 | CI/CD | ✅ Verified | 487 tests passing, lint clean |
 
 ---

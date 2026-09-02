@@ -81,22 +81,12 @@ jobs:
       - name: Report training results
         if: always()
         run: |
-          echo "## 🧠 Training Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f "models/production/model_metadata.json" ]; then
-            python -c "
-import json
-with open('models/production/model_metadata.json') as f:
-    m = json.load(f)
-print(f'**Best Model:** {m.get(\"model_name\", \"unknown\")}')
-print(f'**Test MAE:** {m.get(\"metrics\", {}).get(\"test\", {}).get(\"mae\", 0):.2f}')
-print(f'**Test R²:** {m.get(\"metrics\", {}).get(\"test\", {}).get(\"r2\", 0):.4f}')
-print(f'**Data Source:** {m.get(\"data_source\", \"unknown\")}')
-print(f'**Train Rows:** {m.get(\"train_rows\", 0):,}')
-print(f'**Features:** {m.get(\"n_features\", 0)}')
-" >> $GITHUB_STEP_SUMMARY
+          echo '## Training Results' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          if [ -f models/production/model_metadata.json ]; then
+            python scripts/report_training.py >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo 'Report script not found'
           else
-            echo "No model metadata available" >> $GITHUB_STEP_SUMMARY
+            echo 'No model metadata available' >> $GITHUB_STEP_SUMMARY
           fi

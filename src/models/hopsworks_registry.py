@@ -162,7 +162,6 @@ class HopsworksModelRegistry:
             return {
                 "name": latest.name,
                 "version": latest.version,
-                "metrics": latest.metrics,
                 "description": latest.description,
                 "model": latest,
             }
@@ -204,8 +203,12 @@ class HopsworksModelRegistry:
             best_value = float("inf") if lower_is_better else float("-inf")
 
             for model in all_models:
-                if metric in model.metrics:
-                    value = model.metrics[metric]
+                try:
+                    training_metrics = model.training_metrics or {}
+                except AttributeError:
+                    training_metrics = {}
+                if metric in training_metrics:
+                    value = training_metrics[metric]
                     if lower_is_better and value < best_value:
                         best_value = value
                         best_model = model
@@ -217,7 +220,6 @@ class HopsworksModelRegistry:
                 return {
                     "name": best_model.name,
                     "version": best_model.version,
-                    "metrics": best_model.metrics,
                     "description": best_model.description,
                     "model": best_model,
                 }
@@ -254,11 +256,21 @@ class HopsworksModelRegistry:
                     return None
                 model = max(models, key=lambda m: m.version)
 
-            # Load the model
-            loaded_model = model.load()
+            # Download model files from Hopsworks
+            model_path = model.download()
 
-            logger.info(f"Loaded model {model_name} v{model.version}")
-            return loaded_model
+            # Find and load the pickle file
+            import pickle as _pickle
+
+            for f in os.listdir(model_path):
+                if f.endswith(".pkl"):
+                    with open(os.path.join(model_path, f), "rb") as fh:
+                        loaded_model = _pickle.load(fh)
+                    logger.info(f"Loaded model {model_name} v{model.version} from {f}")
+                    return loaded_model
+
+            logger.warning(f"No .pkl file found in model {model_name} v{model.version}")
+            return None
 
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
