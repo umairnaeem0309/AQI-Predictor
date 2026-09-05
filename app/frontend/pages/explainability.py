@@ -195,8 +195,7 @@ def render_explainability(api_client: APIClient):
                 )
 
                 # Interpretation
-                st.markdown(
-                    """
+                st.markdown("""
                 **How to read this:** SHAP (SHapley Additive exPlanations) values show how much each
                 feature contributes to pushing predictions away from the average prediction.
                 Higher |SHAP| = more influence on the model's output.
@@ -204,8 +203,7 @@ def render_explainability(api_client: APIClient):
                 Unlike XGBoost's built-in importance (which uses split gain), SHAP provides
                 **game-theoretic** feature attribution — each feature gets credit proportional
                 to its marginal contribution.
-                """
-                )
+                """)
             else:
                 st.warning("No SHAP data available.")
 
@@ -401,8 +399,7 @@ def render_explainability(api_client: APIClient):
                 st.info(
                     "👆 Enter feature values and click **Explain Prediction** to see SHAP analysis."
                 )
-                st.markdown(
-                    """
+                st.markdown("""
                 **What this does:**
                 - Takes the feature values you enter
                 - Runs them through the XGBoost model
@@ -411,8 +408,7 @@ def render_explainability(api_client: APIClient):
 
                 This gives you a **per-prediction** explanation, unlike the global
                 importance shown in the other tabs.
-                """
-                )
+                """)
 
     # ── Tab 4: Model Comparison ──
     with tab4:

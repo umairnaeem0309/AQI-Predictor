@@ -37,8 +37,7 @@ class PredictionHistoryStore:
     def _init_db(self):
         """Create tables if they don't exist."""
         with sqlite3.connect(str(self.db_path)) as conn:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS predictions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -53,20 +52,15 @@ class PredictionHistoryStore:
                     data_source TEXT,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
-            conn.execute(
-                """
+            """)
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_predictions_city
                 ON predictions(city)
-            """
-            )
-            conn.execute(
-                """
+            """)
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_predictions_timestamp
                 ON predictions(timestamp)
-            """
-            )
+            """)
             conn.commit()
 
     def store_prediction(self, prediction: Dict[str, Any]) -> int:

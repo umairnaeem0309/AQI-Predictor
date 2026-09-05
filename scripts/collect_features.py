@@ -51,30 +51,83 @@ from src.utils.epa_aqi import calculate_pm10_aqi, calculate_pm25_aqi
 # collector must produce so inserts into Hopsworks actually succeed.
 # =============================================================================
 FG_SCHEMA_COLUMNS = [
-    "timestamp", "location_id", "city_name",
-    "temperature", "humidity", "pressure", "wind_speed", "wind_direction",
-    "cloud_cover", "precipitation",
-    "pm25", "pm10", "co", "no2", "so2", "o3",
-    "us_aqi_open_meteo", "us_aqi_pm25_open_meteo", "us_aqi_pm10_open_meteo",
-    "aqi", "aqi_lag_1h", "aqi_lag_6h", "aqi_lag_12h", "aqi_lag_24h",
-    "aqi_lag_48h", "aqi_lag_72h", "aqi_rolling_mean_6h", "aqi_rolling_mean_12h",
-    "aqi_rolling_mean_24h", "aqi_rolling_std_24h", "aqi_rolling_min_24h",
+    "timestamp",
+    "location_id",
+    "city_name",
+    "temperature",
+    "humidity",
+    "pressure",
+    "wind_speed",
+    "wind_direction",
+    "cloud_cover",
+    "precipitation",
+    "pm25",
+    "pm10",
+    "co",
+    "no2",
+    "so2",
+    "o3",
+    "us_aqi_open_meteo",
+    "us_aqi_pm25_open_meteo",
+    "us_aqi_pm10_open_meteo",
+    "aqi",
+    "aqi_lag_1h",
+    "aqi_lag_6h",
+    "aqi_lag_12h",
+    "aqi_lag_24h",
+    "aqi_lag_48h",
+    "aqi_lag_72h",
+    "aqi_rolling_mean_6h",
+    "aqi_rolling_mean_12h",
+    "aqi_rolling_mean_24h",
+    "aqi_rolling_std_24h",
+    "aqi_rolling_min_24h",
     "aqi_rolling_max_24h",
-    "pm25_lag_1h", "pm25_lag_6h", "pm25_lag_12h", "pm25_lag_24h",
-    "pm25_lag_48h", "pm25_lag_72h", "pm25_rolling_mean_6h", "pm25_rolling_mean_24h",
-    "temperature_lag_1h", "temperature_lag_6h", "temperature_lag_12h",
-    "temperature_lag_24h", "temperature_lag_48h", "temperature_lag_72h",
+    "pm25_lag_1h",
+    "pm25_lag_6h",
+    "pm25_lag_12h",
+    "pm25_lag_24h",
+    "pm25_lag_48h",
+    "pm25_lag_72h",
+    "pm25_rolling_mean_6h",
+    "pm25_rolling_mean_24h",
+    "temperature_lag_1h",
+    "temperature_lag_6h",
+    "temperature_lag_12h",
+    "temperature_lag_24h",
+    "temperature_lag_48h",
+    "temperature_lag_72h",
     "temperature_rolling_mean_24h",
-    "humidity_lag_1h", "humidity_lag_6h", "humidity_lag_12h", "humidity_lag_24h",
-    "humidity_lag_48h", "humidity_lag_72h", "humidity_rolling_mean_24h",
-    "hour", "day_of_week", "month", "is_weekend", "season", "hour_sin", "hour_cos",
-    "target_aqi_24h", "target_aqi_48h", "target_aqi_72h",
+    "humidity_lag_1h",
+    "humidity_lag_6h",
+    "humidity_lag_12h",
+    "humidity_lag_24h",
+    "humidity_lag_48h",
+    "humidity_lag_72h",
+    "humidity_rolling_mean_24h",
+    "hour",
+    "day_of_week",
+    "month",
+    "is_weekend",
+    "season",
+    "hour_sin",
+    "hour_cos",
+    "target_aqi_24h",
+    "target_aqi_48h",
+    "target_aqi_72h",
 ]
 
 # Sensor columns present in the collector's raw record (kept as audit columns
 # in the local backup, but NOT part of the Hopsworks feature-group schema).
-RAW_AUDIT_COLUMNS = ["pm25_aqi", "pm10_aqi", "data_source", "collected_at",
-                     "is_training_valid", "weather_available", "aqi_available"]
+RAW_AUDIT_COLUMNS = [
+    "pm25_aqi",
+    "pm10_aqi",
+    "data_source",
+    "collected_at",
+    "is_training_valid",
+    "weather_available",
+    "aqi_available",
+]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -249,7 +302,11 @@ def collect_one_round(city_ids=None, dry_run=False):
         fg_rows = []
         for rec in all_records:
             fg_rows.append(_build_engineered_row(rec))
-        df = pd.concat(fg_rows, ignore_index=True) if fg_rows else pd.DataFrame(columns=FG_SCHEMA_COLUMNS)
+        df = (
+            pd.concat(fg_rows, ignore_index=True)
+            if fg_rows
+            else pd.DataFrame(columns=FG_SCHEMA_COLUMNS)
+        )
 
         # Ensure timestamp is datetime for Hopsworks
         if "timestamp" in df.columns:
@@ -332,11 +389,6 @@ def _build_engineered_row(record: dict) -> pd.DataFrame:
     Returns:
         Single-row DataFrame aligned to FG_SCHEMA_COLUMNS.
     """
-    from src.features.feature_engineering import (
-        add_lag_features,
-        add_rolling_features,
-        add_time_features,
-    )
     from src.utils.epa_aqi import calculate_pm10_aqi, calculate_pm25_aqi
 
     hist = record.get("_history_df")
@@ -350,7 +402,11 @@ def _build_engineered_row(record: dict) -> pd.DataFrame:
     df = df.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
 
     # Ensure the current observation is present as the latest row
-    now = pd.Timestamp(record["timestamp"]).tz_localize("UTC") if pd.Timestamp(record["timestamp"]).tzinfo is None else pd.Timestamp(record["timestamp"])
+    now = (
+        pd.Timestamp(record["timestamp"]).tz_localize("UTC")
+        if pd.Timestamp(record["timestamp"]).tzinfo is None
+        else pd.Timestamp(record["timestamp"])
+    )
     cur = {
         "timestamp": now,
         "location_id": record["location_id"],
@@ -415,8 +471,19 @@ def _build_engineered_row(record: dict) -> pd.DataFrame:
     row["location_id"] = record["location_id"]
     row["city_name"] = record["city_name"]
     raw_cols = [
-        "temperature", "humidity", "pressure", "wind_speed", "wind_direction",
-        "cloud_cover", "precipitation", "pm25", "pm10", "co", "no2", "so2", "o3",
+        "temperature",
+        "humidity",
+        "pressure",
+        "wind_speed",
+        "wind_direction",
+        "cloud_cover",
+        "precipitation",
+        "pm25",
+        "pm10",
+        "co",
+        "no2",
+        "so2",
+        "o3",
     ]
     for col in raw_cols:
         row[col] = record.get(col)
