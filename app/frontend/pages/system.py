@@ -1,8 +1,9 @@
+import json
 import os
 import sys
-import json
 from datetime import datetime
 from pathlib import Path
+
 import streamlit as st
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -32,8 +33,8 @@ def render_system(api_client: APIClient):
     try:
         _probe_health = api_client.get_health()
         _overall_ok = _probe_health.get("status", "unknown") == "healthy"
-        _model_ok   = _probe_health.get("model_loaded", False)
-        _fs_ok      = _probe_health.get("feature_store_connected", False)
+        _model_ok = _probe_health.get("model_loaded", False)
+        _fs_ok = _probe_health.get("feature_store_connected", False)
         if _overall_ok and _model_ok:
             _hero_status = ("All Systems Operational", "#00C853", "#E8F5E9")
         elif _overall_ok:
@@ -105,7 +106,9 @@ def render_system(api_client: APIClient):
 
                 with mi2:
                     render_info_card("Status", model_info.get("status", "N/A").title())
-                    render_info_card("Approval Status", model_info.get("approval_status", "N/A").title())
+                    render_info_card(
+                        "Approval Status", model_info.get("approval_status", "N/A").title()
+                    )
 
                 with mi3:
                     render_info_card("Dataset Type", model_info.get("dataset_type", "N/A"))
@@ -133,7 +136,7 @@ def render_system(api_client: APIClient):
                         render_info_card("R²", f"{r2:.4f}" if r2 else "N/A")
 
             feature_cols = model_info.get("feature_columns", [])
-            target_cols  = model_info.get("target_columns", [])
+            target_cols = model_info.get("target_columns", [])
             if feature_cols or target_cols:
                 st.subheader("Dataset Schema")
                 with st.container(border=True):
@@ -148,7 +151,7 @@ def render_system(api_client: APIClient):
 
         st.subheader("Pipeline Status")
 
-        model_path    = Path("models/production/best_model.pkl")
+        model_path = Path("models/production/best_model.pkl")
         metadata_path = Path("models/production/model_metadata.json")
 
         with st.container(border=True):
@@ -188,17 +191,21 @@ def render_system(api_client: APIClient):
 
                 with st.container(border=True):
                     ds1, ds2, ds3, ds4 = st.columns(4)
-                    with ds1: st.metric("Train Rows", f"{_meta.get('train_rows', 0):,}")
-                    with ds2: st.metric("Val Rows", f"{_meta.get('val_rows', 0):,}")
-                    with ds3: st.metric("Test Rows", f"{_meta.get('test_rows', 0):,}")
-                    with ds4: st.metric("Features", _meta.get("n_features", 0))
+                    with ds1:
+                        st.metric("Train Rows", f"{_meta.get('train_rows', 0):,}")
+                    with ds2:
+                        st.metric("Val Rows", f"{_meta.get('val_rows', 0):,}")
+                    with ds3:
+                        st.metric("Test Rows", f"{_meta.get('test_rows', 0):,}")
+                    with ds4:
+                        st.metric("Features", _meta.get("n_features", 0))
         except Exception:
             pass
 
         st.subheader("Data Freshness")
 
         last_pred = health.get("last_prediction") if health else None
-        pred_ago  = format_time_ago(last_pred) if last_pred else "No predictions yet"
+        pred_ago = format_time_ago(last_pred) if last_pred else "No predictions yet"
 
         with st.container(border=True):
             fr1, fr2 = st.columns(2)
@@ -206,7 +213,7 @@ def render_system(api_client: APIClient):
                 st.markdown(
                     f'<div class="health-card-label">Last Prediction</div>'
                     f'<div class="health-card-value" style="font-size:1.1rem;color:#1A1A2E;margin-top:4px;">'
-                    f'{pred_ago}</div>',
+                    f"{pred_ago}</div>",
                     unsafe_allow_html=True,
                 )
             with fr2:
@@ -230,9 +237,8 @@ def render_system(api_client: APIClient):
             with st.spinner("Running drift detection..."):
                 drift = api_client.get_drift_report()
 
-            unavailable = (
-                drift.get("status") == "unavailable"
-                or (not drift.get("features") and drift.get("total_features", 0) == 0)
+            unavailable = drift.get("status") == "unavailable" or (
+                not drift.get("features") and drift.get("total_features", 0) == 0
             )
 
             if unavailable:
@@ -245,9 +251,9 @@ def render_system(api_client: APIClient):
                 )
             else:
                 drift_detected = drift.get("drift_detected", False)
-                drifted_count  = drift.get("drifted_count", 0)
-                drift_pct      = drift.get("drift_percentage", 0)
-                total_feats    = drift.get("total_features", 0)
+                drifted_count = drift.get("drifted_count", 0)
+                drift_pct = drift.get("drift_percentage", 0)
+                total_feats = drift.get("total_features", 0)
 
                 if drift_detected:
                     st.markdown(
@@ -305,27 +311,33 @@ def render_system(api_client: APIClient):
                         st.markdown(
                             '<div style="font-size:0.78rem;font-weight:700;color:#64748B;'
                             'text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">'
-                            'Overall Training Metrics</div>',
+                            "Overall Training Metrics</div>",
                             unsafe_allow_html=True,
                         )
                         pm1, pm2, pm3 = st.columns(3)
-                        with pm1: st.metric("MAE", f"{overall.get('mae', 0):.2f}")
-                        with pm2: st.metric("RMSE", f"{overall.get('rmse', 0):.2f}")
-                        with pm3: st.metric("R²", f"{overall.get('r2', 0):.4f}")
+                        with pm1:
+                            st.metric("MAE", f"{overall.get('mae', 0):.2f}")
+                        with pm2:
+                            st.metric("RMSE", f"{overall.get('rmse', 0):.2f}")
+                        with pm3:
+                            st.metric("R²", f"{overall.get('r2', 0):.4f}")
 
                 horizon_rows = []
                 for h in ["24h", "48h", "72h"]:
                     if h in metrics:
                         m = metrics[h]
-                        horizon_rows.append({
-                            "Horizon": h,
-                            "MAE": round(m.get("mae", 0), 2),
-                            "RMSE": round(m.get("rmse", 0), 2),
-                            "R²": round(m.get("r2", 0), 4),
-                        })
+                        horizon_rows.append(
+                            {
+                                "Horizon": h,
+                                "MAE": round(m.get("mae", 0), 2),
+                                "RMSE": round(m.get("rmse", 0), 2),
+                                "R²": round(m.get("r2", 0), 4),
+                            }
+                        )
 
                 if horizon_rows:
                     import pandas as pd
+
                     st.subheader("Per-Horizon Metrics")
                     st.dataframe(
                         pd.DataFrame(horizon_rows),
@@ -349,11 +361,13 @@ def render_system(api_client: APIClient):
             with st.spinner("Checking current AQI levels..."):
                 alerts_data = api_client.get_alerts()
 
-            alerts       = alerts_data.get("alerts", [])
+            alerts = alerts_data.get("alerts", [])
             total_alerts = alerts_data.get("total_alerts", 0)
 
             if total_alerts == 0:
-                st.success("No active AQI alerts. Air quality is within safe levels across all cities.")
+                st.success(
+                    "No active AQI alerts. Air quality is within safe levels across all cities."
+                )
             else:
                 st.markdown(
                     f'<div class="status-pill status-pill-error" style="margin-bottom:14px;">'
@@ -362,12 +376,12 @@ def render_system(api_client: APIClient):
                 )
 
                 for alert in alerts:
-                    city         = alert.get("city", "Unknown")
-                    aqi          = alert.get("aqi", 0)
-                    category     = alert.get("category", "Unknown")
-                    level        = alert.get("alert_level", "none")
+                    city = alert.get("city", "Unknown")
+                    aqi = alert.get("aqi", 0)
+                    category = alert.get("category", "Unknown")
+                    level = alert.get("alert_level", "none")
                     recommendation = alert.get("recommendation", "")
-                    aqi_color    = get_aqi_color(aqi)
+                    aqi_color = get_aqi_color(aqi)
 
                     if level == "critical":
                         card_cls = "alert-critical"
@@ -378,7 +392,7 @@ def render_system(api_client: APIClient):
 
                     badge_html = (
                         f'<span style="background:{aqi_color}22;color:{aqi_color};'
-                        f'border:1.5px solid {aqi_color};border-radius:20px;padding:2px 10px;'
+                        f"border:1.5px solid {aqi_color};border-radius:20px;padding:2px 10px;"
                         f'font-size:0.75rem;font-weight:700;">AQI {aqi}</span>'
                     )
 
@@ -402,12 +416,48 @@ def render_system(api_client: APIClient):
         st.subheader("AQI Reference Guide")
 
         aqi_ref_rows = [
-            ("0–50",   "Good",                    AQI_COLORS["good"],                  "#E8F5E9", "Satisfactory. Air quality poses little or no risk."),
-            ("51–100", "Moderate",                AQI_COLORS["moderate"],              "#FFFDE7", "Acceptable. Sensitive individuals may experience minor effects."),
-            ("101–150","Unhealthy for Sensitive", AQI_COLORS["unhealthy_sensitive"],   "#FFF3E0", "Members of sensitive groups may experience health effects."),
-            ("151–200","Unhealthy",               AQI_COLORS["unhealthy"],             "#FFEBEE", "Everyone may begin to experience health effects."),
-            ("201–300","Very Unhealthy",          AQI_COLORS["very_unhealthy"],        "#F3E5F5", "Health alert: everyone may experience serious effects."),
-            ("301–500","Hazardous",               AQI_COLORS["hazardous"],             "#FCE4EC", "Emergency conditions. The entire population is likely to be affected."),
+            (
+                "0–50",
+                "Good",
+                AQI_COLORS["good"],
+                "#E8F5E9",
+                "Satisfactory. Air quality poses little or no risk.",
+            ),
+            (
+                "51–100",
+                "Moderate",
+                AQI_COLORS["moderate"],
+                "#FFFDE7",
+                "Acceptable. Sensitive individuals may experience minor effects.",
+            ),
+            (
+                "101–150",
+                "Unhealthy for Sensitive",
+                AQI_COLORS["unhealthy_sensitive"],
+                "#FFF3E0",
+                "Members of sensitive groups may experience health effects.",
+            ),
+            (
+                "151–200",
+                "Unhealthy",
+                AQI_COLORS["unhealthy"],
+                "#FFEBEE",
+                "Everyone may begin to experience health effects.",
+            ),
+            (
+                "201–300",
+                "Very Unhealthy",
+                AQI_COLORS["very_unhealthy"],
+                "#F3E5F5",
+                "Health alert: everyone may experience serious effects.",
+            ),
+            (
+                "301–500",
+                "Hazardous",
+                AQI_COLORS["hazardous"],
+                "#FCE4EC",
+                "Emergency conditions. The entire population is likely to be affected.",
+            ),
         ]
 
         for aqi_range, cat_name, color, bg, health_note in aqi_ref_rows:

@@ -85,7 +85,7 @@ def _render_sidebar_footer():
                 f'<div class="city-strip-item">'
                 f'<span style="{city_style}">{city}</span>'
                 f'<span style="font-size:0.72rem;">{cat_label}</span>'
-                f'</div>'
+                f"</div>"
             )
 
         st.sidebar.markdown(
@@ -97,7 +97,7 @@ def _render_sidebar_footer():
             f'<div class="city-strip-item">'
             f'<span style="color:#94A3B8;">{c}</span>'
             f'<span style="font-size:0.7rem;color:#94A3B8;">—</span>'
-            f'</div>'
+            f"</div>"
             for c in ["Karachi", "Lahore", "Islamabad"]
         )
         st.sidebar.markdown(
@@ -134,7 +134,7 @@ def main():
         render_explainability(api_client)
     elif page == "System":
         render_system(api_client)
-        
+
     _render_sidebar_footer()
 
 

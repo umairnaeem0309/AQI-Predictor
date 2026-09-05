@@ -96,7 +96,10 @@ def render_dashboard(api_client: APIClient):
     model_ver = prediction.get("model_version", "v1")
 
     st.title(f"{selected_city}")
-    st.markdown(f"**Current Status:** {badge_html} &nbsp;·&nbsp; Model: `{model_ver}`", unsafe_allow_html=True)
+    st.markdown(
+        f"**Current Status:** {badge_html} &nbsp;·&nbsp; Model: `{model_ver}`",
+        unsafe_allow_html=True,
+    )
 
     # Confidence intervals (extract early for KPI cards)
     confidence = prediction.get("confidence")
@@ -180,9 +183,7 @@ def render_dashboard(api_client: APIClient):
         ci_method = confidence.get("method", "N/A")
         ci_level = confidence.get("level", 90)
 
-        st.caption(
-            f"Method: **{ci_method}** · Confidence Level: **{ci_level}%**"
-        )
+        st.caption(f"Method: **{ci_method}** · Confidence Level: **{ci_level}%**")
 
         horizons, point_preds, lower_bounds, upper_bounds = [], [], [], []
         for h in ["24h", "48h", "72h"]:
@@ -211,7 +212,8 @@ def render_dashboard(api_client: APIClient):
 
                 ci_fig.add_trace(
                     go.Scatter(
-                        x=horizons, y=upper_bounds,
+                        x=horizons,
+                        y=upper_bounds,
                         mode="lines",
                         line=dict(color="rgba(30,136,229,0.4)", width=1, dash="dot"),
                         name="Upper Bound",
@@ -220,7 +222,8 @@ def render_dashboard(api_client: APIClient):
                 )
                 ci_fig.add_trace(
                     go.Scatter(
-                        x=horizons, y=lower_bounds,
+                        x=horizons,
+                        y=lower_bounds,
                         mode="lines",
                         line=dict(color="rgba(30,136,229,0.4)", width=1, dash="dot"),
                         name="Lower Bound",
@@ -230,7 +233,8 @@ def render_dashboard(api_client: APIClient):
 
                 ci_fig.add_trace(
                     go.Scatter(
-                        x=horizons, y=point_preds,
+                        x=horizons,
+                        y=point_preds,
                         mode="lines+markers+text",
                         name="Point Prediction",
                         line=dict(color="#1E88E5", width=3),
@@ -243,7 +247,8 @@ def render_dashboard(api_client: APIClient):
                 )
 
                 apply_chart_theme(
-                    ci_fig, height=360,
+                    ci_fig,
+                    height=360,
                     title=f"AQI Forecast with {ci_level}% Confidence Intervals",
                     xaxis_title="Forecast Horizon",
                     yaxis_title="AQI",
@@ -259,13 +264,15 @@ def render_dashboard(api_client: APIClient):
                 for h in ["24h", "48h", "72h"]:
                     iv = intervals.get(h)
                     if iv:
-                        iv_data.append({
-                            "Horizon": h,
-                            "Point Prediction": int(iv["point_prediction"]),
-                            "Lower Bound": int(iv["lower"]),
-                            "Upper Bound": int(iv["upper"]),
-                            "Interval Width": int(iv["width"]),
-                        })
+                        iv_data.append(
+                            {
+                                "Horizon": h,
+                                "Point Prediction": int(iv["point_prediction"]),
+                                "Lower Bound": int(iv["lower"]),
+                                "Upper Bound": int(iv["upper"]),
+                                "Interval Width": int(iv["width"]),
+                            }
+                        )
 
                 if iv_data:
                     max_width = max(r["Interval Width"] for r in iv_data)
@@ -290,7 +297,7 @@ def render_dashboard(api_client: APIClient):
     level = confidence.get("level", "N/A") if confidence else "N/A"
     st.markdown(
         f'<div class="info-strip">Model: <b>{prediction.get("model_version", "N/A")}</b>'
-        f'&nbsp;&nbsp;·&nbsp;&nbsp;Confidence Level: <b>{level}%</b>'
-        f'&nbsp;&nbsp;·&nbsp;&nbsp;Source: US EPA PM NowCast AQI</div>',
+        f"&nbsp;&nbsp;·&nbsp;&nbsp;Confidence Level: <b>{level}%</b>"
+        f"&nbsp;&nbsp;·&nbsp;&nbsp;Source: US EPA PM NowCast AQI</div>",
         unsafe_allow_html=True,
     )
