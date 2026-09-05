@@ -1,6 +1,6 @@
 # AQI Predictor — Project Journey
 
-**Last Updated:** 2026-09-02
+**Last Updated:** 2026-09-05
 
 ---
 
@@ -69,7 +69,7 @@ The system must include:
 - **Weather:** ~4 years (Aug 2022 – Aug 2026)
 - **Air Quality:** ~4 years (Aug 2022 – Aug 2026)
 - **Cities:** Karachi, Lahore, Islamabad
-- **Total rows:** 107,064 (35,688 per city)
+- **Total rows:** 107,064 historical (35,688 per city) + live hourly rows accumulating since 2026-09-05
 - **Stored in:** Hopsworks Feature Store (features + targets together)
 - **Ingestion script:** `scripts/ingest_to_hopsworks.py`
 - **Hourly collection:** `scripts/collect_features.py`
@@ -137,6 +137,7 @@ The system must include:
 | **XGBoost** | **19.01** | **27.41** | **0.7210** ★ |
 | Random Forest | 19.20 | 27.53 | 0.7185 |
 | Ridge | 19.53 | 27.83 | 0.7122 |
+| LSTM | 33.12 | 47.89 | 0.0142 |
 
 #### Per-Horizon — 48h
 
@@ -145,6 +146,7 @@ The system must include:
 | **XGBoost** | **21.78** | **30.88** | **0.6463** ★ |
 | Random Forest | 21.89 | 30.87 | 0.6465 |
 | Ridge | 22.37 | 31.27 | 0.6372 |
+| LSTM | 39.28 | 52.14 | -0.0198 |
 
 #### Per-Horizon — 72h
 
@@ -225,6 +227,10 @@ XGBoost is 47% better than mean predictor and 19% better than persistence.
 | Hopsworks model.load() not available | Fixed to use download() + pickle |
 | YAML workflow syntax errors | Moved Python reporting to separate scripts |
 | CRLF line endings on Windows | Added .gitattributes for LF enforcement |
+| Hourly collector schema mismatch (silent) | Aligned collector to exact 64-column FG schema with per-column types (double/bigint/int) |
+| Daily training missing Hopsworks env | Documented GitHub repository secrets/variables setup |
+| Scheduled-run min-improvement arg empty | Workflow defaults to 0.01 when dispatched via schedule |
+| Duplicate live observations risk | Hourly UTC-bucket timestamps + Hopsworks upsert on (location_id, timestamp) |
 
 ---
 
@@ -240,9 +246,11 @@ XGBoost is 47% better than mean predictor and 19% better than persistence.
 
 - **All pipelines verified end-to-end**
 - **487 tests passing**
-- **Hopsworks connected with 107,064 rows (features + targets together)**
-- **4-year dataset (2022-08 to 2026-08)**
+- **Hopsworks connected with 107,067 rows (features + targets together)** — 107,064 historical + live hourly rows since 2026-09-05
+- **Live hourly collection VERIFIED in Hopsworks** (real rounds: insert + read-back + duplicate protection)
+- **Hopsworks is the SINGLE data store** — no local parquet backup for collected data
+- **4-year historical dataset (2022-08 to 2026-08)**
 - **XGBoost selected as production model** (composite score 27.84)
 - **Hopsworks Model Registry** (XGBoost v4)
 - **Both services deployed and accessible**
-- **Hourly data collection + daily retraining automated via GitHub Actions**
+- **Hourly data collection + daily retraining automated via GitHub Actions** (requires Hopsworks repository secrets/variables)

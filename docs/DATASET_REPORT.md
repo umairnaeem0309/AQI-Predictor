@@ -2,9 +2,10 @@
 
 ## AQI Predictor — Historical Dataset Analysis
 
-**Generated:** 31 August 2026
+**Generated:** 5 September 2026
 **Status:** Ready for model training
 **Dataset type:** real_api_data (approved_for_training: true)
+**Storage:** Hopsworks Feature Store `aqi_features_prod` v1 (single store, no local backup)
 
 ---
 
@@ -12,14 +13,15 @@
 
 | Metric | Value |
 |--------|-------|
-| Total rows | 107,208 |
+| Historical rows | 107,064 |
+| Live hourly rows | accumulating since 2026-09-05 (+1/city/hour) |
 | Cities | 3 (Karachi, Lahore, Islamabad) |
-| Date range | 2022-08-04 to 2026-08-28 |
+| Date range (historical) | 2022-08-03 to 2026-08-28 |
 | Time span | **~4 years** |
-| Rows per city | 35,736 |
+| Rows per city (historical) | 35,688 |
 | Weather features | 7 |
 | Pollution features | 6 |
-| Total features | 63 |
+| Total features | 58 |
 | Target variables | 3 (target_aqi_24h, target_aqi_48h, target_aqi_72h) |
 
 ---
@@ -39,7 +41,7 @@
 
 | Statistic | Value |
 |-----------|-------|
-| Valid AQI values | 107,208 (100%) |
+| Valid AQI values | 107,064 (100% of historical rows) |
 | Range | 2 – 500 |
 | Mean | 114.7 |
 | Median | 100.0 |
@@ -48,9 +50,9 @@
 
 | City | n | Mean | Median | Min | Max |
 |------|---|------|--------|-----|-----|
-| Islamabad | 35,736 | 105.6 | 97 | 3 | 343 |
-| Karachi | 35,736 | 90.7 | 81 | 2 | 471 |
-| Lahore | 35,736 | 147.8 | 148 | 3 | 500 |
+| Islamabad | 35,688 | 105.6 | 97 | 3 | 343 |
+| Karachi | 35,688 | 90.7 | 81 | 2 | 471 |
+| Lahore | 35,688 | 147.8 | 148 | 3 | 500 |
 
 ---
 
@@ -58,9 +60,9 @@
 
 | Split | Rows | Percentage |
 |-------|------|-----------|
-| Train (72%) | 77,034 | 72% |
-| Validation (8%) | 8,559 | 8% |
-| Test (20%) | 21,399 | 20% |
+| Train (72%) | 77,086 | 72% |
+| Validation (8%) | 8,565 | 8% |
+| Test (20%) | 21,413 | 20% |
 
 **Split method:** Chronological (sorted by timestamp).
 
@@ -76,15 +78,15 @@
 
 ## 6. Feature Engineering
 
-| Category | Count |
-|----------|-------|
-| Weather | 7 |
-| Pollution | 6 |
-| Time | 6 |
-| Lag | 24 |
-| Rolling | 10 |
-| Derived | 10 |
-| **Total** | **63** |
+| Category | Count | Examples |
+|----------|-------|----------|
+| Weather | 7 | temperature, humidity, pressure, wind_speed, wind_direction, cloud_cover, precipitation |
+| Pollution | 6 | pm25, pm10, co, no2, so2, o3 |
+| AQI reference | 4 | aqi, us_aqi_open_meteo, us_aqi_pm25_open_meteo, us_aqi_pm10_open_meteo |
+| Time | 7 | hour, day_of_week, month, is_weekend, season, hour_sin, hour_cos |
+| Lag | 24 | aqi/pm25/temperature/humidity lags at 1h, 6h, 12h, 24h, 48h, 72h |
+| Rolling | 10 | aqi mean(6h/12h/24h), std/min/max(24h), pm25 mean(6h/24h), temp/humidity mean(24h) |
+| **Total** | **58** | (64 columns − 3 targets − timestamp − location_id − city_name) |
 
 ---
 
@@ -103,4 +105,4 @@ python scripts/train_model.py --force-register
 
 ---
 
-**Report generated:** 2 September 2026
+**Report generated:** 5 September 2026

@@ -1,7 +1,7 @@
 # AQI Predictor — Current State
 
-**Last Updated:** 2026-09-02
-**Status:** Production Ready — All Pipelines Verified
+**Last Updated:** 2026-09-05
+**Status:** Production Ready — All Pipelines Verified, Live Hourly Collection ACTIVE
 
 ---
 
@@ -24,12 +24,12 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 | Stage | Status | Evidence |
 |-------|--------|----------|
-| Data Collection | ✅ VERIFIED | Open-Meteo API, 4-year range (Aug 2022 – Aug 2026) |
+| Data Collection | ✅ VERIFIED | Open-Meteo API, 4-year range (Aug 2022 – Aug 2026) + hourly live collection |
 | Data Ingestion | ✅ VERIFIED | Hopsworks Feature Store (features + targets together) |
-| Data Cleaning | ✅ VERIFIED | 107,064 rows, 0 duplicates, <0.2% NaN |
+| Data Cleaning | ✅ VERIFIED | 107,064 historical rows, 0 duplicates, <0.2% NaN |
 | EDA | ✅ VERIFIED | 4 Jupyter notebooks |
 | Feature Engineering | ✅ VERIFIED | 58 features |
-| Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,064 rows |
+| Feature Store | ✅ VERIFIED | Hopsworks PRIMARY, 107,067 rows (single store, no local backup) |
 | Feature View | ✅ VERIFIED | Target label designation |
 | Model Training | ✅ VERIFIED | 4 models on complete 4-year data from Hopsworks |
 | Model Evaluation | ✅ VERIFIED | MAE + RMSE + R² across all horizons |
@@ -37,7 +37,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | Model Registry | ✅ VERIFIED | Hopsworks Model Registry (XGBoost v4) |
 | CI/CD | ✅ VERIFIED | 487 tests pass, lint clean |
 | Deployment | ✅ VERIFIED | Render (API) + Streamlit Cloud (Dashboard) |
-| Automation | ✅ VERIFIED | Hourly collection + daily retraining |
+| Automation | ✅ VERIFIED | Hourly collection (verified live in Hopsworks) + daily retraining |
 
 ---
 
@@ -45,10 +45,11 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 
 | Property | Value | Verified |
 |----------|-------|----------|
-| Total observations | 107,064 | ✅ |
+| Historical observations | 107,064 | ✅ |
+| Live hourly rows (since 2026-09-05) | accumulating, +1/city/hour | ✅ |
 | Cities | Karachi, Lahore, Islamabad | ✅ |
-| Rows per city | 35,688 | ✅ |
-| Date range | 2022-08-03 to 2026-08-28 | ✅ |
+| Historical rows per city | 35,688 | ✅ |
+| Date range | 2022-08-03 to 2026-08-28 (historical) + live rows | ✅ |
 | Data coverage | ~4 years | ✅ |
 | Features | 58 | ✅ |
 | Targets | 3 (target_aqi_24h, 48h, 72h) | ✅ |
@@ -83,6 +84,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | **XGBoost** | **19.01** | **27.41** | **0.7210** ★ |
 | Random Forest | 19.20 | 27.53 | 0.7185 |
 | Ridge | 19.53 | 27.83 | 0.7122 |
+| LSTM | 33.12 | 47.89 | 0.0142 |
 
 #### 48-Hour Prediction
 
@@ -91,6 +93,7 @@ A production-grade AQI forecasting system that predicts Air Quality Index 24/48/
 | **XGBoost** | **21.78** | **30.88** | **0.6463** ★ |
 | Random Forest | 21.89 | 30.87 | 0.6465 |
 | Ridge | 22.37 | 31.27 | 0.6372 |
+| LSTM | 39.28 | 52.14 | -0.0198 |
 
 #### 72-Hour Prediction
 
@@ -128,11 +131,13 @@ XGBoost significantly outperforms both naive baselines, confirming it learns mea
 | Property | Value |
 |----------|-------|
 | Connection | ✅ eu-west.cloud.hopsworks.ai |
-| Feature Group | `aqi_features_prod` v1 |
-| Rows stored | 107,064 |
+| Feature Group | `aqi_features_prod` v1 (64 columns) |
+| Rows stored | 107,067 (107,064 historical + 3 live) |
 | Features | 58 |
 | Targets | 3 (target_aqi_24h, 48h, 72h) |
-| Storage | Features + Targets TOGETHER |
+| Storage | Features + Targets TOGETHER — SINGLE store (no local parquet backup) |
+| Live collection | Hourly upsert on (location_id, timestamp) — duplicates impossible |
+| Target backfill | Training pipeline recomputes 24/48/72h targets from AQI series for live rows |
 | Feature View | `aqi_feature_view` v1 |
 | Data source | Hopsworks Feature Store (PRIMARY, NO CSV fallback) |
 
@@ -171,11 +176,27 @@ XGBoost significantly outperforms both naive baselines, confirming it learns mea
 
 | Workflow | Schedule | Action |
 |----------|----------|--------|
-| `feature-collection.yml` | Every hour at :00 | Collect weather + pollution from Open-Meteo |
+| `feature-collection.yml` | Every hour at :00 | Collect weather + pollution from Open-Meteo → Hopsworks |
 | `daily-training.yml` | Daily 6 AM UTC | Train all models, select best, register |
 | `keep-alive.yml` | Every 10 min | Ping Render API to prevent sleep |
 | `ci.yml` | On push | Lint, type-check, tests, Docker build, security |
 | `cd.yml` | On push | Validate, build Docker, deploy |
+
+### Required GitHub Configuration
+
+Both scheduled workflows require these under **Settings → Secrets and variables → Actions**:
+
+| Name | Type | Notes |
+|------|------|-------|
+| `HOPSWORKS_API_KEY` | Repository **secret** | sensitive |
+| `HOPSWORKS_HOST` | Repository **secret** | sensitive |
+| `HOPSWORKS_PROJECT` | Repository **variable** | not sensitive; `secrets.HOPSWORKS_PROJECT` also accepted |
+
+Use **Repository** level (not Environment) — no GitHub Environments are configured for this repo.
+
+> **Verified 2026-09-05:** the hourly collector was silently failing (schema mismatch); fixed and
+> verified with real rounds: Hopsworks grew 107,064 → 107,067, duplicate protection confirmed
+> (re-run within the same hour upserts instead of duplicating). See PROJECT_JOURNAL Entry 012.
 
 ---
 

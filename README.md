@@ -39,9 +39,9 @@ A production-grade ML pipeline that collects historical weather and air quality 
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE STORE (Hopsworks PRIMARY)                            │
+│ FEATURE STORE (Hopsworks — SINGLE store)                     │
 │ Features + Targets stored TOGETHER                           │
-│ → 107,064 rows, 58 features + 3 targets                     │
+│ → 107,067 rows, 58 features + 3 targets                     │
 │ → Feature View with target label designation                 │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
@@ -62,7 +62,8 @@ A production-grade ML pipeline that collects historical weather and air quality 
 
 ## Verified Model Performance
 
-*All results verified on 107,064 rows from Hopsworks Feature Store.*
+*Verified on the full 4-year dataset from Hopsworks Feature Store*
+*(107,064 historical rows + live hourly rows accumulating since 2026-09-05).*
 
 ### Production Model: XGBoost
 
@@ -72,7 +73,7 @@ A production-grade ML pipeline that collects historical weather and air quality 
 | **Test RMSE** | **30.33** |
 | **Test R²** | **0.6588** |
 | **Composite Score** | **27.84** |
-| **Training Time** | 22.5s |
+| **Training Time** | 23.7s |
 
 ### Model Comparison — Test Set (All Models)
 
@@ -119,7 +120,7 @@ A production-grade ML pipeline that collects historical weather and air quality 
 1. **Best Test MAE** (21.31) — lowest prediction error
 2. **Best Test R²** (0.6588) — explains most variance
 3. **Wins ALL 3 horizons** — 24h, 48h, 72h consistently
-4. **Fast training** (22.5s) — suitable for daily retraining
+4. **Fast training** (23.7s) — suitable for daily retraining
 5. **Handles non-linear relationships** in AQI data
 
 ### Baseline Comparison
@@ -140,9 +141,9 @@ XGBoost significantly outperforms both naive baselines, confirming it learns mea
 |-------|--------|---------|
 | Data Collection | ✅ Verified | Open-Meteo API, 4-year range |
 | Data Ingestion | ✅ Verified | Hopsworks Feature Store (features + targets together) |
-| Data Cleaning | ✅ Verified | 107,064 rows, 0 duplicates, <0.2% NaN |
+| Data Cleaning | ✅ Verified | 107,064 historical rows, 0 duplicates, <0.2% NaN |
 | Feature Engineering | ✅ Verified | 58 features |
-| Feature Store | ✅ Verified | Hopsworks: 107,064 rows (NO CSV fallback) |
+| Feature Store | ✅ Verified | Hopsworks: 107,067 rows — the SINGLE data store (no local backup) |
 | Feature View | ✅ Verified | Target label designation |
 | Model Training | ✅ Verified | 4 models (Ridge, RF, XGBoost, LSTM) from Hopsworks |
 | Model Registry | ✅ Verified | Hopsworks Model Registry (XGBoost v4) |
@@ -255,11 +256,27 @@ AQI-Predictor/
 
 | Workflow | Schedule | Action |
 |----------|----------|--------|
-| Feature Collection | Every hour | Collect weather + pollution |
-| Model Training | Daily 6 AM UTC | Train all models, select best |
+| Feature Collection | Every hour | Collect weather + pollution → Hopsworks |
+| Model Training | Daily 6 AM UTC | Train all models, select best → Hopsworks Registry |
 | CI Pipeline | On push | Lint, tests |
 | ML Validation | Weekly | Data safety, feature quality |
 | CD Pipeline | On push | Pre-deploy checks, Docker |
+
+### GitHub Actions Setup (Secrets & Variables)
+
+The automated pipelines read Hopsworks credentials from GitHub. Configure them under
+**Settings → Secrets and variables → Actions**:
+
+| Name | Where | Value |
+|------|-------|-------|
+| `HOPSWORKS_API_KEY` | **Repository secret** | Hopsworks API key (sensitive — use Secrets tab) |
+| `HOPSWORKS_HOST` | **Repository secret** | e.g. `eu-west.cloud.hopsworks.ai` (sensitive — use Secrets tab) |
+| `HOPSWORKS_PROJECT` | **Repository variable** | e.g. `AQI_Predictor` (not sensitive — use Variables tab) |
+
+**Which option to choose?**
+- Use the **Secrets** tab (Repository secrets) for anything sensitive (API keys, tokens). Secrets are encrypted and masked in logs.
+- Use the **Variables** tab (Repository variables) for plain configuration values like the project name.
+- Use **Repository** level, not Environment level — this project has no GitHub Environments; repository secrets are available to all workflow jobs.
 
 ---
 

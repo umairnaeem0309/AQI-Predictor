@@ -571,3 +571,45 @@ tests/unit/test_environment.py
 - Verify CI/CD pipeline passes after push
 - Monitor daily training automation
 - Project complete and ready for submission
+
+---
+
+## Entry 012
+
+**Date:** 5 September 2026  
+**Phase:** Operations — Live Collection Verification and Storage Cleanup  
+
+### Work Completed
+- Diagnosed hourly collector: GitHub Actions job ran every hour but ALL Hopsworks inserts were silently rejected (`Features are not compatible with Feature Group schema`) — proven by Hopsworks containing exactly 107,064 rows ending 2026-08-28 with zero live rows
+- Queried the live `aqi_features_prod` v1 feature-group schema from Hopsworks (64 columns) and aligned `scripts/collect_features.py` to it exactly, including per-column types (double→float64, bigint→int64 for humidity/wind_direction/cloud_cover/season, int→int32 for hour/day_of_week/month/is_weekend)
+- Changed collector timestamps to floored UTC hours so Hopsworks upserts on (location_id, timestamp) deduplicate retries within the same hour
+- Added target backfill to `scripts/train_model.py`: 24/48/72h targets recomputed from the AQI series so live rows become trainable once future hours accumulate (deterministic, no leakage)
+- Fixed daily-training.yml scheduled-run bug: empty `--min-improvement` argument on schedule events now defaults to 0.01
+- Removed the local Parquet backup (`hourly_observations.parquet`, `collection_metadata.json`) from the collector AND from disk — Hopsworks is now the SINGLE data store (DEC-022)
+- Updated workflows so `HOPSWORKS_PROJECT` can be a repository variable (non-sensitive) while host/API key remain repository secrets
+- Verified with REAL API rounds: Hopsworks grew 107,064 → 107,067; read-back confirmed correct raw values, lags, rolling and time features; duplicate protection confirmed (re-run in same hour kept 107,067)
+- Ran full test suite: 487 passed, 1 skipped
+- Updated ALL documentation (README, CURRENT_STATE, PROJECT_JOURNEY, FINAL_PROJECT_REPORT, DECISIONS, ARCHITECTURE, DATASET_REPORT) and fixed inconsistencies: missing LSTM rows in 24h/48h per-horizon tables, stale DEC-020 metrics (21.34/0.6584/9.9s → 21.31/0.6588/23.7s), stale DATASET_REPORT counts (107,208/63 features → 107,064/58 features), README train-time mismatch (22.5s → 23.7s)
+
+### Key Findings
+- Hopsworks rejects inserts on type mismatches even when column names match — the schema must be matched exactly (including int32 vs int64 vs float64)
+- Open-Meteo history already covers the current hour, so the collector must stamp current-observation values onto the engineered row explicitly
+- GitHub scheduled workflows receive EMPTY `github.event.inputs.*` — defaults must be handled with `|| 'default'` expressions
+- Daily training failure root cause: `HOPSWORKS_HOST`/`HOPSWORKS_API_KEY` repository secrets not configured in GitHub (env resolves to empty in Actions)
+
+### Decisions Made
+- DEC-022: Hopsworks is the single store for live collection; no local parquet backup
+- Per-column type casting derived from the live Hopsworks feature-group schema (authoritative source)
+
+### Files Modified
+- scripts/collect_features.py — schema alignment, typed casts, UTC hour buckets, local backup removed
+- scripts/train_model.py — target backfill from AQI series
+- .github/workflows/daily-training.yml — min-improvement default, HOPSWORKS_PROJECT vars fallback
+- .github/workflows/feature-collection.yml — HOPSWORKS_PROJECT vars fallback
+- README.md + 7 docs — consistency fixes and live-collection verification
+
+### Action Required (Owner)
+- Add GitHub repository secrets `HOPSWORKS_API_KEY`, `HOPSWORKS_HOST` and repository variable `HOPSWORKS_PROJECT` (Settings → Secrets and variables → Actions) — cannot be done locally without GitHub authentication
+
+### Next Step
+- After secrets are added, verify the next hourly GitHub Actions run persists to Hopsworks and the next daily training completes

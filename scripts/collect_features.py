@@ -83,7 +83,6 @@ logging.basicConfig(
 logger = logging.getLogger("collect_features")
 
 # Feature store paths
-FEATURES_DIR = PROJECT_ROOT / "data" / "processed" / "features"
 HEALTH_LOG = PROJECT_ROOT / "data" / "collection_health.json"
 
 
@@ -241,7 +240,9 @@ def collect_one_round(city_ids=None, dry_run=False):
             results["errors"].append({"city": city_id, "error": str(e)})
             results["failed_requests"] += 1
 
-    # 8. Persist to feature store (Hopsworks PRIMARY, Local FALLBACK)
+    # 8. Persist to feature store (Hopsworks is the SINGLE store — no local
+    #    backup. The approved architecture keeps all collected observations
+    #    only in Hopsworks so local files cannot cause drift or divergence.)
     if all_records and not dry_run:
         # Each collector record carries its city's recent history (fetched above)
         # so we can engineer the full feature group schema (lags, rolling, time).
@@ -283,43 +284,7 @@ def collect_one_round(city_ids=None, dry_run=False):
 
         except Exception as e:
             logger.warning(f"Hopsworks persistence failed: {e}")
-
-        # Always save locally as backup (full raw + engineered audit columns)
-        FEATURES_DIR.mkdir(parents=True, exist_ok=True)
-        features_file = FEATURES_DIR / "hourly_observations.parquet"
-
-        # Drop the internal _history_df (DataFrame) before persistence —
-        # it cannot be serialized to parquet and is only needed for
-        # feature engineering at collect time.
-        backup_records = [
-            {k: v for k, v in r.items() if k != "_history_df"} for r in all_records
-        ]
-        raw_backup = pd.DataFrame(backup_records)
-        if "timestamp" in raw_backup.columns:
-            raw_backup["timestamp"] = pd.to_datetime(raw_backup["timestamp"], utc=True)
-
-        if features_file.exists():
-            existing_df = pd.read_parquet(features_file)
-            raw_backup = pd.concat([existing_df, raw_backup], ignore_index=True)
-            raw_backup = raw_backup.drop_duplicates(
-                subset=["timestamp", "location_id"], keep="last"
-            )
-            raw_backup = raw_backup.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
-
-        raw_backup.to_parquet(features_file, index=False)
-        results["local_persisted"] = True
-        logger.info(f"✅ Persisted {len(raw_backup)} records to local Parquet (backup)")
-
-        # Save metadata
-        meta = {
-            "last_collection": datetime.now(timezone.utc).isoformat(),
-            "total_records": len(raw_backup),
-            "cities": list(raw_backup["location_id"].unique()),
-            "training_valid": int(raw_backup["is_training_valid"].sum()),
-        }
-        meta_file = FEATURES_DIR / "collection_metadata.json"
-        with open(meta_file, "w") as f:
-            json.dump(meta, f, indent=2)
+            results["errors"].append({"hopsworks": str(e)})
 
     # 9. Update health log
     results["end_time"] = datetime.now(timezone.utc).isoformat()

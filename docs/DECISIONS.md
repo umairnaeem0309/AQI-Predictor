@@ -659,12 +659,12 @@ Four models trained: Ridge, Random Forest, XGBoost, LSTM. Need to select product
 **Chosen Approach:** Option C — XGBoost
 
 **Reason:**  
-XGBoost achieves the best test performance across all metrics:
-- Test MAE: 21.34 (lowest)
-- Test R²: 0.6584 (highest)
-- Wins on all 3 horizons (24h, 48h, 72h)
-- Fast training (9.9s)
-- Fast inference (0.011ms)
+XGBoost achieves the best test performance across all metrics (verified on the full 4-year Hopsworks dataset):
+- Test MAE: 21.31 (lowest)
+- Test R²: 0.6588 (highest)
+- Best composite score: 27.84 (vs RF 27.87, Ridge 28.39, LSTM 62.36)
+- Wins on all 3 horizons (24h: MAE 19.01, 48h: MAE 21.78, 72h: MAE 23.15)
+- Fast training (23.7s vs Random Forest 281.9s)
 
 **Constraints:**  
 - Model must be retrained daily
@@ -717,3 +717,40 @@ XGBoost is 47% better than mean predictor and 19% better than persistence.
 
 **Impact:**  
 All model comparison documentation includes baseline results.
+
+---
+
+### DEC-022
+
+**Date:** 5 September 2026  
+**Topic:** Live Collection Storage — Hopsworks Single Store  
+**Phase:** Operations  
+
+**Problem:**  
+The hourly feature collector (`scripts/collect_features.py`) was silently failing to persist to Hopsworks: it produced ad-hoc columns that did not match the `aqi_features_prod` v1 feature-group schema (64 columns, mixed double/bigint/int types), so every hourly GitHub Actions insert was rejected and no live rows ever landed. It also wrote a local Parquet backup, creating a second source of truth that could drift from Hopsworks.
+
+**Options Considered:**
+
+- **Option A:** Keep local Parquet backup alongside Hopsworks — dual sources of truth, drift risk
+- **Option B:** Hopsworks as the SINGLE store, schema-aligned collector — one source of truth, verified inserts
+
+**Chosen Approach:** Option B — Hopsworks single store
+
+**Reason:**  
+All training already reads exclusively from Hopsworks; a local backup served no purpose and created divergence risk. The collector now produces the exact feature-group schema verified against the live Hopsworks metadata (column names AND per-column types: double→float64, bigint→int64, int→int32), and uses UTC hour-bucket timestamps so Hopsworks upserts on the (location_id, timestamp) primary key deduplicate retries within the same hour.
+
+**Verification (2026-09-05, real API rounds):**
+- Hopsworks grew 107,064 → 107,067 rows (3 cities × 1 round)
+- Read-back confirmed: correct raw values, lags, rolling features, time features
+- Duplicate protection confirmed: re-run within the same hour kept the total at 107,067
+- Live rows carry NULL targets at insert; training pipeline backfills 24/48/72h targets from the AQI series once future hours exist (deterministic, no leakage)
+
+**Trade-offs:**  
+- If Hopsworks is unavailable, a collection round is lost (accepted: missingness is preserved honestly rather than backed up divergently)
+- Local collection health log (`data/collection_health.json`) retained for operational audit only
+
+**Impact:**  
+- `scripts/collect_features.py` is schema-aligned with `aqi_features_prod` v1 and writes only to Hopsworks
+- `scripts/train_model.py` backfills live-row targets from the AQI series before splitting
+- Local `hourly_observations.parquet` backup removed from disk and from code
+- GitHub Actions requires Hopsworks repository secrets/variables (`HOPSWORKS_API_KEY`, `HOPSWORKS_HOST` secrets; `HOPSWORKS_PROJECT` variable) for both scheduled workflows

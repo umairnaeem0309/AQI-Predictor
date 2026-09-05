@@ -55,7 +55,7 @@ jobs:
         env:
           HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
+          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT || vars.HOPSWORKS_PROJECT }}
 
       - name: Upload model artifacts
         if: success()

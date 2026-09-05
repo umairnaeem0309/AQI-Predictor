@@ -1,9 +1,9 @@
 # AQI Predictor — Complete Project Report
 
 **Project:** Production-grade AQI forecasting for Pakistani cities
-**Timeline:** July — August 2026
-**Status:** Production Ready — All Pipelines Verified, CI/CD Automated
-**Report Date:** 2 September 2026
+**Timeline:** July — September 2026
+**Status:** Production Ready — All Pipelines Verified, Live Hourly Collection ACTIVE
+**Report Date:** 5 September 2026
 
 ---
 
@@ -55,9 +55,9 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 - **Original request:** 5 years
 - **Actual:** ~4 years (Aug 2022 – Aug 2026)
 - **Reason:** Open-Meteo CAMS Global air quality starts Aug 2022
-- **Total:** 107,064 hourly observations (35,688 per city)
-- **Stored in:** Hopsworks Feature Store (features + targets together)
-- **No local CSV files** — all training data from Hopsworks
+- **Total:** 107,064 hourly observations (35,688 per city) + live hourly rows accumulating since 2026-09-05
+- **Stored in:** Hopsworks Feature Store (features + targets together) — the SINGLE data store
+- **No local CSV/parquet backup** — hourly collection writes ONLY to Hopsworks
 
 ---
 
@@ -110,7 +110,7 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 
 ## 5. Verified Results (Hopsworks Feature Store)
 
-*All results verified on 107,064 rows from Hopsworks Feature Store.*
+*All results verified on the 4-year dataset from Hopsworks Feature Store (107,064 historical rows).*
 *Data source confirmed: `"data_source": "hopsworks_feature_store"`*
 *Train: 77,086 | Val: 8,565 | Test: 21,413 | Features: 58*
 
@@ -229,8 +229,11 @@ XGBoost significantly outperforms both baselines, confirming it learns meaningfu
 | SHAP failing for Ridge model | Added LinearExplainer fallback |
 | Local CSV files causing data drift | Migrated to Hopsworks Feature Store |
 | Separate features/targets files | Combined into single Feature Group |
-| Hopsworks offline materialization delay | Added local CSV fallback for training |
+| Hopsworks offline materialization delay | Training pipeline re-reads feature group; target backfill from AQI series |
 | PyTorch not installed for LSTM | Installed PyTorch CPU (`pip install torch`) |
+| Hourly collector schema mismatch (silent) | Aligned collector to exact 64-column FG schema with per-column types; verified live inserts |
+| Daily training missing Hopsworks env | Documented GitHub repository secrets/variables setup (`HOPSWORKS_API_KEY`, `HOPSWORKS_HOST`, `HOPSWORKS_PROJECT`) |
+| Duplicate live observations risk | Hourly UTC-bucket timestamps + Hopsworks upsert on (location_id, timestamp); verified no duplicates |
 
 ---
 
@@ -254,9 +257,9 @@ XGBoost significantly outperforms both baselines, confirming it learns meaningfu
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE STORE (Hopsworks PRIMARY)                            │
+│ FEATURE STORE (Hopsworks — SINGLE store)                     │
 │ Features + Targets stored TOGETHER                           │
-│ → 107,064 rows, 58 features + 3 targets                     │
+│ → 107,067 rows, 58 features + 3 targets                     │
 │ → Feature View with target label designation                 │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
@@ -291,9 +294,10 @@ XGBoost significantly outperforms both baselines, confirming it learns meaningfu
 
 ### Data Store
 
-- **Feature Store:** Hopsworks PRIMARY (107,064 rows, features + targets together)
+- **Feature Store:** Hopsworks PRIMARY (107,067 rows: 107,064 historical + live hourly rows)
 - **Model Registry:** Hopsworks Model Registry (XGBoost v4)
+- **No local data backup** — hourly collection persists ONLY to Hopsworks (verified 2026-09-05)
 
 ---
 
-**Report generated:** 2 September 2026
+**Report generated:** 5 September 2026

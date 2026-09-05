@@ -30,9 +30,9 @@ The AQI Predictor is a production-grade MLOps system that forecasts Air Quality 
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE STORE (Hopsworks PRIMARY)                            │
-│ → Hopsworks cloud (107,064 rows)                             │
-│ → Local Parquet (fallback)                                   │
+│ FEATURE STORE (Hopsworks — SINGLE store)                     │
+│ → Hopsworks cloud (107,067 rows: historical + live hourly)   │
+│ → Hourly collector upserts on (location_id, timestamp)       │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -68,9 +68,9 @@ The AQI Predictor is a production-grade MLOps system that forecasts Air Quality 
 
 | Component | Technology | Status |
 |-----------|-----------|--------|
-| Feature Store | Hopsworks (PRIMARY) | ✅ Active |
+| Feature Store | Hopsworks (PRIMARY — single store for collection) | ✅ Active |
 | Model Registry | Hopsworks Model Registry | ✅ Active |
-| Fallback | Local Parquet + pickle | ✅ Available |
+| Local fallback | Parquet interface (development only; NOT used by hourly collection) | ✅ Available |
 
 ---
 
@@ -125,4 +125,4 @@ AQI-Predictor/
 
 ---
 
-**Document generated:** 2 September 2026
+**Document generated:** 5 September 2026
