@@ -1,4 +1,4 @@
-# 🌍 AQI Predictor
+# AQI Predictor
 
 **Predict Air Quality Index 24/48/72 hours ahead for Pakistani cities using Machine Learning.**
 
@@ -12,7 +12,7 @@
 
 ## Overview
 
-A production-grade ML pipeline that collects historical weather and air quality data from Open-Meteo (4 years, 107K+ observations), engineers 58 features, trains and compares 4 models (Ridge Regression, Random Forest, XGBoost, LSTM), and serves real-time predictions via a FastAPI backend and interactive Streamlit dashboard.
+A ML pipeline that collects historical weather and air quality data from Open-Meteo (4 years, 107K+ observations), engineers 58 features, trains and compares 4 models (Ridge Regression, Random Forest, XGBoost, LSTM), and serves real-time predictions via a FastAPI backend and interactive Streamlit dashboard.
 
 **Key facts:**
 - Data source: Open-Meteo (free, no API key required)
@@ -23,9 +23,9 @@ A production-grade ML pipeline that collects historical weather and air quality 
 
 ### Cities Supported
 
-- 🏙️ **Karachi** — Pakistan's largest city, coastal
-- 🏙️ **Lahore** — Punjab province, industrial
-- 🏙️ **Islamabad** — Capital city
+-  **Karachi** — Pakistan's largest city, coastal
+-  **Lahore** — Punjab province, industrial
+-  **Islamabad** — Capital city
 
 ---
 
@@ -33,28 +33,28 @@ A production-grade ML pipeline that collects historical weather and air quality 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ DATA COLLECTION (Hourly)                                     │
-│ Open-Meteo Weather + Air Quality APIs                        │
-│ → scripts/collect_features.py                                │
+│ DATA COLLECTION (Hourly)                                    │
+│ Open-Meteo Weather + Air Quality APIs                       │
+│ → scripts/collect_features.py                               │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE STORE (Hopsworks — SINGLE store)                     │
-│ Features + Targets stored TOGETHER                           │
+│ FEATURE STORE (Hopsworks — SINGLE store)                    │
+│ Features + Targets stored TOGETHER                          │
 │ → 107,067 rows, 58 features + 3 targets                     │
-│ → Feature View with target label designation                 │
+│ → Feature View with target label designation                │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ MODEL TRAINING (Daily 6 AM UTC)                              │
-│ Ridge, Random Forest, XGBoost, LSTM                          │
-│ → scripts/train_model.py (reads from Hopsworks)              │
-│ → Best model → Hopsworks Model Registry                      │
+│ MODEL TRAINING (Daily 6 AM UTC)                             │
+│ Ridge, Random Forest, XGBoost, LSTM                         │
+│ → scripts/train_model.py (reads from Hopsworks)             │
+│ → Best model → Hopsworks Model Registry                     │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ DEPLOYMENT                                                   │
-│ FastAPI Backend (Render) + Streamlit Dashboard (Cloud)       │
+│ DEPLOYMENT                                                  │
+│ FastAPI Backend (Render) + Streamlit Dashboard (Cloud)      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -63,7 +63,7 @@ A production-grade ML pipeline that collects historical weather and air quality 
 ## Verified Model Performance
 
 *Verified on the full 4-year dataset from Hopsworks Feature Store*
-*(107,064 historical rows + live hourly rows accumulating since 2026-09-05).*
+*(107,064 historical rows + live hourly rows accumulating).*
 
 ### Production Model: XGBoost
 
@@ -137,17 +137,17 @@ XGBoost significantly outperforms both naive baselines, confirming it learns mea
 
 ## Verified Data Pipeline
 
-| Stage | Status | Details |
-|-------|--------|---------|
-| Data Collection | ✅ Verified | Open-Meteo API, 4-year range |
-| Data Ingestion | ✅ Verified | Hopsworks Feature Store (features + targets together) |
-| Data Cleaning | ✅ Verified | 107,064 historical rows, 0 duplicates, <0.2% NaN |
-| Feature Engineering | ✅ Verified | 58 features |
-| Feature Store | ✅ Verified | Hopsworks: 107,067 rows — the SINGLE data store (no local backup) |
-| Feature View | ✅ Verified | Target label designation |
-| Model Training | ✅ Verified | 4 models (Ridge, RF, XGBoost, LSTM) from Hopsworks |
-| Model Registry | ✅ Verified | Hopsworks Model Registry (XGBoost v4) |
-| CI/CD | ✅ Verified | 487 tests passing, lint clean |
+| Stage | Details |
+|-------|---------|
+| Data Collection  | Open-Meteo API, 4-year range |
+| Data Ingestion  | Hopsworks Feature Store (features + targets together) |
+| Data Cleaning  | 107,064 historical rows, 0 duplicates, <0.2% NaN |
+| Feature Engineering  | 58 features |
+| Feature Store  | Hopsworks: 107,067 rows — the SINGLE data store |
+| Feature View   | Target label designation |
+| Model Training   | 4 models (Ridge, RF, XGBoost, LSTM) from Hopsworks |
+| Model Registry  | Hopsworks Model Registry (XGBoost v4) |
+| CI/CD  | 487 tests passing, lint clean |
 
 ---
 
@@ -273,10 +273,6 @@ The automated pipelines read Hopsworks credentials from GitHub. Configure them u
 | `HOPSWORKS_HOST` | **Repository secret** | e.g. `eu-west.cloud.hopsworks.ai` (sensitive — use Secrets tab) |
 | `HOPSWORKS_PROJECT` | **Repository variable** | e.g. `AQI_Predictor` (not sensitive — use Variables tab) |
 
-**Which option to choose?**
-- Use the **Secrets** tab (Repository secrets) for anything sensitive (API keys, tokens). Secrets are encrypted and masked in logs.
-- Use the **Variables** tab (Repository variables) for plain configuration values like the project name.
-- Use **Repository** level, not Environment level — this project has no GitHub Environments; repository secrets are available to all workflow jobs.
 
 ---
 
@@ -295,6 +291,3 @@ The automated pipelines read Hopsworks credentials from GitHub. Configure them u
 
 ---
 
-## License
-
-This project is for educational and research purposes.

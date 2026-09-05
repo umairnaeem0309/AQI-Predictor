@@ -1,25 +1,12 @@
-# Decisions
+# AQI Predictor : Decision Documentation
 
-## AQI Predictor — Decision Documentation System
-
-**Version:** 1.0  
-**Date:** 31 July 2026  
-**Status:** Phase 0 — Foundation  
-
----
 
 ## Decision Log
 
----
-
-### DEC-001
-
-**Date:** 31 July 2026  
-**Topic:** Primary Python Version  
-**Phase:** 0  
-
+### Primary Python Version
+ 
 **Problem:**  
-Hopsworks SDK has known incompatibilities with Python 3.12+ due to removal of the `imp` standard library module. Need to select a Python version that ensures compatibility across all dependencies.
+Hopsworks SDK has known incompatibilities with Python 3.12+ due to removal of the `imp` standard library module. Needed to select a Python version that ensures compatibility across all dependencies.
 
 **Options Considered:**
 
@@ -32,20 +19,11 @@ Hopsworks SDK has known incompatibilities with Python 3.12+ due to removal of th
 **Reason:**  
 Python 3.11 provides the best balance of modern language features and full compatibility with the locked technology stack (Hopsworks, TensorFlow, Scikit-learn, XGBoost). Python 3.12+ is explicitly forbidden by Hopsworks compatibility requirements.
 
-**Trade-offs:**  
-- Losing Python 3.12 features (minor)
-- Gaining full Hopsworks and ecosystem compatibility (significant)
-
-**Impact:**  
-All development, testing, and deployment environments must use Python 3.11.
 
 ---
 
-### DEC-002
+### Backend API Framework 
 
-**Date:** 31 July 2026  
-**Topic:** Backend API Framework  
-**Phase:** 0  
 
 **Problem:**  
 Need to select a backend framework for the prediction API. Project description mentions Flask, but master instructions specify FastAPI.
@@ -53,27 +31,21 @@ Need to select a backend framework for the prediction API. Project description m
 **Options Considered:**
 
 - **Option A:** Flask — Lightweight, widely known, mentioned in project-description.txt
-- **Option B:** FastAPI — Modern, automatic OpenAPI docs, native async, Pydantic integration, specified in MASTER_AGENT_INSTRUCTIONS.md
+- **Option B:** FastAPI — Modern, automatic OpenAPI docs, native async, Pydantic integration
 
 **Chosen Approach:** FastAPI
 
 **Reason:**  
-MASTER_AGENT_INSTRUCTIONS.md is the highest authority and explicitly specifies FastAPI. FastAPI provides superior features for ML serving: automatic API documentation, request/response validation via Pydantic, and native async support.
+FastAPI provides superior features for ML serving: automatic API documentation, request/response validation via Pydantic, and native async support.
 
-**Trade-offs:**  
-- Slightly newer technology with less community content than Flask (minor)
-- Significantly better API development experience and documentation (major)
 
 **Impact:**  
 Streamlit dashboard communicates with FastAPI backend; no direct model loading in frontend code.
 
 ---
 
-### DEC-003
-
-**Date:** 31 July 2026  
-**Topic:** Primary Data Source  
-**Phase:** 0  
+### Primary Data Source 
+ 
 
 **Problem:**  
 Need to select primary and fallback external APIs for weather and air quality data collection.
@@ -89,20 +61,10 @@ Need to select primary and fallback external APIs for weather and air quality da
 **Reason:**  
 OpenWeather provides more frequent and dynamic data updates. AQICN has documented staleness issues. Single primary source keeps schema consistent while fallback improves reliability.
 
-**Trade-offs:**  
-- Two API integrations to maintain (necessary complexity)
-- OpenWeather free-tier has rate limits (mitigated with caching and mock data during development)
-
-**Impact:**  
-Pipeline detects OpenWeather failure and transparently switches to AQICN with staleness validation.
-
 ---
 
-### DEC-004
+### Feature Store Strategy 
 
-**Date:** 31 July 2026  
-**Topic:** Feature Store Strategy  
-**Phase:** 0  
 
 **Problem:**  
 Need feature storage that provides both cloud-grade capabilities and local development reliability.
@@ -118,20 +80,13 @@ Need feature storage that provides both cloud-grade capabilities and local devel
 **Reason:**  
 Hopsworks provides production-grade feature store capabilities required by the project. Local fallback ensures development continuity when Hopsworks is unavailable or rate-limited. Abstraction pattern enables clean switching.
 
-**Trade-offs:**  
-- Two implementations to maintain (necessary for reliability)
-- Abstraction adds slight code complexity (justified by fallback benefit)
-
 **Impact:**  
 All feature store operations go through `FeatureStoreInterface`; implementations are interchangeable via configuration.
 
 ---
 
-### DEC-005
-
-**Date:** 31 July 2026  
-**Topic:** Forecast Model Design  
-**Phase:** 0  
+### Forecast Model Design 
+ 
 
 **Problem:**  
 Need to decide how to structure the 3-day AQI prediction (24h, 48h, 72h).
@@ -156,11 +111,8 @@ Model outputs `[AQI_24h, AQI_48h, AQI_72h]` as a single prediction vector.
 
 ---
 
-### DEC-006
-
-**Date:** 31 July 2026  
-**Topic:** AQI Classification Standard  
-**Phase:** 0  
+### AQI Classification Standard  
+ 
 
 **Problem:**  
 Need a standard AQI category system for dashboard display and hazard alerts.
@@ -183,27 +135,24 @@ Dashboard alerts and classifications use US EPA AQI ranges (Good: 0-50, Moderate
 
 ---
 
-### DEC-007
+### Supported Cities
 
-**Date:** 31 July 2026  
-**Topic:** Initial Supported Cities  
-**Phase:** 0  
 
 **Problem:**  
-Need to define initial cities for development and demonstration while keeping architecture extensible.
+Need to define cities for development and demonstration while keeping architecture extensible.
 
 **Options Considered:**
 
 - **Option A:** Single city — Faster to develop but less impressive demo
 - **Option B:** Three cities — Good demo coverage; Karachi, Lahore, Islamabad are major Pakistani cities with varying air quality profiles
 
-**Chosen Approach:** Karachi, Lahore, Islamabad as initial cities, with extensible architecture for future cities.
+**Chosen Approach:** Karachi, Lahore, Islamabad as cities, with extensible architecture for future cities.
 
 **Reason:**  
 Three cities provide diverse air quality profiles for demonstration. Karachi (coastal, industrial), Lahore (inland, agricultural/industrial), Islamabad (capital, relatively cleaner). Architecture uses configuration-driven city support so new cities can be added via configuration without code changes.
 
 **Trade-offs:**  
-- Three cities triple the initial data collection scope (acceptable for demo quality)
+- Three cities triple the initial data collection scope
 - Extensible design requires abstracting city-specific logic (beneficial for long-term maintainability)
 
 **Impact:**  
@@ -211,11 +160,7 @@ City coordinates stored in `config.yaml`; API calls and feature store use `locat
 
 ---
 
-### DEC-008
-
-**Date:** 31 July 2026  
-**Topic:** Mock Data Volume and Usage  
-**Phase:** 0  
+### Mock Data Volume and Usage  
 
 **Problem:**  
 How much synthetic data to generate for development and testing, and how to prevent misuse.
@@ -240,11 +185,8 @@ How much synthetic data to generate for development and testing, and how to prev
 
 ---
 
-### DEC-009
+### TensorFlow Package Variant 
 
-**Date:** 1 August 2026  
-**Topic:** TensorFlow Package Variant  
-**Phase:** 1  
 
 **Problem:**  
 Full TensorFlow package includes GPU support and is significantly larger than needed for CPU-only development.
@@ -268,11 +210,8 @@ GPU support is not required for initial development and experimentation. CPU-onl
 
 ---
 
-### DEC-010
-
-**Date:** 1 August 2026  
-**Topic:** Hopsworks Host Configuration  
-**Phase:** 1  
+### Hopsworks Host Configuration 
+  
 
 **Problem:**  
 Hopsworks host URL should not be hardcoded in configuration files for security and flexibility.
@@ -295,11 +234,8 @@ Environment variables are the standard for secret/sensitive configuration. Allow
 
 ---
 
-### DEC-011
+### Code Quality Pre-commit Hooks
 
-**Date:** 1 August 2026  
-**Topic:** Code Quality Pre-commit Hooks  
-**Phase:** 1  
 
 **Problem:**  
 Need consistent code formatting and linting across the project.
@@ -324,12 +260,8 @@ Industry-standard Python code quality tools. Black handles formatting, isort han
 
 ---
 
-### DEC-012
-
-**Date:** 2 August 2026  
-**Topic:** API Client Credential Handling  
-**Phase:** 2  
-
+### API Client Credential Handling
+ 
 **Problem:**  
 API clients should support both authenticated and unauthenticated modes for development and testing.
 
@@ -352,12 +284,8 @@ All API clients accept `api_key=None`. Warning logged if initialized without key
 
 ---
 
-### DEC-013
-
-**Date:** 2 August 2026  
-**Topic:** API Retry Strategy  
-**Phase:** 2  
-
+### API Retry Strategy 
+ 
 **Problem:**  
 Need to define which errors trigger retries and which fail immediately.
 
@@ -380,12 +308,8 @@ Authentication failures (401/403) and invalid requests (4xx) are permanent and w
 
 ---
 
-### DEC-014 (Amended)
-
-**Date:** 2 August 2026 | **Amended:** 26 August 2026  
-**Topic:** Data Source Authority  
-**Phase:** 2 | **Amended in:** Phase 17  
-
+### Data Source Authority
+ 
 **Problem:**  
 Both OpenWeather and AQICN provide overlapping data. Need clear ownership rules for weather, AQI, and pollutant fields.
 
@@ -429,11 +353,8 @@ OpenWeather is authoritative for temperature, humidity, wind, pressure, weather_
 
 ---
 
-### DEC-015
+### Synthetic Data Usage Restrictions
 
-**Date:** 8 August 2026  
-**Topic:** Synthetic Data Usage Restrictions  
-**Phase:** 5  
 
 **Problem:**  
 Historical API data is not yet available. Pipeline development requires data for testing, but synthetic data must not contaminate final results.
@@ -471,11 +392,8 @@ All dataset metadata includes `approved_for_training: false` for synthetic datas
 
 ---
 
-### DEC-016
-
-**Date:** 20 August 2026  
-**Topic:** Production Deployment Strategy  
-**Phase:** 14  
+### Production Deployment Strategy  
+  
 
 **Problem:**  
 Need a production deployment strategy that ensures safety, reliability, and rollback capability.
@@ -506,11 +424,7 @@ Production deployment uses `docker/docker-compose.prod.yml`. All deployments run
 
 ---
 
-### DEC-017
-
-**Date:** 26 August 2026  
-**Topic:** AQICN Station Selection Strategy  
-**Phase:** 17  
+### AQICN Station Selection Strategy 
 
 **Problem:**  
 AQICN city-level feeds (`/v2/feed/{city}/`) return severely stale data (timestamps from months ago), while bound station IDs (`/v2/@{station_id}/`) return fresh, current observations.
@@ -541,14 +455,11 @@ AQICN client uses bound station IDs for fresh data. Quality gate validates sourc
 
 ---
 
-### DEC-018
+### Historical Data Source Migration to Open-Meteo  
 
-**Date:** 27 August 2026  
-**Topic:** Historical Data Source Migration to Open-Meteo  
-**Phase:** 17 (Revision)  
 
 **Problem:**  
-The previous Phase 17 strategy depended on OpenWeather + AQICN + 30-day live collection. Timeline constraints require an immediate historical dataset without waiting 30 days. AQICN Pakistan stations are confirmed stale. OpenWeather historical weather requires a paid subscription.
+Timeline constraints require an immediate historical dataset without waiting 30 days. AQICN Pakistan stations are confirmed stale. OpenWeather historical weather requires a paid subscription.
 
 **Options Considered:**
 
@@ -598,16 +509,10 @@ New Open-Meteo providers implement `BaseHistoricalProvider`. Existing OpenWeathe
 - Dataset output: `data/processed/{train,val,test}_{features,targets}.csv`
 - Configuration added to `config.yaml` under `api.open_meteo`
 
-**DEC-014 relationship:**  
-DEC-014 (Data Source Authority) is amended to include Open-Meteo as the historical data source. For real-time inference, OpenWeather and AQICN remain the primary and fallback sources per DEC-014.
 
 ---
 
-### DEC-019
-
-**Date:** 31 August 2026  
-**Topic:** Model Registry — Hopsworks vs MLflow  
-**Phase:** Final  
+### Model Registry — Hopsworks vs MLflow 
 
 **Problem:**  
 Need a model registry for storing trained models, versioning, and production model selection.
@@ -640,11 +545,8 @@ Hopsworks provides integrated model registry with the feature store. Models are 
 
 ---
 
-### DEC-020
+### Production Model Selection
 
-**Date:** 31 August 2026  
-**Topic:** Production Model Selection — XGBoost  
-**Phase:** Final  
 
 **Problem:**  
 Four models trained: Ridge, Random Forest, XGBoost, LSTM. Need to select production model.
@@ -682,11 +584,8 @@ XGBoost achieves the best test performance across all metrics (verified on the f
 
 ---
 
-### DEC-021
-
-**Date:** 2 September 2026  
-**Topic:** Baseline Model Comparison  
-**Phase:** Final  
+### Baseline Model Comparison 
+  
 
 **Problem:**  
 Need to validate that trained models learn meaningful patterns, not just memorize or predict the mean.
@@ -720,11 +619,8 @@ All model comparison documentation includes baseline results.
 
 ---
 
-### DEC-022
-
-**Date:** 5 September 2026  
-**Topic:** Live Collection Storage — Hopsworks Single Store  
-**Phase:** Operations  
+### Live Collection Storage
+ 
 
 **Problem:**  
 The hourly feature collector (`scripts/collect_features.py`) was silently failing to persist to Hopsworks: it produced ad-hoc columns that did not match the `aqi_features_prod` v1 feature-group schema (64 columns, mixed double/bigint/int types), so every hourly GitHub Actions insert was rejected and no live rows ever landed. It also wrote a local Parquet backup, creating a second source of truth that could drift from Hopsworks.
@@ -739,7 +635,7 @@ The hourly feature collector (`scripts/collect_features.py`) was silently failin
 **Reason:**  
 All training already reads exclusively from Hopsworks; a local backup served no purpose and created divergence risk. The collector now produces the exact feature-group schema verified against the live Hopsworks metadata (column names AND per-column types: double→float64, bigint→int64, int→int32), and uses UTC hour-bucket timestamps so Hopsworks upserts on the (location_id, timestamp) primary key deduplicate retries within the same hour.
 
-**Verification (2026-09-05, real API rounds):**
+**Verification (real API rounds):**
 - Hopsworks grew 107,064 → 107,067 rows (3 cities × 1 round)
 - Read-back confirmed: correct raw values, lags, rolling features, time features
 - Duplicate protection confirmed: re-run within the same hour kept the total at 107,067

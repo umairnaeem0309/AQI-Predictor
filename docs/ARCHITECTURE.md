@@ -2,10 +2,6 @@
 
 ## AQI Predictor — System Architecture
 
-**Version:** 2.0  
-**Date:** 31 August 2026  
-**Status:** Production Ready  
-
 ---
 
 ## 1. Overview
@@ -18,38 +14,38 @@ The AQI Predictor is a production-grade MLOps system that forecasts Air Quality 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ DATA COLLECTION (Hourly)                                     │
-│ Open-Meteo Weather + Air Quality APIs                        │
-│ → scripts/collect_features.py                                │
+│ DATA COLLECTION (Hourly)                                    │
+│ Open-Meteo Weather + Air Quality APIs                       │
+│ → scripts/collect_features.py                               │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE ENGINEERING                                          │
-│ 58 features: weather, pollution, time, lags, rolling, ratios │
-│ → src/features/feature_engineering.py                        │
+│ FEATURE ENGINEERING                                         │
+│ 58 features: weather, pollution, time, lags, rolling,ratios │
+│ → src/features/feature_engineering.py                       │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE STORE (Hopsworks — SINGLE store)                     │
-│ → Hopsworks cloud (107,067 rows: historical + live hourly)   │
-│ → Hourly collector upserts on (location_id, timestamp)       │
+│ FEATURE STORE (Hopsworks — SINGLE store)                    │
+│ → Hopsworks cloud (107,067 rows: historical + live hourly)  │
+│ → Hourly collector upserts on (location_id, timestamp)      │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ MODEL TRAINING (Daily 6 AM UTC)                              │
-│ Ridge, Random Forest, XGBoost, LSTM                          │
-│ → scripts/train_model.py                                     │
+│ MODEL TRAINING (Daily 6 AM UTC)                             │
+│ Ridge, Random Forest, XGBoost, LSTM                         │
+│ → scripts/train_model.py                                    │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ MODEL REGISTRY (Hopsworks)                                   │
-│ Version tracking, metrics, model comparison                  │
-│ → src/models/hopsworks_registry.py                           │
+│ MODEL REGISTRY (Hopsworks)                                  │
+│ Version tracking, metrics, model comparison                 │
+│ → src/models/hopsworks_registry.py                          │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ DEPLOYMENT                                                   │
-│ FastAPI Backend (Render) + Streamlit Dashboard (Cloud)       │
+│ DEPLOYMENT                                                  │
+│ FastAPI Backend (Render) + Streamlit Dashboard (Cloud)      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,10 +53,10 @@ The AQI Predictor is a production-grade MLOps system that forecasts Air Quality 
 
 ## 3. Data Providers
 
-| Provider | Purpose | API Key | Status |
+| Provider | Purpose | API Key |  |
 |----------|---------|---------|--------|
-| Open-Meteo Weather | Historical + current weather | Not required | ✅ Primary |
-| Open-Meteo Air Quality | Historical + current pollution | Not required | ✅ Primary |
+| Open-Meteo Weather | Historical + current weather | Not required | 
+| Open-Meteo Air Quality | Historical + current pollution | Not required | 
 
 ---
 
@@ -68,9 +64,9 @@ The AQI Predictor is a production-grade MLOps system that forecasts Air Quality 
 
 | Component | Technology | Status |
 |-----------|-----------|--------|
-| Feature Store | Hopsworks (PRIMARY — single store for collection) | ✅ Active |
-| Model Registry | Hopsworks Model Registry | ✅ Active |
-| Local fallback | Parquet interface (development only; NOT used by hourly collection) | ✅ Available |
+| Feature Store | Hopsworks (PRIMARY — single store for collection) |  Active |
+| Model Registry | Hopsworks Model Registry |  Active |
+| Local fallback | Parquet interface (development only; NOT used by hourly collection) |  Available |
 
 ---
 
@@ -124,5 +120,3 @@ AQI-Predictor/
 ```
 
 ---
-
-**Document generated:** 5 September 2026

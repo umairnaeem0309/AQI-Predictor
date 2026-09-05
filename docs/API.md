@@ -2,16 +2,11 @@
 
 ## AQI Predictor API
 
-**Version:** 1.0.0  
-**Base URL:** `/`
-
----
 
 ## Authentication
 
 All prediction and model endpoints require API key authentication.
 
-**Header:** `X-API-Key: <your-api-key>`
 
 ---
 

@@ -1,13 +1,7 @@
 # Dataset Report
 
-## AQI Predictor — Historical Dataset Analysis
+## AQI Predictor : Historical Dataset Analysis
 
-**Generated:** 5 September 2026
-**Status:** Ready for model training
-**Dataset type:** real_api_data (approved_for_training: true)
-**Storage:** Hopsworks Feature Store `aqi_features_prod` v1 (single store, no local backup)
-
----
 
 ## 1. Dataset Overview
 
@@ -105,4 +99,3 @@ python scripts/train_model.py --force-register
 
 ---
 
-**Report generated:** 5 September 2026

@@ -1,7 +1,5 @@
 # AQI Predictor — Project Journey
 
-**Last Updated:** 2026-09-05
-
 ---
 
 ## 1. Problem Definition
@@ -39,12 +37,12 @@ The system must include:
 
 ### Final Choice: Open-Meteo
 
-- ✅ No API key required
-- ✅ Historical weather from 2017+
-- ✅ Historical air quality from Aug 2022+
-- ✅ Hourly granularity
-- ✅ Free tier with generous rate limits
-- ✅ Works for all three cities
+-  No API key required
+-  Historical weather from 2017+
+-  Historical air quality from Aug 2022+
+-  Hourly granularity
+-  Free tier with generous rate limits
+-  Works for all three cities
 
 ---
 
@@ -78,11 +76,11 @@ The system must include:
 
 ## 5. Data Cleaning
 
-- ✅ 0 duplicate (timestamp, city) pairs
-- ✅ <0.2% missing values
-- ✅ 0 negative values for PM2.5, PM10, CO, NO2, SO2
-- ✅ Timestamps normalized to UTC
-- ✅ Hourly ordering verified
+-  0 duplicate (timestamp, city) pairs
+-  <0.2% missing values
+-  0 negative values for PM2.5, PM10, CO, NO2, SO2
+-  Timestamps normalized to UTC
+-  Hourly ordering verified
 
 ---
 

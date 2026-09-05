@@ -1,9 +1,5 @@
-# AQI Predictor — Complete Project Report
+# AQI Predictor : Complete Project Report
 
-**Project:** Production-grade AQI forecasting for Pakistani cities
-**Timeline:** July — September 2026
-**Status:** Production Ready — All Pipelines Verified, Live Hourly Collection ACTIVE
-**Report Date:** 5 September 2026
 
 ---
 
@@ -37,11 +33,11 @@ Real-time AQI data from ground monitoring stations in Pakistan is **unreliable**
 
 ### API Selection Process
 
-| Source | Weather | AQI | Historical | Free | Pakistan Fresh | Used |
-|--------|---------|-----|-----------|------|---------------|------|
-| OpenWeather | ✅ | ⚠️ (1–5) | ❌ (paid) | ✅ | ✅ | Limited |
-| AQICN | ❌ | ✅ (0–500) | ❌ | ✅ | ❌ (stale) | No |
-| Open-Meteo | ✅ | ✅ (concentrations) | ✅ (4+ years) | ✅ | ✅ | **Primary** |
+| Source | Weather |   AQI | Historical |  | Data | Used |
+|--------|---------|------------|---------|------|---------------|------|
+| OpenWeather | available |  (1–5) |  paid |  | fresh | Limited |
+| AQICN | available |  (0–500) | not available |  |  stale | No |
+| Open-Meteo | available |  concentrations |  4+ years | | fresh | **Primary** |
 
 ### Final Choice: Open-Meteo
 
@@ -250,30 +246,30 @@ XGBoost significantly outperforms both baselines, confirming it learns meaningfu
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ DATA COLLECTION (Every Hour)                                 │
-│ Open-Meteo Weather + Air Quality APIs                        │
-│ → scripts/collect_features.py                                │
-│ → Hopsworks Feature Store                                    │
+│ DATA COLLECTION (Every Hour)                                │
+│ Open-Meteo Weather + Air Quality APIs                       │
+│ → scripts/collect_features.py                               │
+│ → Hopsworks Feature Store                                   │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ FEATURE STORE (Hopsworks — SINGLE store)                     │
-│ Features + Targets stored TOGETHER                           │
+│ FEATURE STORE (Hopsworks — SINGLE store)                    │
+│ Features + Targets stored TOGETHER                          │
 │ → 107,067 rows, 58 features + 3 targets                     │
-│ → Feature View with target label designation                 │
+│ → Feature View with target label designation                │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ MODEL TRAINING (Daily 6 AM UTC)                              │
-│ Ridge, Random Forest, XGBoost, LSTM                          │
-│ → scripts/train_model.py                                     │
-│ → Reads from Hopsworks Feature Store                         │
-│ → Best model → Hopsworks Model Registry                      │
+│ MODEL TRAINING (Daily 6 AM UTC)                             │
+│ Ridge, Random Forest, XGBoost, LSTM                         │
+│ → scripts/train_model.py                                    │
+│ → Reads from Hopsworks Feature Store                        │
+│ → Best model → Hopsworks Model Registry                     │
 └─────────────────────────────┬───────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ DEPLOYMENT                                                   │
-│ FastAPI Backend (Render) + Streamlit Dashboard (Cloud)       │
+│ DEPLOYMENT                                                  │
+│ FastAPI Backend (Render) + Streamlit Dashboard (Cloud)      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -296,8 +292,8 @@ XGBoost significantly outperforms both baselines, confirming it learns meaningfu
 
 - **Feature Store:** Hopsworks PRIMARY (107,067 rows: 107,064 historical + live hourly rows)
 - **Model Registry:** Hopsworks Model Registry (XGBoost v4)
-- **No local data backup** — hourly collection persists ONLY to Hopsworks (verified 2026-09-05)
+- **No local data backup** — hourly collection persists ONLY to Hopsworks
 
 ---
 
-**Report generated:** 5 September 2026
+
