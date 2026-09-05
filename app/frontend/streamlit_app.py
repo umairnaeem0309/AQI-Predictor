@@ -59,7 +59,11 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
         ["Dashboard", "Analytics", "Explainability", "System"],
         label_visibility="collapsed",
     )
+    return page
 
+
+def _render_sidebar_footer():
+    """Render the city status strip and footer at the bottom of the sidebar."""
     # City quick-status strip
     pred = st.session_state.get("prediction_data")
     if pred:
@@ -70,7 +74,7 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
 
         city_rows = ""
         for city in ["Karachi", "Lahore", "Islamabad"]:
-            if city == selected:
+            if city.lower() == selected.lower():
                 cat_label = f"<b>AQI {aqi_now}</b> · {cat_now}"
                 city_style = f"font-weight: 600; color: {color_now};"
             else:
@@ -106,8 +110,6 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
     st.sidebar.caption("**AirPulse** v1.0.0")
     st.sidebar.caption("US EPA AQI Standards")
 
-    return page
-
 
 def main():
     """Main application entry point."""
@@ -132,6 +134,8 @@ def main():
         render_explainability(api_client)
     elif page == "System":
         render_system(api_client)
+        
+    _render_sidebar_footer()
 
 
 if __name__ == "__main__":
