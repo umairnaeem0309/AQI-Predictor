@@ -40,6 +40,8 @@ _BADGE_CLASS = {
     "hazardous": "badge-hazardous",
 }
 
+_DOT_CLASS = {"ok": "dot-ok animated", "warning": "dot-warning animated", "error": "dot-error animated"}
+
 
 def _get_category_key(aqi_value: int) -> str:
     if aqi_value <= 50:
@@ -107,34 +109,58 @@ def render_aqi_card(
     st.markdown(html, unsafe_allow_html=True)
 
 
-def render_property(
+def render_status_card(
     label: str,
     value: Any,
-    value_color: str = "#0F172A",
+    status: str = "ok",
+    icon: Optional[str] = None,
 ):
     """
-    Render a clean key-value property list item. This avoids the text truncation 
-    issue present in Streamlit's native st.metric component.
+    Render a system status card with animated dot indicator.
 
     Args:
-        label: The property name
-        value: The property value
-        value_color: Optional color for the value text
+        label: Card label
+        value: Display value string
+        status: 'ok', 'warning', or 'error'
+        icon: Optional emoji icon override
     """
-    display_val = str(value) if value is not None else "N/A"
-    
+    dot_cls = _DOT_CLASS.get(status, "dot-ok animated")
+    status_colors = {"ok": "#00C853", "warning": "#FF9800", "error": "#D50000"}
+    text_color = status_colors.get(status, "#64748B")
+
     st.markdown(
         f"""
-        <div style="padding: 6px 0; border-bottom: 1px solid #F1F5F9; margin-bottom: 4px;">
-            <div style="font-size: 0.75rem; color: #64748B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">
-                {label}
+        <div class="health-card">
+          <div class="health-card-body">
+            <div class="health-card-label">{label}</div>
+            <div class="health-card-value" style="display:flex;align-items:center;gap:6px;">
+              <span class="status-dot {dot_cls}"></span>
+              <span style="color:{text_color};">{value}</span>
             </div>
-            <div style="font-size: 0.95rem; color: {value_color}; font-weight: 500; word-wrap: break-word;">
-                {display_val}
-            </div>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
+    )
+
+
+def render_info_card(
+    label: str,
+    value: Any,
+    help_text: Optional[str] = None,
+):
+    """
+    Render an info metric card using st.metric.
+
+    Args:
+        label: Card label
+        value: Display value
+        help_text: Optional tooltip text
+    """
+    st.metric(
+        label=label,
+        value=str(value) if value is not None else "N/A",
+        help=help_text,
     )
 
 

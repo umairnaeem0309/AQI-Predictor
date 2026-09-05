@@ -36,9 +36,16 @@ def render_analytics(api_client: APIClient):
     """Render analytics page."""
     st.markdown(get_dashboard_css(), unsafe_allow_html=True)
 
-    # Page header
-    st.title("Analytics Dashboard")
-    st.caption("Historical AQI trends, pollutant analysis, and city comparisons.")
+    # Page hero
+    st.markdown(
+        """
+        <div class="page-hero">
+          <div class="page-hero-title">Analytics Dashboard</div>
+          <div class="page-hero-sub">Historical AQI trends, pollutant analysis, and city comparisons.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # Controls toolbar
     with st.container(border=True):
