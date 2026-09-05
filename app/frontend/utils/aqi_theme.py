@@ -353,39 +353,29 @@ button, .stButton > button, input, select {
 .status-pill-error { background: #FFEBEE; color: #C62828; }
 .status-pill-info  { background: #E3F2FD; color: #1565C0; }
 
-/* ── 4. Page Hero / Section Headers ─────────────────────────────────────── */
+/* ── 4. Page Hero ─────────────────────────────────────────────────────────── */
 .page-hero {
-  background: linear-gradient(135deg, var(--brand-blue) 0%, #1565C0 100%);
-  border-radius: var(--radius-lg);
+  background: var(--surface-0);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   padding: 24px 28px;
   margin-bottom: 20px;
-  color: white;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--brand-blue);
 }
 .page-hero-title {
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
   margin: 0 0 4px 0;
   line-height: 1.2;
 }
 .page-hero-sub {
   font-size: 0.85rem;
-  opacity: 0.82;
+  color: var(--text-secondary);
   font-weight: 400;
   margin: 0;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 20px 0 10px 0;
-  padding-bottom: 6px;
-  border-bottom: 2px solid var(--border-color);
 }
 
 /* ── 5. Card / Container Utilities ──────────────────────────────────────── */

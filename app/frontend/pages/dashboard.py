@@ -6,8 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 Dashboard Page
 
 Primary view: city selector, 3-day AQI KPI cards, forecast chart,
-confidence intervals, and model info. Pure presentation layer —
-all data bindings and API calls are unchanged.
+confidence intervals, and model info.
 """
 
 from typing import Optional
@@ -19,8 +18,6 @@ from app.frontend.components.charts import apply_chart_theme, create_forecast_ch
 from app.frontend.components.metrics import (
     render_aqi_card,
     render_error_state,
-    render_loading_state,
-    render_unavailable_state,
     render_warning_state,
 )
 from app.frontend.utils.api_client import APIClient, APIClientError
@@ -33,24 +30,16 @@ from app.frontend.utils.aqi_theme import (
 )
 from app.frontend.utils.formatters import format_time_ago, format_timestamp
 
-# Valid cities
 VALID_CITIES = ["Karachi", "Lahore", "Islamabad"]
 
-# City flag emojis for hero
 _CITY_FLAGS = {"Karachi": "🏙️", "Lahore": "🌳", "Islamabad": "🏔️"}
 
 
 def render_dashboard(api_client: APIClient):
-    """
-    Render main dashboard page.
-
-    Args:
-        api_client: API client instance
-    """
-    # Inject global design system CSS
+    """Render main dashboard page."""
     st.markdown(get_dashboard_css(), unsafe_allow_html=True)
 
-    # ── Toolbar Row ────────────────────────────────────────────────────────────
+    # Toolbar
     toolbar_col1, toolbar_col2, toolbar_col3 = st.columns([3, 1, 2])
 
     with toolbar_col1:
@@ -58,19 +47,19 @@ def render_dashboard(api_client: APIClient):
             "Select City",
             VALID_CITIES,
             key="city_selector",
-            help="Choose a Pakistani city to view its 24/48/72-hour AQI forecast.",
+            help="Choose a city to view its AQI forecast.",
         )
 
     with toolbar_col2:
         st.markdown("<div style='padding-top:26px;'>", unsafe_allow_html=True)
-        refresh_clicked = st.button("🔄 Refresh", key="refresh_btn", use_container_width=True)
+        refresh_clicked = st.button("Refresh", key="refresh_btn", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     with toolbar_col3:
         last_upd = format_time_ago(st.session_state.get("last_refresh"))
         st.markdown(
             f"<div style='padding-top:30px;font-size:0.78rem;color:#64748B;'>"
-            f"🕐 Last updated: <b>{last_upd}</b></div>",
+            f"Last updated: <b>{last_upd}</b></div>",
             unsafe_allow_html=True,
         )
 
@@ -78,22 +67,17 @@ def render_dashboard(api_client: APIClient):
         st.cache_data.clear()
         st.rerun()
 
-    # Store selected city
     st.session_state.selected_city = selected_city
 
-    st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
-
-    # ── Fetch Prediction ───────────────────────────────────────────────────────
-    with st.status("⏳ Fetching forecast data…", expanded=False) as status_widget:
-        try:
+    # Fetch prediction
+    try:
+        with st.spinner("Fetching forecast data..."):
             prediction = api_client.get_prediction(selected_city)
             st.session_state.prediction_data = prediction
             st.session_state.last_refresh = prediction.get("timestamp")
-            status_widget.update(label="✅ Forecast loaded", state="complete", expanded=False)
-        except APIClientError as e:
-            status_widget.update(label="❌ Fetch failed", state="error", expanded=True)
-            render_error_state("Failed to fetch prediction data", e)
-            return
+    except APIClientError as e:
+        render_error_state("Failed to fetch prediction data", e)
+        return
 
     if not prediction:
         render_warning_state("No prediction data available")
@@ -106,25 +90,25 @@ def render_dashboard(api_client: APIClient):
     cat_48h = prediction.get("category_48h", get_aqi_category(aqi_48h))
     cat_72h = prediction.get("category_72h", get_aqi_category(aqi_72h))
 
-    # ── Hero Band ──────────────────────────────────────────────────────────────
+    # Hero band
     badge_html = render_aqi_badge(aqi_24h, get_aqi_category_short(aqi_24h), size="md")
-    city_flag = _CITY_FLAGS.get(selected_city, "🏙️")
+    city_flag = _CITY_FLAGS.get(selected_city, "")
     model_ver = prediction.get("model_version", "v1")
 
     st.markdown(
         f"""
         <div class="page-hero">
-          <div class="page-hero-title">{city_flag} {selected_city} Air Quality Forecast</div>
+          <div class="page-hero-title">{city_flag} {selected_city} — Air Quality Forecast</div>
           <div class="page-hero-sub" style="display:flex;align-items:center;gap:12px;margin-top:8px;">
             Current 24h AQI: {badge_html}
-            <span style="opacity:0.7;">Model: {model_ver}</span>
+            <span style="opacity:0.7;">Model {model_ver}</span>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # ── Confidence Intervals (extract early for KPI cards) ────────────────────
+    # Confidence intervals (extract early for KPI cards)
     confidence = prediction.get("confidence")
     intervals = confidence.get("intervals") if confidence else None
 
@@ -140,8 +124,8 @@ def render_dashboard(api_client: APIClient):
     ci_48_lo, ci_48_hi = _get_ci("48h")
     ci_72_lo, ci_72_hi = _get_ci("72h")
 
-    # ── AQI Forecast KPI Cards ─────────────────────────────────────────────────
-    st.markdown('<div class="section-header">📊 Forecast Summary</div>', unsafe_allow_html=True)
+    # Forecast KPI cards
+    st.subheader("Forecast Summary")
 
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
@@ -184,10 +168,8 @@ def render_dashboard(api_client: APIClient):
             ci_upper=ci_72_hi,
         )
 
-    st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
-
-    # ── 3-Day Forecast Chart ───────────────────────────────────────────────────
-    st.markdown('<div class="section-header">📈 3-Day Forecast Trend</div>', unsafe_allow_html=True)
+    # Forecast chart
+    st.subheader("3-Day Forecast Trend")
 
     timestamps = [
         prediction.get("timestamp", "Now"),
@@ -195,30 +177,21 @@ def render_dashboard(api_client: APIClient):
         "48h",
         "72h",
     ]
-    aqi_values = [
-        aqi_24h,
-        aqi_24h,
-        aqi_48h,
-        aqi_72h,
-    ]
+    aqi_values = [aqi_24h, aqi_24h, aqi_48h, aqi_72h]
 
     with st.container(border=True):
         fig = create_forecast_chart(timestamps, aqi_values, f"AQI Forecast — {selected_city}")
         st.plotly_chart(fig, use_container_width=True)
 
-    # ── Confidence Interval Section ────────────────────────────────────────────
+    # Confidence interval section
     if confidence and intervals:
-        st.markdown(
-            '<div class="section-header">📐 Prediction Confidence Intervals</div>',
-            unsafe_allow_html=True,
-        )
+        st.subheader("Prediction Confidence Intervals")
 
         ci_method = confidence.get("method", "N/A")
         ci_level = confidence.get("level", 90)
 
         st.caption(
-            f"Method: **{ci_method}** · Confidence Level: **{ci_level}%** · "
-            "Intervals widen with longer horizons as forecast uncertainty grows."
+            f"Method: **{ci_method}** · Confidence Level: **{ci_level}%**"
         )
 
         horizons, point_preds, lower_bounds, upper_bounds = [], [], [], []
@@ -234,7 +207,6 @@ def render_dashboard(api_client: APIClient):
             with st.container(border=True):
                 ci_fig = go.Figure()
 
-                # Confidence band
                 ci_fig.add_trace(
                     go.Scatter(
                         x=horizons + horizons[::-1],
@@ -247,11 +219,9 @@ def render_dashboard(api_client: APIClient):
                     )
                 )
 
-                # Upper / Lower bound traces (for hover)
                 ci_fig.add_trace(
                     go.Scatter(
-                        x=horizons,
-                        y=upper_bounds,
+                        x=horizons, y=upper_bounds,
                         mode="lines",
                         line=dict(color="rgba(30,136,229,0.4)", width=1, dash="dot"),
                         name="Upper Bound",
@@ -260,8 +230,7 @@ def render_dashboard(api_client: APIClient):
                 )
                 ci_fig.add_trace(
                     go.Scatter(
-                        x=horizons,
-                        y=lower_bounds,
+                        x=horizons, y=lower_bounds,
                         mode="lines",
                         line=dict(color="rgba(30,136,229,0.4)", width=1, dash="dot"),
                         name="Lower Bound",
@@ -269,11 +238,9 @@ def render_dashboard(api_client: APIClient):
                     )
                 )
 
-                # Point predictions
                 ci_fig.add_trace(
                     go.Scatter(
-                        x=horizons,
-                        y=point_preds,
+                        x=horizons, y=point_preds,
                         mode="lines+markers+text",
                         name="Point Prediction",
                         line=dict(color="#1E88E5", width=3),
@@ -286,8 +253,7 @@ def render_dashboard(api_client: APIClient):
                 )
 
                 apply_chart_theme(
-                    ci_fig,
-                    height=360,
+                    ci_fig, height=360,
                     title=f"AQI Forecast with {ci_level}% Confidence Intervals",
                     xaxis_title="Forecast Horizon",
                     yaxis_title="AQI",
@@ -297,22 +263,19 @@ def render_dashboard(api_client: APIClient):
                 )
                 st.plotly_chart(ci_fig, use_container_width=True)
 
-                # Interval details table
                 import pandas as pd
 
                 iv_data = []
                 for h in ["24h", "48h", "72h"]:
                     iv = intervals.get(h)
                     if iv:
-                        iv_data.append(
-                            {
-                                "Horizon": h,
-                                "Point Prediction": int(iv["point_prediction"]),
-                                "Lower Bound": int(iv["lower"]),
-                                "Upper Bound": int(iv["upper"]),
-                                "Interval Width": int(iv["width"]),
-                            }
-                        )
+                        iv_data.append({
+                            "Horizon": h,
+                            "Point Prediction": int(iv["point_prediction"]),
+                            "Lower Bound": int(iv["lower"]),
+                            "Upper Bound": int(iv["upper"]),
+                            "Interval Width": int(iv["width"]),
+                        })
 
                 if iv_data:
                     max_width = max(r["Interval Width"] for r in iv_data)
@@ -331,17 +294,13 @@ def render_dashboard(api_client: APIClient):
                     )
 
     elif confidence is None:
-        st.markdown(
-            '<div class="info-strip">ℹ️ Confidence intervals will appear once residual statistics are computed.</div>',
-            unsafe_allow_html=True,
-        )
+        st.info("Confidence intervals will appear once residual statistics are computed.")
 
-    # ── Model Info Strip ───────────────────────────────────────────────────────
-    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+    # Model info strip
     level = confidence.get("level", "N/A") if confidence else "N/A"
     st.markdown(
-        f'<div class="info-strip">🤖 Model: <b>{prediction.get("model_version", "N/A")}</b>'
-        f'&nbsp;&nbsp;·&nbsp;&nbsp;📐 Confidence Level: <b>{level}%</b>'
-        f'&nbsp;&nbsp;·&nbsp;&nbsp;📡 Source: US EPA PM NowCast AQI</div>',
+        f'<div class="info-strip">Model: <b>{prediction.get("model_version", "N/A")}</b>'
+        f'&nbsp;&nbsp;·&nbsp;&nbsp;Confidence Level: <b>{level}%</b>'
+        f'&nbsp;&nbsp;·&nbsp;&nbsp;Source: US EPA PM NowCast AQI</div>',
         unsafe_allow_html=True,
     )

@@ -18,7 +18,6 @@ from app.frontend.pages.explainability import render_explainability
 from app.frontend.pages.system import render_system
 from app.frontend.utils.api_client import APIClient
 from app.frontend.utils.aqi_theme import (
-    AQI_COLORS,
     CITY_COLORS,
     get_aqi_category_short,
     get_aqi_color,
@@ -39,15 +38,10 @@ def init_session_state():
 
 
 def _render_sidebar_nav(api_client: APIClient) -> str:
-    """
-    Render the branded sidebar and return the selected page name.
-
-    Returns:
-        Selected page string
-    """
+    """Render the branded sidebar and return the selected page name."""
     st.sidebar.markdown(get_dashboard_css(), unsafe_allow_html=True)
 
-    # ── Brand Header ──────────────────────────────────────────────────────────
+    # Brand header
     st.sidebar.markdown(
         """
         <div class="sidebar-brand">
@@ -61,27 +55,27 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
         unsafe_allow_html=True,
     )
 
-    # ── API / Mock Status Pill ────────────────────────────────────────────────
+    # API / Mock status
     if api_client.mock_mode:
         st.sidebar.markdown(
-            '<div class="status-pill status-pill-warn">⚠️ Mock Mode — Simulated Data</div>',
+            '<div class="status-pill status-pill-warn">Mock Mode — Simulated Data</div>',
             unsafe_allow_html=True,
         )
     else:
         if api_client.is_available():
             st.sidebar.markdown(
-                '<div class="status-pill status-pill-ok">✅ API Connected</div>',
+                '<div class="status-pill status-pill-ok">API Connected</div>',
                 unsafe_allow_html=True,
             )
         else:
             st.sidebar.markdown(
-                '<div class="status-pill status-pill-error">❌ API Unavailable</div>',
+                '<div class="status-pill status-pill-error">API Unavailable</div>',
                 unsafe_allow_html=True,
             )
 
     st.sidebar.markdown("<div style='margin:10px 0 4px;'></div>", unsafe_allow_html=True)
 
-    # ── Navigation ────────────────────────────────────────────────────────────
+    # Navigation
     page = st.sidebar.radio(
         "Navigation",
         ["Dashboard", "Analytics", "Explainability", "System"],
@@ -92,11 +86,9 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
     )
     st.session_state.active_page = page
 
-    # ── City Quick-Status Strip ───────────────────────────────────────────────
+    # City quick-status strip
     pred = st.session_state.get("prediction_data")
     if pred:
-        # Build a small AQI dot for each city using prediction of selected city
-        # (full multi-city live data would need extra API calls; we show selected city only)
         selected = st.session_state.get("selected_city", "Karachi")
         aqi_now = pred.get("aqi_24h", 0)
         color_now = get_aqi_color(aqi_now)
@@ -104,13 +96,12 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
 
         city_rows = ""
         for city in ["Karachi", "Lahore", "Islamabad"]:
-            city_color = CITY_COLORS.get(city, "#1E88E5")
             if city == selected:
                 dot_color = color_now
                 cat_label = f"<b>AQI {aqi_now}</b> · {cat_now}"
             else:
                 dot_color = "#CBD5E1"
-                cat_label = "<span style='color:#94A3B8;'>select to load</span>"
+                cat_label = "<span style='color:#94A3B8;'>—</span>"
 
             city_rows += (
                 f'<div class="city-strip-item">'
@@ -124,7 +115,6 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
             unsafe_allow_html=True,
         )
     else:
-        # Placeholder strip with city brand dots
         city_rows = "".join(
             f'<div class="city-strip-item">'
             f'<span><span class="city-dot" style="background:{CITY_COLORS[c]};opacity:0.4;"></span>{c}</span>'
@@ -137,17 +127,16 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
             unsafe_allow_html=True,
         )
 
-    # ── Footer ────────────────────────────────────────────────────────────────
+    # Footer
     st.sidebar.markdown("---")
     st.sidebar.caption("**AirPulse** v1.0.0")
-    st.sidebar.caption("📐 US EPA AQI Standards")
+    st.sidebar.caption("US EPA AQI Standards")
 
     return page
 
 
 def main():
     """Main application entry point."""
-    # Page configuration
     st.set_page_config(
         page_title="AirPulse — AQI Forecaster",
         page_icon="🌬️",
@@ -155,16 +144,12 @@ def main():
         initial_sidebar_state="expanded",
     )
 
-    # Initialize session state
     init_session_state()
 
-    # Initialize API client
     api_client = APIClient.from_env()
 
-    # Sidebar navigation
     page = _render_sidebar_nav(api_client)
 
-    # Render selected page
     if page == "Dashboard":
         render_dashboard(api_client)
     elif page == "Analytics":

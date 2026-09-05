@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 """
 Metric Components
 
-Reusable metric display components with polished AirPulse styling.
+Reusable metric display components with AirPulse styling.
 """
 
 from typing import Any, Optional
@@ -21,7 +21,7 @@ from app.frontend.utils.aqi_theme import (
 from app.frontend.utils.formatters import format_aqi, format_time_ago
 
 
-# ── CSS class helpers (map category key → CSS class) ──────────────────────────
+# CSS class helpers
 _STRIPE_CLASS = {
     "good": "kpi-stripe-good",
     "moderate": "kpi-stripe-moderate",
@@ -40,7 +40,6 @@ _BADGE_CLASS = {
     "hazardous": "badge-hazardous",
 }
 
-_STATUS_ICONS = {"ok": "✅", "warning": "⚠️", "error": "❌"}
 _DOT_CLASS = {"ok": "dot-ok animated", "warning": "dot-warning animated", "error": "dot-error animated"}
 
 
@@ -59,8 +58,6 @@ def _get_category_key(aqi_value: int) -> str:
         return "hazardous"
 
 
-# ── Public Components ─────────────────────────────────────────────────────────
-
 def render_aqi_card(
     label: str,
     aqi_value: int,
@@ -70,8 +67,7 @@ def render_aqi_card(
     ci_upper: Optional[int] = None,
 ):
     """
-    Render a styled AQI KPI card with AQI tier left-border stripe,
-    category badge, optional delta, and optional confidence interval.
+    Render a styled AQI KPI card with tier stripe and category badge.
 
     Args:
         label: Card label (e.g., "24h Forecast")
@@ -86,22 +82,18 @@ def render_aqi_card(
     badge_cls = _BADGE_CLASS.get(key, "badge-good")
     color = get_aqi_color(aqi_value)
 
-    # Delta string
     delta_html = ""
-    if delta is not None:
-        sign = "▲" if delta > 0 else "▼" if delta < 0 else "●"
-        d_color = "#D50000" if delta > 0 else "#00C853" if delta < 0 else "#64748B"
+    if delta is not None and delta != 0:
+        sign = "+" if delta > 0 else ""
+        d_color = "#D50000" if delta > 0 else "#00C853"
         delta_html = (
             f'<div class="kpi-delta" style="color:{d_color};">'
-            f'{sign} {abs(delta):+d} vs prev horizon</div>'
+            f'{sign}{delta} vs prev</div>'
         )
 
-    # CI string
     ci_html = ""
     if ci_lower is not None and ci_upper is not None:
-        ci_html = (
-            f'<div class="kpi-ci">95% CI: {ci_lower} – {ci_upper}</div>'
-        )
+        ci_html = f'<div class="kpi-ci">{ci_lower} – {ci_upper}</div>'
 
     short_cat = get_aqi_category_short(aqi_value)
 
@@ -135,12 +127,10 @@ def render_status_card(
     dot_cls = _DOT_CLASS.get(status, "dot-ok animated")
     status_colors = {"ok": "#00C853", "warning": "#FF9800", "error": "#D50000"}
     text_color = status_colors.get(status, "#64748B")
-    display_icon = icon or _STATUS_ICONS.get(status, "ℹ️")
 
     st.markdown(
         f"""
         <div class="health-card">
-          <div class="health-card-icon">{display_icon}</div>
           <div class="health-card-body">
             <div class="health-card-label">{label}</div>
             <div class="health-card-value" style="display:flex;align-items:center;gap:6px;">
@@ -160,7 +150,7 @@ def render_info_card(
     help_text: Optional[str] = None,
 ):
     """
-    Render an info metric card using st.metric (with card CSS from design system).
+    Render an info metric card using st.metric.
 
     Args:
         label: Card label
@@ -174,41 +164,40 @@ def render_info_card(
     )
 
 
-def render_loading_state(message: str = "Loading data…"):
-    """Render a polished status spinner context manager."""
-    return st.status(message, expanded=True)
+def render_loading_state(message: str = "Loading data..."):
+    """Render loading spinner context manager."""
+    return st.spinner(message)
 
 
 def render_error_state(message: str, error: Optional[Any] = None):
     """
-    Render a styled error state with collapsible details.
+    Render error state with collapsible details.
 
     Args:
         message: User-facing error description
         error: Optional exception or string details
     """
-    st.error(f"**{message}**", icon="🚨")
+    st.error(f"**{message}**")
     if error:
-        with st.expander("🔍 Error Details", expanded=False):
+        with st.expander("Error Details", expanded=False):
             st.code(str(error), language="text")
 
 
 def render_warning_state(message: str):
-    """Render a styled warning banner."""
-    st.warning(f"**{message}**", icon="⚠️")
+    """Render warning banner."""
+    st.warning(f"**{message}**")
 
 
 def render_unavailable_state(feature: str):
     """
-    Render a feature-unavailable info card.
+    Render feature-unavailable info card.
 
     Args:
         feature: Name of unavailable feature
     """
     st.info(
         f"**{feature}** is currently unavailable — "
-        "additional backend support is required.",
-        icon="ℹ️",
+        "additional backend support is required."
     )
 
 
