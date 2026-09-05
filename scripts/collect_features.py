@@ -46,6 +46,36 @@ from src.features.feature_engineering import (
 )
 from src.utils.epa_aqi import calculate_pm10_aqi, calculate_pm25_aqi
 
+# =============================================================================
+# Hopsworks feature-group schema (aqi_features_prod v1) — columns the live
+# collector must produce so inserts into Hopsworks actually succeed.
+# =============================================================================
+FG_SCHEMA_COLUMNS = [
+    "timestamp", "location_id", "city_name",
+    "temperature", "humidity", "pressure", "wind_speed", "wind_direction",
+    "cloud_cover", "precipitation",
+    "pm25", "pm10", "co", "no2", "so2", "o3",
+    "us_aqi_open_meteo", "us_aqi_pm25_open_meteo", "us_aqi_pm10_open_meteo",
+    "aqi", "aqi_lag_1h", "aqi_lag_6h", "aqi_lag_12h", "aqi_lag_24h",
+    "aqi_lag_48h", "aqi_lag_72h", "aqi_rolling_mean_6h", "aqi_rolling_mean_12h",
+    "aqi_rolling_mean_24h", "aqi_rolling_std_24h", "aqi_rolling_min_24h",
+    "aqi_rolling_max_24h",
+    "pm25_lag_1h", "pm25_lag_6h", "pm25_lag_12h", "pm25_lag_24h",
+    "pm25_lag_48h", "pm25_lag_72h", "pm25_rolling_mean_6h", "pm25_rolling_mean_24h",
+    "temperature_lag_1h", "temperature_lag_6h", "temperature_lag_12h",
+    "temperature_lag_24h", "temperature_lag_48h", "temperature_lag_72h",
+    "temperature_rolling_mean_24h",
+    "humidity_lag_1h", "humidity_lag_6h", "humidity_lag_12h", "humidity_lag_24h",
+    "humidity_lag_48h", "humidity_lag_72h", "humidity_rolling_mean_24h",
+    "hour", "day_of_week", "month", "is_weekend", "season", "hour_sin", "hour_cos",
+    "target_aqi_24h", "target_aqi_48h", "target_aqi_72h",
+]
+
+# Sensor columns present in the collector's raw record (kept as audit columns
+# in the local backup, but NOT part of the Hopsworks feature-group schema).
+RAW_AUDIT_COLUMNS = ["pm25_aqi", "pm10_aqi", "data_source", "collected_at",
+                     "is_training_valid", "weather_available", "aqi_available"]
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -120,7 +150,11 @@ def collect_one_round(city_ids=None, dry_run=False):
             results["openweather_requests"] += 2  # weather + pollution archive
 
             # 5. Build the current observation record
-            now = datetime.now(timezone.utc)
+            # Use the floored hour (UTC) as the observation timestamp so live
+            # rows align with the hourly-bucket convention used by the
+            # historical ingest (e.g. 17:00), and so Hopsworks upserts on
+            # (location_id, timestamp) deduplicate retries within the same hour.
+            now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
             record = {
                 "timestamp": now,
                 "location_id": city_id,
@@ -194,6 +228,7 @@ def collect_one_round(city_ids=None, dry_run=False):
                 "training_valid": record["is_training_valid"],
             }
 
+            record["_history_df"] = hist_df
             all_records.append(record)
             logger.info(
                 f"  {city_name}: AQI={record.get('aqi')}, "
@@ -208,7 +243,12 @@ def collect_one_round(city_ids=None, dry_run=False):
 
     # 8. Persist to feature store (Hopsworks PRIMARY, Local FALLBACK)
     if all_records and not dry_run:
-        df = pd.DataFrame(all_records)
+        # Each collector record carries its city's recent history (fetched above)
+        # so we can engineer the full feature group schema (lags, rolling, time).
+        fg_rows = []
+        for rec in all_records:
+            fg_rows.append(_build_engineered_row(rec))
+        df = pd.concat(fg_rows, ignore_index=True) if fg_rows else pd.DataFrame(columns=FG_SCHEMA_COLUMNS)
 
         # Ensure timestamp is datetime for Hopsworks
         if "timestamp" in df.columns:
@@ -244,26 +284,38 @@ def collect_one_round(city_ids=None, dry_run=False):
         except Exception as e:
             logger.warning(f"Hopsworks persistence failed: {e}")
 
-        # Always save locally as backup
+        # Always save locally as backup (full raw + engineered audit columns)
         FEATURES_DIR.mkdir(parents=True, exist_ok=True)
         features_file = FEATURES_DIR / "hourly_observations.parquet"
 
+        # Drop the internal _history_df (DataFrame) before persistence —
+        # it cannot be serialized to parquet and is only needed for
+        # feature engineering at collect time.
+        backup_records = [
+            {k: v for k, v in r.items() if k != "_history_df"} for r in all_records
+        ]
+        raw_backup = pd.DataFrame(backup_records)
+        if "timestamp" in raw_backup.columns:
+            raw_backup["timestamp"] = pd.to_datetime(raw_backup["timestamp"], utc=True)
+
         if features_file.exists():
             existing_df = pd.read_parquet(features_file)
-            df = pd.concat([existing_df, df], ignore_index=True)
-            df = df.drop_duplicates(subset=["timestamp", "location_id"], keep="last")
-            df = df.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
+            raw_backup = pd.concat([existing_df, raw_backup], ignore_index=True)
+            raw_backup = raw_backup.drop_duplicates(
+                subset=["timestamp", "location_id"], keep="last"
+            )
+            raw_backup = raw_backup.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
 
-        df.to_parquet(features_file, index=False)
+        raw_backup.to_parquet(features_file, index=False)
         results["local_persisted"] = True
-        logger.info(f"✅ Persisted {len(df)} records to local Parquet (backup)")
+        logger.info(f"✅ Persisted {len(raw_backup)} records to local Parquet (backup)")
 
         # Save metadata
         meta = {
             "last_collection": datetime.now(timezone.utc).isoformat(),
-            "total_records": len(df),
-            "cities": list(df["location_id"].unique()),
-            "training_valid": int(df["is_training_valid"].sum()),
+            "total_records": len(raw_backup),
+            "cities": list(raw_backup["location_id"].unique()),
+            "training_valid": int(raw_backup["is_training_valid"].sum()),
         }
         meta_file = FEATURES_DIR / "collection_metadata.json"
         with open(meta_file, "w") as f:
@@ -299,6 +351,149 @@ def _update_health_log(results):
         json.dump(log_entries, f, indent=2, default=str)
 
     logger.info(f"Health log updated: {len(log_entries)} entries")
+
+
+def _build_engineered_row(record: dict) -> pd.DataFrame:
+    """Build ONE row matching the Hopsworks aqi_features_prod v1 schema.
+
+    Uses the record's recent pollution/weather history (attached as
+    ``_history_df``) to compute the exact feature set the feature group
+    expects: EPA AQI sub-indices, time features, lag features (1/6/12/24/48/72h)
+    and rolling features, matching ``ingest_to_hopsworks.py``.
+
+    Args:
+        record: Collector record containing current observation + history.
+
+    Returns:
+        Single-row DataFrame aligned to FG_SCHEMA_COLUMNS.
+    """
+    from src.features.feature_engineering import (
+        add_lag_features,
+        add_rolling_features,
+        add_time_features,
+    )
+    from src.utils.epa_aqi import calculate_pm10_aqi, calculate_pm25_aqi
+
+    hist = record.get("_history_df")
+    if hist is None or hist.empty:
+        # Insufficient history — row cannot have lag/rolling features.
+        # Return an empty DataFrame so the caller can emit an honest warning.
+        return pd.DataFrame(columns=FG_SCHEMA_COLUMNS)
+
+    df = hist.copy()
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    df = df.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
+
+    # Ensure the current observation is present as the latest row
+    now = pd.Timestamp(record["timestamp"]).tz_localize("UTC") if pd.Timestamp(record["timestamp"]).tzinfo is None else pd.Timestamp(record["timestamp"])
+    cur = {
+        "timestamp": now,
+        "location_id": record["location_id"],
+        "city_name": record["city_name"],
+        "temperature": record.get("temperature"),
+        "humidity": record.get("humidity"),
+        "pressure": record.get("pressure"),
+        "wind_speed": record.get("wind_speed"),
+        "wind_direction": record.get("wind_direction"),
+        "cloud_cover": record.get("cloud_cover"),
+        "precipitation": record.get("precipitation"),
+        "pm25": record.get("pm25"),
+        "pm10": record.get("pm10"),
+        "co": record.get("co"),
+        "no2": record.get("no2"),
+        "so2": record.get("so2"),
+        "o3": record.get("o3"),
+        "us_aqi_open_meteo": record.get("us_aqi"),
+        "us_aqi_pm25_open_meteo": record.get("us_aqi_pm25"),
+        "us_aqi_pm10_open_meteo": record.get("us_aqi_pm10"),
+    }
+    if df["timestamp"].max() >= now:
+        # History already contains the current hour; just use it as-is
+        pass
+    else:
+        df = pd.concat([df, pd.DataFrame([cur])], ignore_index=True)
+
+    df = df.sort_values(["location_id", "timestamp"]).reset_index(drop=True)
+    # No future observations may be used for the CURRENT row: keep only t <= now
+    df = df[df["timestamp"] <= now].reset_index(drop=True)
+
+    # 1) EPA AQI sub-indices + dominant AQI (matches ingest_to_hopsworks.py)
+    df["pm25_aqi"] = df["pm25"].apply(lambda x: calculate_pm25_aqi(x) if pd.notna(x) else None)
+    df["pm10_aqi"] = df["pm10"].apply(lambda x: calculate_pm10_aqi(x) if pd.notna(x) else None)
+    df["aqi"] = df[["pm25_aqi", "pm10_aqi"]].max(axis=1)
+
+    # 2) Time features (hour, day_of_week, month, season, cyclical)
+    df = add_time_features(df)
+
+    # 3) Lag features — shift within each location (available at t)
+    df = add_lag_features(df)
+
+    # 4) Rolling features — time-based, closed='left' (no leakage)
+    df = add_rolling_features(df)
+
+    # 5) AQI-specific lags (matches ingest pipeline)
+    for lag in [1, 6, 12, 24, 48, 72]:
+        df[f"aqi_lag_{lag}h"] = df.groupby("location_id")["aqi"].shift(lag)
+
+    # 6) PM lag features (matches ingest pipeline)
+    for lag in [1, 24]:
+        df[f"pm25_lag_{lag}h"] = df.groupby("location_id")["pm25"].shift(lag)
+
+    # Take the current observation row (latest)
+    row = df.iloc[[-1]].copy()
+
+    # Stamp the row with the CURRENT observation values explicitly. The
+    # Open-Meteo history already contains the current hour, so the current
+    # observation may not have been appended above; these assignments make
+    # the persisted row represent exactly the current collection round.
+    row["timestamp"] = now
+    row["location_id"] = record["location_id"]
+    row["city_name"] = record["city_name"]
+    raw_cols = [
+        "temperature", "humidity", "pressure", "wind_speed", "wind_direction",
+        "cloud_cover", "precipitation", "pm25", "pm10", "co", "no2", "so2", "o3",
+    ]
+    for col in raw_cols:
+        row[col] = record.get(col)
+    row["us_aqi_open_meteo"] = record.get("us_aqi")
+    row["us_aqi_pm25_open_meteo"] = record.get("us_aqi_pm25")
+    row["us_aqi_pm10_open_meteo"] = record.get("us_aqi_pm10")
+
+    # Targets are unknown at collection time (future observations do not
+    # exist yet). They are backfilled deterministically by the training
+    # pipeline once future hours accumulate in the feature group.
+    for col in ["target_aqi_24h", "target_aqi_48h", "target_aqi_72h"]:
+        row[col] = None
+
+    # Align to the feature-group schema: add any missing columns as empty,
+    # then reorder to exactly FG_SCHEMA_COLUMNS.
+    for col in FG_SCHEMA_COLUMNS:
+        if col not in row.columns:
+            row[col] = None
+    row = row[FG_SCHEMA_COLUMNS]
+
+    # Type-cast each numeric column to the EXACT type Hopsworks expects for
+    # aqi_features_prod v1 (verified against the live feature-group schema):
+    #   double  -> float64 (weather, pollutants, AQI, lags, rolling, targets)
+    #   bigint  -> int64   (humidity, wind_direction, cloud_cover, season)
+    #   int     -> int32   (hour, day_of_week, month, is_weekend)
+    # pandas infers int64 for value ranges with no NaN, which Hopsworks
+    # rejects as 'bigint vs double' / 'double vs bigint' mismatches.
+    BIGINT_COLS = {"humidity", "wind_direction", "cloud_cover", "season"}
+    INT_COLS = {"hour", "day_of_week", "month", "is_weekend"}
+    numeric_cols = [
+        c for c in FG_SCHEMA_COLUMNS if c not in ("timestamp", "location_id", "city_name")
+    ]
+    for col in numeric_cols:
+        arr = pd.to_numeric(row[col], errors="coerce")
+        if col in INT_COLS:
+            row[col] = arr.astype("int32") if not arr.isna().any() else arr
+        elif col in BIGINT_COLS:
+            row[col] = arr.astype("int64") if not arr.isna().any() else arr
+        else:
+            row[col] = arr.astype("float64")
+
+    return row
 
 
 def main():

@@ -67,6 +67,8 @@ def load_training_data_from_hopsworks():
     if not host or not api_key:
         raise RuntimeError(
             "HOPSWORKS_HOST and HOPSWORKS_API_KEY must be set. "
+            "Locally these come from .env; in GitHub Actions add them as "
+            "repository secrets (Settings -> Secrets and variables -> Actions). "
             "Run ingest_to_hopsworks.py first to populate the feature store."
         )
 
@@ -89,6 +91,28 @@ def load_training_data_from_hopsworks():
             "Hopsworks returned empty data. "
             "Run ingest_to_hopsworks.py first to populate the feature store."
         )
+
+    # Backfill targets from the AQI series.
+    #
+    # The hourly collector inserts rows with NULL targets because future
+    # observations don't exist yet at insert time. Once those future hours
+    # accumulate in the feature group, targets become well-defined and are
+    # recomputed here deterministically (target at t = AQI at t+horizon,
+    # per city), identical to the definition used by ingest_to_hopsworks.py.
+    # No leakage: targets are the supervised labels, features never use
+    # future data.
+    if "aqi" in df.columns:
+        for horizon, col in [
+            (24, "target_aqi_24h"),
+            (48, "target_aqi_48h"),
+            (72, "target_aqi_72h"),
+        ]:
+            if col in df.columns and "location_id" in df.columns:
+                before = int(df[col].notna().sum())
+                df[col] = df.groupby("location_id")["aqi"].shift(-horizon)
+                after = int(df[col].notna().sum())
+                if after > before:
+                    logger.info(f"Backfilled {col}: {before} -> {after} valid rows")
 
     logger.info(f"✅ Loaded {len(df)} rows from Hopsworks Feature Store")
     logger.info(f"   Columns: {len(df.columns)}")

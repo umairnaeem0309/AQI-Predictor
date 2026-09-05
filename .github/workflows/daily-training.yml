@@ -47,10 +47,10 @@ jobs:
         id: train
         run: |
           ARGS=""
-          if [ "${{ github.event.inputs.force_register }}" = "true" ]; then
+          if [ "${{ github.event.inputs.force_register || 'false' }}" = "true" ]; then
             ARGS="--force-register"
           fi
-          ARGS="$ARGS --min-improvement ${{ github.event.inputs.min_improvement }}"
+          ARGS="$ARGS --min-improvement ${{ github.event.inputs.min_improvement || '0.01' }}"
           python scripts/train_model.py $ARGS
         env:
           HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
