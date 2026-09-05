@@ -92,19 +92,13 @@ def render_dashboard(api_client: APIClient):
 
     # Hero band
     badge_html = render_aqi_badge(aqi_24h, get_aqi_category_short(aqi_24h), size="md")
-    city_flag = _CITY_FLAGS.get(selected_city, "")
     model_ver = prediction.get("model_version", "v1")
 
+    st.title(f"{selected_city} — Air Quality Forecast")
     st.markdown(
-        f"""
-        <div class="page-hero">
-          <div class="page-hero-title">{city_flag} {selected_city} — Air Quality Forecast</div>
-          <div class="page-hero-sub" style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-            Current 24h AQI: {badge_html}
-            <span style="opacity:0.7;">Model {model_ver}</span>
-          </div>
-        </div>
-        """,
+        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;font-size:1.1rem;">'
+        f'Current 24h AQI: {badge_html} <span style="color:#64748B;font-size:0.9rem;">Model {model_ver}</span>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 

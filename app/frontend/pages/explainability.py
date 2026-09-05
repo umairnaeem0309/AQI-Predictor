@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.frontend.components.charts import apply_chart_theme
-from app.frontend.components.metrics import render_error_state, render_info_card
+from app.frontend.components.metrics import render_error_state, render_property
 from app.frontend.utils.api_client import APIClient, APIClientError
 from app.frontend.utils.aqi_theme import (
     CHART_COLORS,
@@ -29,18 +29,8 @@ def render_explainability(api_client: APIClient):
     """Render explainability page."""
     st.markdown(get_dashboard_css(), unsafe_allow_html=True)
 
-    # Page hero
-    st.markdown(
-        """
-        <div class="page-hero">
-          <div class="page-hero-title">Model Explainability</div>
-          <div class="page-hero-sub">
-            Feature importance, SHAP analysis, per-prediction explanations, and model benchmarks.
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title("Model Explainability")
+    st.caption("Feature importance, SHAP analysis, per-prediction explanations, and model benchmarks.")
 
     # Tab layout — NO st.status() inside tabs to avoid double-click rerun bug
     tab1, tab2, tab3, tab4 = st.tabs(
@@ -54,43 +44,20 @@ def render_explainability(api_client: APIClient):
                 feature_data = api_client.get_feature_importance(top_n=20)
                 model_summary = api_client.get_model_summary()
 
-            # Model overview
             st.subheader("Model Overview")
 
             with st.container(border=True):
                 ov1, ov2, ov3, ov4 = st.columns(4)
                 metrics = model_summary.get("metrics", {})
 
-                # Use st.markdown for Model Type to avoid truncation in st.metric
                 with ov1:
-                    model_type_val = model_summary.get("model_type", "XGBoost")
-                    st.markdown(
-                        f"""
-                        <div style="padding:2px 0;">
-                          <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;
-                               letter-spacing:0.8px;color:#94A3B8;">Model Type</div>
-                          <div style="font-size:1.1rem;font-weight:700;color:#1A1A2E;margin-top:4px;">
-                            {model_type_val}
-                          </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                    render_property("Model Type", model_summary.get("model_type", "XGBoost"))
                 with ov2:
-                    render_info_card(
-                        "MAE", f"{metrics.get('mae', 0):.2f}",
-                        help_text="Mean Absolute Error on the test set",
-                    )
+                    render_property("MAE", f"{metrics.get('mae', 0):.2f}")
                 with ov3:
-                    render_info_card(
-                        "R²", f"{metrics.get('r2', 0):.4f}",
-                        help_text="Coefficient of determination",
-                    )
+                    render_property("R²", f"{metrics.get('r2', 0):.4f}")
                 with ov4:
-                    render_info_card(
-                        "Features", str(feature_data.get("total_features", 0)),
-                        help_text="Number of input features",
-                    )
+                    render_property("Features", str(feature_data.get("total_features", 0)))
 
             # Model parameters
             params = model_summary.get("parameters", {})
@@ -198,16 +165,17 @@ def render_explainability(api_client: APIClient):
                 with st.container(border=True):
                     td1, td2, td3, td4 = st.columns(4)
                     with td1:
-                        render_info_card("Data Provider", training.get("provider", "N/A"))
+                        render_property("Data Provider", training.get("provider", "N/A"))
                     with td2:
-                        render_info_card("Date Range", training.get("date_range", "N/A"))
+                        render_property("Date Range", training.get("date_range", "N/A"))
                     with td3:
-                        render_info_card("Cities", ", ".join(training.get("cities", [])))
+                        render_property("Cities", ", ".join(training.get("cities", [])))
                     with td4:
-                        render_info_card("Total Hours", f"{training.get('total_hours', 0):,}")
+                        render_property("Total Hours", f"{training.get('total_hours', 0):,}")
 
             st.markdown(
-                f'<div class="info-strip">AQI Method: <b>{model_summary.get("aqi_method", "US EPA PM NowCast AQI")}</b>'
+                f'<div style="padding: 12px; background: #F8FAFC; border-radius: 6px; font-size: 0.85rem; color: #64748B;">'
+                f'AQI Method: <b>{model_summary.get("aqi_method", "US EPA PM NowCast AQI")}</b>'
                 f'&nbsp;·&nbsp;Source: <b>{model_summary.get("data_source", "Open-Meteo")}</b></div>',
                 unsafe_allow_html=True,
             )

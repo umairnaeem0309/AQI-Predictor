@@ -4,20 +4,18 @@ import json
 from datetime import datetime
 from pathlib import Path
 import streamlit as st
+import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-from app.frontend.components.charts import apply_chart_theme
 from app.frontend.components.metrics import (
     render_error_state,
-    render_info_card,
-    render_status_card,
+    render_property,
     render_warning_state,
 )
 from app.frontend.utils.api_client import APIClient, APIClientError
 from app.frontend.utils.aqi_theme import (
     AQI_COLORS,
-    get_aqi_category,
     get_aqi_color,
     get_dashboard_css,
 )
@@ -28,40 +26,31 @@ def render_system(api_client: APIClient):
     """Render system status page."""
     st.markdown(get_dashboard_css(), unsafe_allow_html=True)
 
+    st.title("System Status")
+
     # Determine overall system health
     try:
-        _probe_health = api_client.get_health()
-        _overall_ok = _probe_health.get("status", "unknown") == "healthy"
-        _model_ok   = _probe_health.get("model_loaded", False)
-        _fs_ok      = _probe_health.get("feature_store_connected", False)
-        if _overall_ok and _model_ok:
-            _hero_status = ("All Systems Operational", "#00C853", "#E8F5E9")
-        elif _overall_ok:
-            _hero_status = ("Partially Degraded", "#FF9800", "#FFF3E0")
+        health = api_client.get_health()
+        overall_ok = health.get("status", "unknown") == "healthy"
+        model_ok   = health.get("model_loaded", False)
+        fs_ok      = health.get("feature_store_connected", False)
+        if overall_ok and model_ok:
+            hero_label = "All Systems Operational"
+        elif overall_ok:
+            hero_label = "Partially Degraded"
         else:
-            _hero_status = ("Service Incident", "#D50000", "#FFEBEE")
+            hero_label = "Service Incident"
     except Exception:
-        _hero_status = ("API Unreachable", "#D50000", "#FFEBEE")
+        health = {}
+        hero_label = "API Unreachable"
+        overall_ok = model_ok = fs_ok = False
 
-    # Page hero
-    hero_label, hero_color, hero_bg = _hero_status
-    st.markdown(
-        f"""
-        <div class="page-hero">
-          <div class="page-hero-title">System Status</div>
-          <div class="page-hero-sub" style="display:flex;align-items:center;gap:12px;margin-top:10px;">
-            <span style="background:{hero_bg};color:{hero_color};border:1.5px solid {hero_color};
-                  border-radius:20px;padding:4px 14px;font-size:0.82rem;font-weight:700;">
-              {hero_label}
-            </span>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.caption(f"Current Status: **{hero_label}**")
 
     if st.button("Refresh Status", key="refresh_system"):
         st.rerun()
+
+    st.markdown("---")
 
     # Tabs — NO st.status inside to prevent double-click reset bug
     tab1, tab2, tab3 = st.tabs(["Service Health", "Monitoring", "Alerts"])
@@ -69,40 +58,27 @@ def render_system(api_client: APIClient):
     # ── Tab 1: Service Health ─────────────────────────────────────────────────
     with tab1:
         st.subheader("Service Health")
-
-        health = {}
-        try:
-            health = api_client.get_health()
-
-            with st.container(border=True):
-                h1, h2, h3 = st.columns(3)
-
-                with h1:
-                    status = health.get("status", "unknown")
-                    render_status_card(
-                        label="Service Status",
-                        value=status.title(),
-                        status="ok" if status == "healthy" else "error",
-                    )
-
-                with h2:
-                    model_loaded = health.get("model_loaded", False)
-                    render_status_card(
-                        label="Model Status",
-                        value="Loaded" if model_loaded else "Not Loaded",
-                        status="ok" if model_loaded else "warning",
-                    )
-
-                with h3:
-                    fs_connected = health.get("feature_store_connected", False)
-                    render_status_card(
-                        label="Feature Store",
-                        value="Connected" if fs_connected else "Disconnected",
-                        status="ok" if fs_connected else "warning",
-                    )
-
-        except APIClientError as e:
-            render_error_state("Cannot fetch health status — is the API running?", str(e))
+        
+        with st.container(border=True):
+            h1, h2, h3 = st.columns(3)
+            with h1:
+                render_property(
+                    "API Service", 
+                    "Healthy" if overall_ok else "Unreachable",
+                    value_color="#00C853" if overall_ok else "#D50000"
+                )
+            with h2:
+                render_property(
+                    "Model Inference", 
+                    "Loaded" if model_ok else "Not Loaded",
+                    value_color="#00C853" if model_ok else "#FF9800"
+                )
+            with h3:
+                render_property(
+                    "Feature Store", 
+                    "Connected" if fs_ok else "Disconnected",
+                    value_color="#00C853" if fs_ok else "#FF9800"
+                )
 
         st.subheader("Model Information")
 
@@ -111,100 +87,60 @@ def render_system(api_client: APIClient):
 
             with st.container(border=True):
                 mi1, mi2, mi3 = st.columns(3)
-
                 with mi1:
-                    render_info_card("Model Name", model_info.get("model_name", "N/A"))
-                    render_info_card("Model Version", model_info.get("model_version", "N/A"))
-
+                    render_property("Model Name", model_info.get("model_name", "N/A"))
+                    render_property("Model Version", model_info.get("model_version", "N/A"))
                 with mi2:
-                    render_info_card("Status", model_info.get("status", "N/A").title())
-                    render_info_card("Approval Status", model_info.get("approval_status", "N/A").title())
-
+                    render_property("Status", model_info.get("status", "N/A").title())
+                    render_property("Approval Status", model_info.get("approval_status", "N/A").title())
                 with mi3:
-                    render_info_card("Dataset Type", model_info.get("dataset_type", "N/A"))
-                    render_info_card("Data Provider", model_info.get("data_provider", "N/A"))
-
-            training_date = model_info.get("training_date", "N/A")
-            st.markdown(
-                f'<div class="info-strip">Training Date: <b>{training_date}</b></div>',
-                unsafe_allow_html=True,
-            )
+                    render_property("Dataset Type", model_info.get("dataset_type", "N/A"))
+                    render_property("Data Provider", model_info.get("data_provider", "N/A"))
+                
+                st.markdown(
+                    f'<div style="margin-top: 10px; font-size: 0.85rem; color: #64748B;">'
+                    f'Training Date: <b>{model_info.get("training_date", "N/A")}</b></div>',
+                    unsafe_allow_html=True,
+                )
 
             metrics = model_info.get("metrics", {})
             if metrics:
-                st.subheader("Model Metrics")
-                with st.container(border=True):
-                    mm1, mm2, mm3 = st.columns(3)
-                    with mm1:
-                        mae = metrics.get("mae")
-                        render_info_card("MAE", f"{mae:.2f}" if mae else "N/A")
-                    with mm2:
-                        rmse = metrics.get("rmse")
-                        render_info_card("RMSE", f"{rmse:.2f}" if rmse else "N/A")
-                    with mm3:
-                        r2 = metrics.get("r2")
-                        render_info_card("R²", f"{r2:.4f}" if r2 else "N/A")
-
-            feature_cols = model_info.get("feature_columns", [])
-            target_cols  = model_info.get("target_columns", [])
-            if feature_cols or target_cols:
-                st.subheader("Dataset Schema")
-                with st.container(border=True):
-                    sc1, sc2 = st.columns(2)
-                    with sc1:
-                        st.metric("Input Features", len(feature_cols))
-                    with sc2:
-                        st.metric("Target Variables", len(target_cols))
+                st.markdown("**Model Metrics**")
+                m1, m2, m3 = st.columns(3)
+                with m1: st.metric("MAE", f"{metrics.get('mae', 0):.2f}")
+                with m2: st.metric("RMSE", f"{metrics.get('rmse', 0):.2f}")
+                with m3: st.metric("R²", f"{metrics.get('r2', 0):.4f}")
 
         except APIClientError as e:
             render_error_state("Cannot fetch model information", str(e))
 
-        st.subheader("Pipeline Status")
+        st.subheader("Pipeline Artifacts")
 
         model_path    = Path("models/production/best_model.pkl")
         metadata_path = Path("models/production/model_metadata.json")
 
         with st.container(border=True):
-            pp1, pp2, pp3 = st.columns(3)
-
+            pp1, pp2 = st.columns(2)
             with pp1:
                 model_exists = model_path.exists()
-                render_status_card(
-                    label="Model Artifact",
-                    value="Available" if model_exists else "Missing",
-                    status="ok" if model_exists else "error",
-                )
-
+                render_property("Model Artifact (.pkl)", "Available" if model_exists else "Missing", 
+                                value_color="#00C853" if model_exists else "#D50000")
             with pp2:
                 metadata_exists = metadata_path.exists()
-                render_status_card(
-                    label="Metadata",
-                    value="Available" if metadata_exists else "Missing",
-                    status="ok" if metadata_exists else "error",
-                )
-
-            with pp3:
-                fs_ok = health.get("feature_store_connected", False) if health else False
-                render_status_card(
-                    label="Feature Store",
-                    value="Connected" if fs_ok else "Not Connected",
-                    status="ok" if fs_ok else "warning",
-                )
+                render_property("Metadata (.json)", "Available" if metadata_exists else "Missing",
+                                value_color="#00C853" if metadata_exists else "#D50000")
 
         try:
             if metadata_path.exists():
                 with open(metadata_path) as _f:
                     _meta = json.load(_f)
 
-                st.subheader("Dataset Statistics")
-                st.caption(f"Source: `{_meta.get('data_source', 'hopsworks_feature_store')}`")
-
-                with st.container(border=True):
-                    ds1, ds2, ds3, ds4 = st.columns(4)
-                    with ds1: st.metric("Train Rows", f"{_meta.get('train_rows', 0):,}")
-                    with ds2: st.metric("Val Rows", f"{_meta.get('val_rows', 0):,}")
-                    with ds3: st.metric("Test Rows", f"{_meta.get('test_rows', 0):,}")
-                    with ds4: st.metric("Features", _meta.get("n_features", 0))
+                st.markdown("**Dataset Statistics**")
+                ds1, ds2, ds3, ds4 = st.columns(4)
+                with ds1: st.metric("Train Rows", f"{_meta.get('train_rows', 0):,}")
+                with ds2: st.metric("Val Rows", f"{_meta.get('val_rows', 0):,}")
+                with ds3: st.metric("Test Rows", f"{_meta.get('test_rows', 0):,}")
+                with ds4: st.metric("Features", _meta.get("n_features", 0))
         except Exception:
             pass
 
@@ -216,24 +152,14 @@ def render_system(api_client: APIClient):
         with st.container(border=True):
             fr1, fr2 = st.columns(2)
             with fr1:
-                st.markdown(
-                    f'<div class="health-card-label">Last Prediction</div>'
-                    f'<div class="health-card-value" style="font-size:1.1rem;color:#1A1A2E;margin-top:4px;">'
-                    f'{pred_ago}</div>',
-                    unsafe_allow_html=True,
-                )
+                render_property("Last Prediction Request", pred_ago)
             with fr2:
                 if model_path.exists():
                     try:
                         mtime = datetime.fromtimestamp(model_path.stat().st_mtime)
-                        st.markdown(
-                            f'<div class="health-card-label">Model Last Modified</div>'
-                            f'<div class="health-card-value" style="font-size:1.1rem;color:#1A1A2E;margin-top:4px;">'
-                            f'{mtime.strftime("%Y-%m-%d %H:%M:%S")}</div>',
-                            unsafe_allow_html=True,
-                        )
+                        render_property("Model Last Modified", mtime.strftime("%Y-%m-%d %H:%M:%S"))
                     except Exception:
-                        pass
+                        render_property("Model Last Modified", "Unknown")
 
     # ── Tab 2: Monitoring ─────────────────────────────────────────────────────
     with tab2:
@@ -253,7 +179,7 @@ def render_system(api_client: APIClient):
                     drift.get(
                         "message",
                         "Training data not available for drift detection. "
-                        "This is expected in deployed environments.",
+                        "This is expected in deployed environments."
                     )
                 )
             else:
@@ -263,28 +189,17 @@ def render_system(api_client: APIClient):
                 total_feats    = drift.get("total_features", 0)
 
                 if drift_detected:
-                    st.markdown(
-                        f"""
-                        <div class="alert-card alert-warning">
-                          <div class="alert-card-body" style="padding-left:14px;">
-                            <div class="alert-card-city">Data Drift Detected</div>
-                            <div class="alert-card-aqi">{drifted_count} of {total_feats} features drifted ({drift_pct:.1f}%)</div>
-                            <div class="alert-card-rec">Consider retraining the model with updated data.</div>
-                          </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                    st.warning(f"Data Drift Detected: {drifted_count} of {total_feats} features drifted ({drift_pct:.1f}%). Consider retraining.")
                 else:
-                    st.success("No data drift detected — feature distributions are stable.")
+                    st.success("No data drift detected. Feature distributions are stable.")
 
                 with st.container(border=True):
                     dc1, dc2, dc3 = st.columns(3)
                     with dc1:
-                        render_status_card(
-                            "Drift Status",
+                        render_property(
+                            "Drift Status", 
                             "Detected" if drift_detected else "Stable",
-                            "warning" if drift_detected else "ok",
+                            value_color="#FF9800" if drift_detected else "#00C853"
                         )
                     with dc2:
                         st.metric("Drifted Features", f"{drifted_count}/{total_feats}")
@@ -293,12 +208,9 @@ def render_system(api_client: APIClient):
 
                 drifted_cols = drift.get("drifted_columns", [])
                 if drifted_cols:
-                    st.subheader("Drifted Columns")
-                    pills_html = "".join(
-                        f'<span class="drift-pill">{col_info.get("column", "unknown")}</span>'
-                        for col_info in drifted_cols
-                    )
-                    st.markdown(pills_html, unsafe_allow_html=True)
+                    st.markdown("**Drifted Columns**")
+                    cols_list = [col_info.get("column", "unknown") for col_info in drifted_cols]
+                    st.write(", ".join(cols_list))
 
         except APIClientError as e:
             render_error_state("Cannot run drift detection", str(e))
@@ -314,13 +226,8 @@ def render_system(api_client: APIClient):
             if metrics:
                 overall = metrics.get("overall", {})
                 if overall:
+                    st.markdown("**Overall Training Metrics**")
                     with st.container(border=True):
-                        st.markdown(
-                            '<div style="font-size:0.78rem;font-weight:700;color:#64748B;'
-                            'text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">'
-                            'Overall Training Metrics</div>',
-                            unsafe_allow_html=True,
-                        )
                         pm1, pm2, pm3 = st.columns(3)
                         with pm1: st.metric("MAE", f"{overall.get('mae', 0):.2f}")
                         with pm2: st.metric("RMSE", f"{overall.get('rmse', 0):.2f}")
@@ -338,8 +245,7 @@ def render_system(api_client: APIClient):
                         })
 
                 if horizon_rows:
-                    import pandas as pd
-                    st.subheader("Per-Horizon Metrics")
+                    st.markdown("**Per-Horizon Metrics**")
                     st.dataframe(
                         pd.DataFrame(horizon_rows),
                         hide_index=True,
@@ -368,45 +274,26 @@ def render_system(api_client: APIClient):
             if total_alerts == 0:
                 st.success("No active AQI alerts. Air quality is within safe levels across all cities.")
             else:
-                st.markdown(
-                    f'<div class="status-pill status-pill-error" style="margin-bottom:14px;">'
-                    f'{total_alerts} Active Alert{"s" if total_alerts != 1 else ""}</div>',
-                    unsafe_allow_html=True,
-                )
+                st.error(f"{total_alerts} Active Alert{'s' if total_alerts != 1 else ''} found.")
 
                 for alert in alerts:
                     city         = alert.get("city", "Unknown")
                     aqi          = alert.get("aqi", 0)
                     category     = alert.get("category", "Unknown")
-                    level        = alert.get("alert_level", "none")
                     recommendation = alert.get("recommendation", "")
                     aqi_color    = get_aqi_color(aqi)
-
-                    if level == "critical":
-                        card_cls = "alert-critical"
-                    elif level == "warning":
-                        card_cls = "alert-warning"
-                    else:
-                        card_cls = "alert-caution"
-
-                    badge_html = (
-                        f'<span style="background:{aqi_color}22;color:{aqi_color};'
-                        f'border:1.5px solid {aqi_color};border-radius:20px;padding:2px 10px;'
-                        f'font-size:0.75rem;font-weight:700;">AQI {aqi}</span>'
-                    )
-
-                    st.markdown(
-                        f"""
-                        <div class="alert-card {card_cls}">
-                          <div class="alert-card-body" style="padding-left:14px;">
-                            <div class="alert-card-city">{city}</div>
-                            <div class="alert-card-aqi">{badge_html} &nbsp; {category}</div>
-                            {'<div class="alert-card-rec">' + recommendation + '</div>' if recommendation else ''}
-                          </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                    
+                    with st.container(border=True):
+                        st.markdown(f"### {city}")
+                        st.markdown(
+                            f'<span style="background:{aqi_color}22;color:{aqi_color};'
+                            f'border:1.5px solid {aqi_color};border-radius:20px;padding:2px 10px;'
+                            f'font-size:0.75rem;font-weight:700;">AQI {aqi}</span> '
+                            f'**{category}**',
+                            unsafe_allow_html=True
+                        )
+                        if recommendation:
+                            st.caption(recommendation)
 
         except APIClientError as e:
             render_error_state("Cannot check AQI alerts", str(e))

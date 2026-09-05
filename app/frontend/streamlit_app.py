@@ -33,8 +33,7 @@ def init_session_state():
         st.session_state.prediction_data = None
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = None
-    if "active_page" not in st.session_state:
-        st.session_state.active_page = "Dashboard"
+    # Removed active_page to fix the Streamlit radio double-click bug
 
 
 def _render_sidebar_nav(api_client: APIClient) -> str:
@@ -55,36 +54,14 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
         unsafe_allow_html=True,
     )
 
-    # API / Mock status
-    if api_client.mock_mode:
-        st.sidebar.markdown(
-            '<div class="status-pill status-pill-warn">Mock Mode — Simulated Data</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        if api_client.is_available():
-            st.sidebar.markdown(
-                '<div class="status-pill status-pill-ok">API Connected</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.sidebar.markdown(
-                '<div class="status-pill status-pill-error">API Unavailable</div>',
-                unsafe_allow_html=True,
-            )
-
     st.sidebar.markdown("<div style='margin:10px 0 4px;'></div>", unsafe_allow_html=True)
 
-    # Navigation
+    # Navigation - simplified to let Streamlit manage its own state
     page = st.sidebar.radio(
         "Navigation",
         ["Dashboard", "Analytics", "Explainability", "System"],
-        index=["Dashboard", "Analytics", "Explainability", "System"].index(
-            st.session_state.active_page
-        ),
         label_visibility="collapsed",
     )
-    st.session_state.active_page = page
 
     # City quick-status strip
     pred = st.session_state.get("prediction_data")
