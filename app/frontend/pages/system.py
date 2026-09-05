@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 System Status Page
 
 Model status, pipeline status, data freshness, monitoring, and alerts.
-All data from backend - no hardcoded values.
+All data comes from the backend — no hardcoded values.
 """
 
 import json
@@ -15,6 +15,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from app.frontend.components.charts import apply_chart_theme
 from app.frontend.components.metrics import (
     render_error_state,
     render_info_card,
@@ -22,7 +23,12 @@ from app.frontend.components.metrics import (
     render_warning_state,
 )
 from app.frontend.utils.api_client import APIClient, APIClientError
-from app.frontend.utils.aqi_theme import get_dashboard_css
+from app.frontend.utils.aqi_theme import (
+    AQI_COLORS,
+    get_aqi_category,
+    get_aqi_color,
+    get_dashboard_css,
+)
 from app.frontend.utils.formatters import format_time_ago, format_timestamp
 
 
@@ -35,343 +41,506 @@ def render_system(api_client: APIClient):
     """
     st.markdown(get_dashboard_css(), unsafe_allow_html=True)
 
-    st.header("⚙️ System Status")
+    # ── Determine overall system health for hero ───────────────────────────────
+    try:
+        _probe_health = api_client.get_health()
+        _overall_ok = _probe_health.get("status", "unknown") == "healthy"
+        _model_ok   = _probe_health.get("model_loaded", False)
+        _fs_ok      = _probe_health.get("feature_store_connected", False)
+        if _overall_ok and _model_ok:
+            _hero_status = ("✅ All Systems Operational", "#00C853", "#E8F5E9")
+        elif _overall_ok:
+            _hero_status = ("⚠️ Partially Degraded", "#FF9800", "#FFF3E0")
+        else:
+            _hero_status = ("❌ Service Incident", "#D50000", "#FFEBEE")
+    except Exception:
+        _hero_status = ("🔌 API Unreachable", "#D50000", "#FFEBEE")
+
+    # ── Page Hero ──────────────────────────────────────────────────────────────
+    hero_label, hero_color, hero_bg = _hero_status
+    st.markdown(
+        f"""
+        <div class="page-hero" style="background:linear-gradient(135deg,#1A1A2E 0%,#16213E 100%);">
+          <div class="page-hero-title">⚙️ System Status</div>
+          <div class="page-hero-sub" style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+            <span style="background:{hero_bg};color:{hero_color};border:1.5px solid {hero_color};
+                  border-radius:20px;padding:4px 14px;font-size:0.82rem;font-weight:700;">
+              {hero_label}
+            </span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # Refresh button
     if st.button("🔄 Refresh Status", key="refresh_system"):
         st.rerun()
 
-    # ── Tabs ──
+    # ── Tabs ───────────────────────────────────────────────────────────────────
     tab1, tab2, tab3 = st.tabs(["🏥 Service Health", "🔍 Monitoring", "🚨 Alerts"])
 
-    # ── Tab 1: Service Health ──
+    # ══════════════════════════════════════════════════════════════════════════
+    # Tab 1 — Service Health
+    # ══════════════════════════════════════════════════════════════════════════
     with tab1:
-        # Health Check
-        st.subheader("Service Health")
+        st.markdown(
+            '<div class="section-header">🏥 Service Health</div>',
+            unsafe_allow_html=True,
+        )
 
         health = {}
         try:
             health = api_client.get_health()
 
-            col1, col2, col3 = st.columns(3)
+            with st.container(border=True):
+                h1, h2, h3 = st.columns(3)
 
-            with col1:
-                status = health.get("status", "unknown")
-                render_status_card(
-                    label="Service Status",
-                    value=status.title(),
-                    status="ok" if status == "healthy" else "error",
-                )
+                with h1:
+                    status = health.get("status", "unknown")
+                    render_status_card(
+                        label="Service Status",
+                        value=status.title(),
+                        status="ok" if status == "healthy" else "error",
+                        icon="🌐",
+                    )
 
-            with col2:
-                model_loaded = health.get("model_loaded", False)
-                render_status_card(
-                    label="Model Status",
-                    value="Loaded" if model_loaded else "Not Loaded",
-                    status="ok" if model_loaded else "warning",
-                )
+                with h2:
+                    model_loaded = health.get("model_loaded", False)
+                    render_status_card(
+                        label="Model Status",
+                        value="Loaded" if model_loaded else "Not Loaded",
+                        status="ok" if model_loaded else "warning",
+                        icon="🤖",
+                    )
 
-            with col3:
-                fs_connected = health.get("feature_store_connected", False)
-                render_status_card(
-                    label="Feature Store",
-                    value="Connected" if fs_connected else "Disconnected",
-                    status="ok" if fs_connected else "warning",
-                )
+                with h3:
+                    fs_connected = health.get("feature_store_connected", False)
+                    render_status_card(
+                        label="Feature Store",
+                        value="Connected" if fs_connected else "Disconnected",
+                        status="ok" if fs_connected else "warning",
+                        icon="🗄️",
+                    )
 
         except APIClientError as e:
             render_error_state("Cannot fetch health status — is the API running?", str(e))
 
-        # Model Information
-        st.subheader("Model Information")
+        # ── Model Information ──────────────────────────────────────────────────
+        st.markdown(
+            '<div class="section-header">🤖 Model Information</div>',
+            unsafe_allow_html=True,
+        )
 
         try:
             model_info = api_client.get_model_info()
 
-            col1, col2 = st.columns(2)
+            with st.container(border=True):
+                mi1, mi2, mi3 = st.columns(3)
 
-            with col1:
-                render_info_card("Model Name", model_info.get("model_name", "N/A"))
-                render_info_card("Model Version", model_info.get("model_version", "N/A"))
-                render_info_card("Status", model_info.get("status", "N/A"))
+                with mi1:
+                    render_info_card("Model Name", model_info.get("model_name", "N/A"))
+                    render_info_card("Model Version", model_info.get("model_version", "N/A"))
 
-            with col2:
-                render_info_card("Approval Status", model_info.get("approval_status", "N/A"))
-                render_info_card("Dataset Type", model_info.get("dataset_type", "N/A"))
-                render_info_card("Data Provider", model_info.get("data_provider", "N/A"))
+                with mi2:
+                    render_info_card("Status", model_info.get("status", "N/A"))
+                    render_info_card("Approval Status", model_info.get("approval_status", "N/A"))
 
-            # Training Date
+                with mi3:
+                    render_info_card("Dataset Type", model_info.get("dataset_type", "N/A"))
+                    render_info_card("Data Provider", model_info.get("data_provider", "N/A"))
+
             training_date = model_info.get("training_date", "N/A")
-            st.markdown(f"**Training Date:** {training_date}")
+            st.markdown(
+                f'<div class="info-strip">📅 Training Date: <b>{training_date}</b></div>',
+                unsafe_allow_html=True,
+            )
 
-            # Metrics
+            # Model Metrics
             metrics = model_info.get("metrics", {})
             if metrics:
-                st.subheader("Model Metrics")
-                col1, col2, col3 = st.columns(3)
+                st.markdown(
+                    '<div class="section-header">📊 Model Metrics</div>',
+                    unsafe_allow_html=True,
+                )
+                with st.container(border=True):
+                    mm1, mm2, mm3 = st.columns(3)
+                    with mm1:
+                        mae = metrics.get("mae")
+                        render_info_card("MAE", f"{mae:.2f}" if mae else "N/A", help_text="Mean Absolute Error")
+                    with mm2:
+                        rmse = metrics.get("rmse")
+                        render_info_card("RMSE", f"{rmse:.2f}" if rmse else "N/A", help_text="Root Mean Squared Error")
+                    with mm3:
+                        r2 = metrics.get("r2")
+                        render_info_card("R²", f"{r2:.4f}" if r2 else "N/A", help_text="Coefficient of Determination")
 
-                with col1:
-                    mae = metrics.get("mae")
-                    render_info_card("MAE", f"{mae:.2f}" if mae else "N/A")
-
-                with col2:
-                    rmse = metrics.get("rmse")
-                    render_info_card("RMSE", f"{rmse:.2f}" if rmse else "N/A")
-
-                with col3:
-                    r2 = metrics.get("r2")
-                    render_info_card("R²", f"{r2:.4f}" if r2 else "N/A")
-
-            # Feature info
+            # Feature / target schema
             feature_cols = model_info.get("feature_columns", [])
-            target_cols = model_info.get("target_columns", [])
+            target_cols  = model_info.get("target_columns", [])
             if feature_cols or target_cols:
-                st.subheader("Dataset Schema")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Features", len(feature_cols))
-                with col2:
-                    st.metric("Targets", len(target_cols))
+                st.markdown(
+                    '<div class="section-header">🗂️ Dataset Schema</div>',
+                    unsafe_allow_html=True,
+                )
+                with st.container(border=True):
+                    sc1, sc2 = st.columns(2)
+                    with sc1:
+                        st.metric("Input Features", len(feature_cols))
+                    with sc2:
+                        st.metric("Target Variables", len(target_cols))
 
         except APIClientError as e:
             render_error_state("Cannot fetch model information", str(e))
 
-        # Pipeline Status
-        st.subheader("Pipeline Status")
+        # ── Pipeline Status ────────────────────────────────────────────────────
+        st.markdown(
+            '<div class="section-header">🔧 Pipeline Status</div>',
+            unsafe_allow_html=True,
+        )
 
-        model_path = Path("models/production/best_model.pkl")
+        model_path    = Path("models/production/best_model.pkl")
         metadata_path = Path("models/production/model_metadata.json")
 
-        col1, col2, col3 = st.columns(3)
+        with st.container(border=True):
+            pp1, pp2, pp3 = st.columns(3)
 
-        with col1:
-            model_exists = model_path.exists()
-            render_status_card(
-                label="Model Artifact",
-                value="Available" if model_exists else "Missing",
-                status="ok" if model_exists else "error",
-            )
+            with pp1:
+                model_exists = model_path.exists()
+                render_status_card(
+                    label="Model Artifact",
+                    value="Available" if model_exists else "Missing",
+                    status="ok" if model_exists else "error",
+                    icon="📦",
+                )
 
-        with col2:
-            metadata_exists = metadata_path.exists()
-            render_status_card(
-                label="Metadata",
-                value="Available" if metadata_exists else "Missing",
-                status="ok" if metadata_exists else "error",
-            )
+            with pp2:
+                metadata_exists = metadata_path.exists()
+                render_status_card(
+                    label="Metadata",
+                    value="Available" if metadata_exists else "Missing",
+                    status="ok" if metadata_exists else "error",
+                    icon="📋",
+                )
 
-        with col3:
-            # Check Hopsworks feature store
-            fs_connected = health.get("feature_store_connected", False) if health else False
-            render_status_card(
-                label="Feature Store",
-                value="Hopsworks Connected" if fs_connected else "Not Connected",
-                status="ok" if fs_connected else "warning",
-            )
+            with pp3:
+                fs_ok = health.get("feature_store_connected", False) if health else False
+                render_status_card(
+                    label="Feature Store",
+                    value="Hopsworks Connected" if fs_ok else "Not Connected",
+                    status="ok" if fs_ok else "warning",
+                    icon="🗄️",
+                )
 
-        # Dataset stats from model metadata
+        # ── Dataset Stats from Metadata ────────────────────────────────────────
         try:
             if metadata_path.exists():
                 import json as _json
-
                 with open(metadata_path) as _f:
                     _meta = _json.load(_f)
-                st.subheader("Dataset Statistics")
-                st.caption(f"Source: {_meta.get('data_source', 'hopsworks_feature_store')}")
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Train Rows", f"{_meta.get('train_rows', 0):,}")
-                with col2:
-                    st.metric("Val Rows", f"{_meta.get('val_rows', 0):,}")
-                with col3:
-                    st.metric("Test Rows", f"{_meta.get('test_rows', 0):,}")
-                with col4:
-                    st.metric("Features", _meta.get("n_features", 0))
+
+                st.markdown(
+                    '<div class="section-header">📊 Dataset Statistics</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption(f"Source: `{_meta.get('data_source', 'hopsworks_feature_store')}`")
+
+                with st.container(border=True):
+                    ds1, ds2, ds3, ds4 = st.columns(4)
+                    with ds1:
+                        st.metric("🏋️ Train Rows", f"{_meta.get('train_rows', 0):,}")
+                    with ds2:
+                        st.metric("✅ Val Rows", f"{_meta.get('val_rows', 0):,}")
+                    with ds3:
+                        st.metric("🧪 Test Rows", f"{_meta.get('test_rows', 0):,}")
+                    with ds4:
+                        st.metric("⚙️ Features", _meta.get("n_features", 0))
         except Exception:
             pass
 
-        # Data Freshness
-        st.subheader("Data Freshness")
+        # ── Data Freshness ─────────────────────────────────────────────────────
+        st.markdown(
+            '<div class="section-header">🕐 Data Freshness</div>',
+            unsafe_allow_html=True,
+        )
 
         last_pred = health.get("last_prediction") if health else None
-        if last_pred:
-            st.markdown(f"**Last Prediction:** {format_time_ago(last_pred)}")
-        else:
-            st.markdown("**Last Prediction:** No predictions yet")
+        pred_ago  = format_time_ago(last_pred) if last_pred else "No predictions yet"
 
-        if model_exists:
-            try:
-                mtime = datetime.fromtimestamp(model_path.stat().st_mtime)
-                st.markdown(f"**Model Last Modified:** {mtime.strftime('%Y-%m-%d %H:%M:%S')}")
-            except Exception:
-                pass
+        with st.container(border=True):
+            fr1, fr2 = st.columns(2)
+            with fr1:
+                st.markdown(
+                    f'<div class="health-card-label">Last Prediction</div>'
+                    f'<div class="health-card-value" style="font-size:1.1rem;color:#1A1A2E;margin-top:4px;">'
+                    f'🕐 {pred_ago}</div>',
+                    unsafe_allow_html=True,
+                )
+            with fr2:
+                if model_path.exists():
+                    try:
+                        mtime = datetime.fromtimestamp(model_path.stat().st_mtime)
+                        st.markdown(
+                            f'<div class="health-card-label">Model Last Modified</div>'
+                            f'<div class="health-card-value" style="font-size:1.1rem;color:#1A1A2E;margin-top:4px;">'
+                            f'📦 {mtime.strftime("%Y-%m-%d %H:%M:%S")}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    except Exception:
+                        pass
 
-    # ── Tab 2: Monitoring ──
+    # ══════════════════════════════════════════════════════════════════════════
+    # Tab 2 — Monitoring
+    # ══════════════════════════════════════════════════════════════════════════
     with tab2:
-        st.subheader("🔍 Data Drift Monitoring")
+        st.markdown(
+            '<div class="section-header">🔍 Data Drift Monitoring</div>',
+            unsafe_allow_html=True,
+        )
 
         try:
-            with st.spinner("Running drift detection..."):
+            with st.status("⏳ Running drift detection…", expanded=False) as sw:
                 drift = api_client.get_drift_report()
+                sw.update(label="✅ Drift detection complete", state="complete", expanded=False)
 
-            # Handle unavailable data gracefully
-            if (
+            unavailable = (
                 drift.get("status") == "unavailable"
-                or not drift.get("features")
-                and drift.get("total_features", 0) == 0
-            ):
+                or (not drift.get("features") and drift.get("total_features", 0) == 0)
+            )
+
+            if unavailable:
                 st.info(
-                    f"ℹ️ {drift.get('message', 'Training data not available for drift detection. This is expected in deployed environments.')}"
+                    drift.get(
+                        "message",
+                        "Training data not available for drift detection. "
+                        "This is expected in deployed environments.",
+                    ),
+                    icon="ℹ️",
                 )
             else:
                 drift_detected = drift.get("drift_detected", False)
-                drifted_count = drift.get("drifted_count", 0)
-                drift_pct = drift.get("drift_percentage", 0)
-                total = drift.get("total_features", 0)
+                drifted_count  = drift.get("drifted_count", 0)
+                drift_pct      = drift.get("drift_percentage", 0)
+                total_feats    = drift.get("total_features", 0)
 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    render_status_card(
-                        "Drift Status",
-                        "Detected" if drift_detected else "No Drift",
-                        "warning" if drift_detected else "ok",
-                    )
-                with col2:
-                    st.metric("Drifted Features", f"{drifted_count}/{total}")
-                with col3:
-                    st.metric("Drift %", f"{drift_pct:.1f}%")
-
+                # Drift summary banner
                 if drift_detected:
-                    st.warning(
-                        f"⚠️ Data drift detected in {drifted_count} features ({drift_pct:.1f}%)"
+                    st.markdown(
+                        f"""
+                        <div class="alert-card alert-warning">
+                          <div class="alert-card-icon">⚠️</div>
+                          <div class="alert-card-body">
+                            <div class="alert-card-city">Data Drift Detected</div>
+                            <div class="alert-card-aqi">{drifted_count} of {total_feats} features drifted ({drift_pct:.1f}%)</div>
+                            <div class="alert-card-rec">Consider retraining the model with updated data.</div>
+                          </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
                     )
-                    drifted_cols = drift.get("drifted_columns", [])
-                    if drifted_cols:
-                        st.markdown("**Drifted columns:**")
-                        for col_info in drifted_cols:
-                            st.markdown(f"- `{col_info.get('column', 'unknown')}`")
                 else:
-                    st.success("✅ No data drift detected. Feature distributions are stable.")
+                    st.success(
+                        "✅ **No data drift detected** — feature distributions are stable.",
+                        icon="✅",
+                    )
+
+                with st.container(border=True):
+                    dc1, dc2, dc3 = st.columns(3)
+                    with dc1:
+                        render_status_card(
+                            "Drift Status",
+                            "Detected" if drift_detected else "Stable",
+                            "warning" if drift_detected else "ok",
+                            icon="📡",
+                        )
+                    with dc2:
+                        st.metric("Drifted Features", f"{drifted_count}/{total_feats}")
+                    with dc3:
+                        st.metric("Drift %", f"{drift_pct:.1f}%")
+
+                # Drifted column pills
+                drifted_cols = drift.get("drifted_columns", [])
+                if drifted_cols:
+                    st.markdown(
+                        '<div class="section-header">📋 Drifted Columns</div>',
+                        unsafe_allow_html=True,
+                    )
+                    pills_html = "".join(
+                        f'<span class="drift-pill">{col_info.get("column", "unknown")}</span>'
+                        for col_info in drifted_cols
+                    )
+                    st.markdown(pills_html, unsafe_allow_html=True)
 
         except APIClientError as e:
             render_error_state("Cannot run drift detection", str(e))
 
         st.divider()
 
-        # Performance Metrics
-        st.subheader("📊 Model Performance")
+        # ── Performance Metrics ────────────────────────────────────────────────
+        st.markdown(
+            '<div class="section-header">📊 Model Performance</div>',
+            unsafe_allow_html=True,
+        )
 
         try:
             perf = api_client.get_performance()
             metrics = perf.get("training_metrics", {})
 
             if metrics:
-                # Overall
                 overall = metrics.get("overall", {})
                 if overall:
-                    st.markdown("**Overall Training Metrics:**")
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("MAE", f"{overall.get('mae', 0):.2f}")
-                    with col2:
-                        st.metric("RMSE", f"{overall.get('rmse', 0):.2f}")
-                    with col3:
-                        st.metric("R²", f"{overall.get('r2', 0):.4f}")
+                    with st.container(border=True):
+                        st.markdown(
+                            '<div style="font-size:0.78rem;font-weight:700;color:#64748B;'
+                            'text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">'
+                            'Overall Training Metrics</div>',
+                            unsafe_allow_html=True,
+                        )
+                        pm1, pm2, pm3 = st.columns(3)
+                        with pm1:
+                            st.metric("MAE", f"{overall.get('mae', 0):.2f}")
+                        with pm2:
+                            st.metric("RMSE", f"{overall.get('rmse', 0):.2f}")
+                        with pm3:
+                            st.metric("R²", f"{overall.get('r2', 0):.4f}")
 
-                # Per-horizon
+                # Per-horizon table
+                horizon_rows = []
                 for h in ["24h", "48h", "72h"]:
                     if h in metrics:
                         m = metrics[h]
-                        st.markdown(
-                            f"**{h} Horizon:** MAE={m.get('mae', 0):.2f} | RMSE={m.get('rmse', 0):.2f} | R²={m.get('r2', 0):.4f}"
+                        horizon_rows.append(
+                            {
+                                "Horizon": h,
+                                "MAE": round(m.get("mae", 0), 2),
+                                "RMSE": round(m.get("rmse", 0), 2),
+                                "R²": round(m.get("r2", 0), 4),
+                            }
                         )
+
+                if horizon_rows:
+                    import pandas as pd
+
+                    st.markdown(
+                        '<div class="section-header">⏱️ Per-Horizon Metrics</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.dataframe(
+                        pd.DataFrame(horizon_rows),
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "R²": st.column_config.ProgressColumn(
+                                "R² ↑", min_value=0, max_value=1,
+                                help="Coefficient of determination",
+                            )
+                        },
+                    )
             else:
-                st.info("No training metrics available.")
+                st.info("No training metrics available.", icon="ℹ️")
 
         except APIClientError as e:
             render_error_state("Cannot fetch performance metrics", str(e))
 
-    # ── Tab 3: Alerts ──
+    # ══════════════════════════════════════════════════════════════════════════
+    # Tab 3 — Alerts
+    # ══════════════════════════════════════════════════════════════════════════
     with tab3:
-        st.subheader("🚨 AQI Hazard Alerts")
+        st.markdown(
+            '<div class="section-header">🚨 Active AQI Hazard Alerts</div>',
+            unsafe_allow_html=True,
+        )
 
         try:
-            with st.spinner("Checking current AQI levels..."):
+            with st.status("⏳ Checking current AQI levels…", expanded=False) as sw:
                 alerts_data = api_client.get_alerts()
+                sw.update(label="✅ Alerts checked", state="complete", expanded=False)
 
-            alerts = alerts_data.get("alerts", [])
+            alerts       = alerts_data.get("alerts", [])
             total_alerts = alerts_data.get("total_alerts", 0)
 
             if total_alerts == 0:
-                st.success("✅ No active AQI alerts. Air quality is within safe levels.")
+                st.success(
+                    "✅ **No active AQI alerts.** Air quality is within safe levels across all cities.",
+                    icon="✅",
+                )
             else:
-                st.warning(f"⚠️ {total_alerts} active alert(s)")
+                st.markdown(
+                    f'<div class="status-pill status-pill-error" style="margin-bottom:14px;">'
+                    f'🚨 {total_alerts} Active Alert{"s" if total_alerts != 1 else ""}</div>',
+                    unsafe_allow_html=True,
+                )
 
                 for alert in alerts:
-                    city = alert.get("city", "Unknown")
-                    aqi = alert.get("aqi", 0)
-                    category = alert.get("category", "Unknown")
-                    level = alert.get("alert_level", "none")
+                    city         = alert.get("city", "Unknown")
+                    aqi          = alert.get("aqi", 0)
+                    category     = alert.get("category", "Unknown")
+                    level        = alert.get("alert_level", "none")
                     recommendation = alert.get("recommendation", "")
+                    aqi_color    = get_aqi_color(aqi)
 
-                    # Color based on alert level
                     if level == "critical":
-                        st.error(f"🔴 **{city}** — AQI {aqi} ({category})")
+                        card_cls, icon = "alert-critical", "🔴"
                     elif level == "warning":
-                        st.warning(f"🟠 **{city}** — AQI {aqi} ({category})")
-                    elif level == "caution":
-                        st.info(f"🟡 **{city}** — AQI {aqi} ({category})")
+                        card_cls, icon = "alert-warning", "🟠"
+                    else:
+                        card_cls, icon = "alert-caution", "🟡"
 
-                    if recommendation:
-                        st.caption(f"📋 {recommendation}")
+                    badge_html = (
+                        f'<span style="background:{aqi_color}22;color:{aqi_color};'
+                        f'border:1.5px solid {aqi_color};border-radius:20px;padding:2px 10px;'
+                        f'font-size:0.75rem;font-weight:700;">AQI {aqi}</span>'
+                    )
+
+                    st.markdown(
+                        f"""
+                        <div class="alert-card {card_cls}">
+                          <div class="alert-card-icon">{icon}</div>
+                          <div class="alert-card-body">
+                            <div class="alert-card-city">{city}</div>
+                            <div class="alert-card-aqi">{badge_html} &nbsp; {category}</div>
+                            {'<div class="alert-card-rec">📋 ' + recommendation + '</div>' if recommendation else ''}
+                          </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
         except APIClientError as e:
             render_error_state("Cannot check AQI alerts", str(e))
 
-        # AQI Categories Reference
+        # ── AQI Reference Table ────────────────────────────────────────────────
         st.divider()
-        st.subheader("📖 AQI Reference")
-
-        import pandas as pd
-
-        categories = pd.DataFrame(
-            [
-                {
-                    "AQI Range": "0-50",
-                    "Category": "Good",
-                    "Color": "🟢",
-                    "Health": "Satisfactory",
-                },
-                {
-                    "AQI Range": "51-100",
-                    "Category": "Moderate",
-                    "Color": "🟡",
-                    "Health": "Acceptable",
-                },
-                {
-                    "AQI Range": "101-150",
-                    "Category": "USG",
-                    "Color": "🟠",
-                    "Health": "Sensitive groups affected",
-                },
-                {
-                    "AQI Range": "151-200",
-                    "Category": "Unhealthy",
-                    "Color": "🔴",
-                    "Health": "Everyone affected",
-                },
-                {
-                    "AQI Range": "201-300",
-                    "Category": "Very Unhealthy",
-                    "Color": "🟣",
-                    "Health": "Health alert",
-                },
-                {
-                    "AQI Range": "301-500",
-                    "Category": "Hazardous",
-                    "Color": "⚫",
-                    "Health": "Emergency",
-                },
-            ]
+        st.markdown(
+            '<div class="section-header">📖 AQI Reference Guide</div>',
+            unsafe_allow_html=True,
         )
-        st.dataframe(categories, hide_index=True, use_container_width=True)
+
+        aqi_ref_rows = [
+            ("0–50",   "Good",                    AQI_COLORS["good"],                  "#E8F5E9", "Satisfactory. Air quality poses little or no risk."),
+            ("51–100", "Moderate",                AQI_COLORS["moderate"],              "#FFFDE7", "Acceptable. Sensitive individuals may experience minor effects."),
+            ("101–150","Unhealthy for Sensitive", AQI_COLORS["unhealthy_sensitive"],   "#FFF3E0", "Members of sensitive groups may experience health effects."),
+            ("151–200","Unhealthy",               AQI_COLORS["unhealthy"],             "#FFEBEE", "Everyone may begin to experience health effects."),
+            ("201–300","Very Unhealthy",          AQI_COLORS["very_unhealthy"],        "#F3E5F5", "Health alert: everyone may experience serious effects."),
+            ("301–500","Hazardous",               AQI_COLORS["hazardous"],             "#FCE4EC", "Emergency conditions. The entire population is likely to be affected."),
+        ]
+
+        for aqi_range, cat_name, color, bg, health_note in aqi_ref_rows:
+            st.markdown(
+                f"""
+                <div style="display:flex;align-items:center;gap:14px;padding:10px 14px;
+                     background:{bg};border-left:4px solid {color};border-radius:0 8px 8px 0;
+                     margin-bottom:6px;">
+                  <div style="min-width:70px;font-size:0.88rem;font-weight:700;color:{color};">
+                    {aqi_range}
+                  </div>
+                  <div style="min-width:180px;font-size:0.85rem;font-weight:700;color:#1A1A2E;">
+                    {cat_name}
+                  </div>
+                  <div style="font-size:0.78rem;color:#64748B;flex:1;">
+                    {health_note}
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )

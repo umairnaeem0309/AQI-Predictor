@@ -1,5 +1,5 @@
 """
-AQI Predictor Dashboard
+AirPulse — AQI Forecaster
 
 Main Streamlit application for AQI prediction visualization.
 """
@@ -17,6 +17,13 @@ from app.frontend.pages.dashboard import render_dashboard
 from app.frontend.pages.explainability import render_explainability
 from app.frontend.pages.system import render_system
 from app.frontend.utils.api_client import APIClient
+from app.frontend.utils.aqi_theme import (
+    AQI_COLORS,
+    CITY_COLORS,
+    get_aqi_category_short,
+    get_aqi_color,
+    get_dashboard_css,
+)
 
 
 def init_session_state():
@@ -27,13 +34,122 @@ def init_session_state():
         st.session_state.prediction_data = None
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = None
+    if "active_page" not in st.session_state:
+        st.session_state.active_page = "Dashboard"
+
+
+def _render_sidebar_nav(api_client: APIClient) -> str:
+    """
+    Render the branded sidebar and return the selected page name.
+
+    Returns:
+        Selected page string
+    """
+    st.sidebar.markdown(get_dashboard_css(), unsafe_allow_html=True)
+
+    # ── Brand Header ──────────────────────────────────────────────────────────
+    st.sidebar.markdown(
+        """
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-icon">🌬️</div>
+          <div class="sidebar-brand-text">
+            <span class="sidebar-brand-name">AirPulse</span>
+            <span class="sidebar-brand-sub">Pakistan AQI Intelligence</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── API / Mock Status Pill ────────────────────────────────────────────────
+    if api_client.mock_mode:
+        st.sidebar.markdown(
+            '<div class="status-pill status-pill-warn">⚠️ Mock Mode — Simulated Data</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        if api_client.is_available():
+            st.sidebar.markdown(
+                '<div class="status-pill status-pill-ok">✅ API Connected</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.sidebar.markdown(
+                '<div class="status-pill status-pill-error">❌ API Unavailable</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.sidebar.markdown("<div style='margin:10px 0 4px;'></div>", unsafe_allow_html=True)
+
+    # ── Navigation ────────────────────────────────────────────────────────────
+    page = st.sidebar.radio(
+        "Navigation",
+        ["Dashboard", "Analytics", "Explainability", "System"],
+        index=["Dashboard", "Analytics", "Explainability", "System"].index(
+            st.session_state.active_page
+        ),
+        label_visibility="collapsed",
+    )
+    st.session_state.active_page = page
+
+    # ── City Quick-Status Strip ───────────────────────────────────────────────
+    pred = st.session_state.get("prediction_data")
+    if pred:
+        # Build a small AQI dot for each city using prediction of selected city
+        # (full multi-city live data would need extra API calls; we show selected city only)
+        selected = st.session_state.get("selected_city", "Karachi")
+        aqi_now = pred.get("aqi_24h", 0)
+        color_now = get_aqi_color(aqi_now)
+        cat_now = get_aqi_category_short(aqi_now)
+
+        city_rows = ""
+        for city in ["Karachi", "Lahore", "Islamabad"]:
+            city_color = CITY_COLORS.get(city, "#1E88E5")
+            if city == selected:
+                dot_color = color_now
+                cat_label = f"<b>AQI {aqi_now}</b> · {cat_now}"
+            else:
+                dot_color = "#CBD5E1"
+                cat_label = "<span style='color:#94A3B8;'>select to load</span>"
+
+            city_rows += (
+                f'<div class="city-strip-item">'
+                f'<span><span class="city-dot" style="background:{dot_color};"></span>{city}</span>'
+                f'<span style="font-size:0.72rem;">{cat_label}</span>'
+                f'</div>'
+            )
+
+        st.sidebar.markdown(
+            f'<div class="city-strip">{city_rows}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # Placeholder strip with city brand dots
+        city_rows = "".join(
+            f'<div class="city-strip-item">'
+            f'<span><span class="city-dot" style="background:{CITY_COLORS[c]};opacity:0.4;"></span>{c}</span>'
+            f'<span style="font-size:0.7rem;color:#94A3B8;">—</span>'
+            f'</div>'
+            for c in ["Karachi", "Lahore", "Islamabad"]
+        )
+        st.sidebar.markdown(
+            f'<div class="city-strip">{city_rows}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    st.sidebar.markdown("---")
+    st.sidebar.caption("**AirPulse** v1.0.0")
+    st.sidebar.caption("📐 US EPA AQI Standards")
+
+    return page
 
 
 def main():
     """Main application entry point."""
     # Page configuration
     st.set_page_config(
-        page_title="AQI Predictor",
+        page_title="AirPulse — AQI Forecaster",
         page_icon="🌬️",
         layout="wide",
         initial_sidebar_state="expanded",
@@ -46,25 +162,7 @@ def main():
     api_client = APIClient.from_env()
 
     # Sidebar navigation
-    st.sidebar.title("🌬️ AQI Predictor")
-
-    page = st.sidebar.radio(
-        "Navigation",
-        ["Dashboard", "Analytics", "Explainability", "System"],
-        index=0,
-    )
-
-    # Mock mode indicator
-    if api_client.mock_mode:
-        st.sidebar.warning("⚠️ Mock Mode Active")
-        st.sidebar.caption("Using simulated data for development")
-
-    # API connection status
-    if not api_client.mock_mode:
-        if api_client.is_available():
-            st.sidebar.success("✅ API Connected")
-        else:
-            st.sidebar.error("❌ API Unavailable")
+    page = _render_sidebar_nav(api_client)
 
     # Render selected page
     if page == "Dashboard":
@@ -75,11 +173,6 @@ def main():
         render_explainability(api_client)
     elif page == "System":
         render_system(api_client)
-
-    # Footer
-    st.sidebar.markdown("---")
-    st.sidebar.caption("AQI Predictor v1.0.0")
-    st.sidebar.caption("US EPA AQI Standards")
 
 
 if __name__ == "__main__":
