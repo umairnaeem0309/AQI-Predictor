@@ -20,8 +20,8 @@ from app.frontend.utils.aqi_theme import (
     get_plotly_template,
 )
 
-
 # ── Theme Application Utility ─────────────────────────────────────────────────
+
 
 def apply_chart_theme(
     fig: go.Figure,
@@ -65,6 +65,7 @@ def apply_chart_theme(
 
 # ── AQI Zone Band Helper ──────────────────────────────────────────────────────
 
+
 def _add_aqi_zone_bands(fig: go.Figure, annotate_right: bool = True) -> None:
     """Add EPA AQI color zone bands as background rectangles to a figure."""
     bands = [
@@ -96,6 +97,7 @@ def _add_aqi_zone_bands(fig: go.Figure, annotate_right: bool = True) -> None:
 
 
 # ── Public Chart Factories ────────────────────────────────────────────────────
+
 
 def create_forecast_chart(
     timestamps: List[str],
@@ -196,9 +198,7 @@ def create_multi_city_chart(
 
     _add_aqi_zone_bands(fig, annotate_right=False)
     apply_chart_theme(fig, height=400, title=title, xaxis_title="Time", yaxis_title="AQI")
-    fig.update_layout(
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
+    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     return fig
 
 
@@ -220,9 +220,7 @@ def create_pollutant_bar_chart(
     values = list(pollutants.values())
     # Gradient color by value magnitude
     max_v = max(values, default=1)
-    bar_colors = [
-        f"rgba(30,136,229,{0.4 + 0.6 * (v / max_v)})" for v in values
-    ]
+    bar_colors = [f"rgba(30,136,229,{0.4 + 0.6 * (v / max_v)})" for v in values]
 
     fig = go.Figure()
     fig.add_trace(

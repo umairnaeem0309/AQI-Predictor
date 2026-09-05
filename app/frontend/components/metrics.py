@@ -20,7 +20,6 @@ from app.frontend.utils.aqi_theme import (
 )
 from app.frontend.utils.formatters import format_aqi, format_time_ago
 
-
 # CSS class helpers
 _STRIPE_CLASS = {
     "good": "kpi-stripe-good",
@@ -40,7 +39,11 @@ _BADGE_CLASS = {
     "hazardous": "badge-hazardous",
 }
 
-_DOT_CLASS = {"ok": "dot-ok animated", "warning": "dot-warning animated", "error": "dot-error animated"}
+_DOT_CLASS = {
+    "ok": "dot-ok animated",
+    "warning": "dot-warning animated",
+    "error": "dot-error animated",
+}
 
 
 def _get_category_key(aqi_value: int) -> str:
@@ -87,8 +90,7 @@ def render_aqi_card(
         sign = "+" if delta > 0 else ""
         d_color = "#D50000" if delta > 0 else "#00C853"
         delta_html = (
-            f'<div class="kpi-delta" style="color:{d_color};">'
-            f'{sign}{delta} vs prev</div>'
+            f'<div class="kpi-delta" style="color:{d_color};">' f"{sign}{delta} vs prev</div>"
         )
 
     ci_html = ""
@@ -202,10 +204,7 @@ def render_unavailable_state(feature: str):
     Args:
         feature: Name of unavailable feature
     """
-    st.info(
-        f"**{feature}** is currently unavailable — "
-        "additional backend support is required."
-    )
+    st.info(f"**{feature}** is currently unavailable — " "additional backend support is required.")
 
 
 def render_aqi_badge_html(aqi_value: int, category: str, size: str = "md") -> str:
@@ -227,7 +226,7 @@ def render_aqi_badge_html(aqi_value: int, category: str, size: str = "md") -> st
     style = size_styles.get(size, size_styles["md"])
     return (
         f'<span style="background:{bg};color:{color};border:1.5px solid {color};'
-        f'border-radius:20px;{style}font-weight:700;display:inline-block;'
+        f"border-radius:20px;{style}font-weight:700;display:inline-block;"
         f'white-space:nowrap;line-height:1.5;">'
-        f'<b>{aqi_value}</b> · {category}</span>'
+        f"<b>{aqi_value}</b> · {category}</span>"
     )

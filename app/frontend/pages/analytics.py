@@ -46,7 +46,9 @@ def render_analytics(api_client: APIClient):
 
         with col1:
             selected_city = st.selectbox(
-                "City", VALID_CITIES, key="analytics_city",
+                "City",
+                VALID_CITIES,
+                key="analytics_city",
                 help="Select a city to analyze",
             )
         with col2:
@@ -109,19 +111,23 @@ def render_analytics(api_client: APIClient):
 
                 fig.add_trace(
                     go.Scatter(
-                        x=df["timestamp"], y=df["aqi"],
+                        x=df["timestamp"],
+                        y=df["aqi"],
                         fill="tozeroy",
                         fillcolor="rgba(30,136,229,0.08)",
                         line=dict(color="rgba(30,136,229,0)", width=0),
-                        showlegend=False, hoverinfo="skip",
+                        showlegend=False,
+                        hoverinfo="skip",
                     )
                 )
 
                 city_color = get_city_color(selected_city)
                 fig.add_trace(
                     go.Scatter(
-                        x=df["timestamp"], y=df["aqi"],
-                        mode="lines", name=f"{selected_city} AQI",
+                        x=df["timestamp"],
+                        y=df["aqi"],
+                        mode="lines",
+                        name=f"{selected_city} AQI",
                         line=dict(color=city_color, width=2),
                         hovertemplate="<b>%{x|%b %d, %Y %H:%M}</b><br>AQI: <b>%{y}</b><extra></extra>",
                     )
@@ -137,9 +143,11 @@ def render_analytics(api_client: APIClient):
                     fig.add_hrect(y0=y0, y1=y1, fillcolor=color, opacity=0.07, line_width=0)
 
                 apply_chart_theme(
-                    fig, height=420,
+                    fig,
+                    height=420,
                     title=f"AQI Trend — {selected_city}",
-                    xaxis_title="Date", yaxis_title="AQI",
+                    xaxis_title="Date",
+                    yaxis_title="AQI",
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -176,8 +184,10 @@ def render_analytics(api_client: APIClient):
                                     pfig = go.Figure()
                                     pfig.add_trace(
                                         go.Scatter(
-                                            x=df["timestamp"], y=df[col_name],
-                                            mode="lines", name=col_name.upper(),
+                                            x=df["timestamp"],
+                                            y=df[col_name],
+                                            mode="lines",
+                                            name=col_name.upper(),
                                             line=dict(color=_pollutant_color(col_name), width=2),
                                             fill="tozeroy",
                                             fillcolor=f"rgba({_hex_to_rgb(_pollutant_color(col_name))},0.1)",
@@ -188,9 +198,11 @@ def render_analytics(api_client: APIClient):
                                         )
                                     )
                                     apply_chart_theme(
-                                        pfig, height=300,
+                                        pfig,
+                                        height=300,
                                         title=col_name.upper(),
-                                        xaxis_title="Date", yaxis_title="Concentration",
+                                        xaxis_title="Date",
+                                        yaxis_title="Concentration",
                                     )
                                     st.plotly_chart(pfig, use_container_width=True)
         else:
@@ -207,16 +219,23 @@ def render_analytics(api_client: APIClient):
                 w_col1, w_col2 = st.columns([1, 3])
                 with w_col1:
                     selected_weather = st.selectbox(
-                        "Compare AQI with", available_weather,
+                        "Compare AQI with",
+                        available_weather,
                         key="weather_compare",
                         format_func=lambda x: x.replace("_", " ").title(),
                     )
                 with w_col2:
                     scatter_fig = px.scatter(
-                        df, x=selected_weather, y="aqi",
-                        opacity=0.45, trendline="ols",
+                        df,
+                        x=selected_weather,
+                        y="aqi",
+                        opacity=0.45,
+                        trendline="ols",
                         color_discrete_sequence=[get_city_color(selected_city)],
-                        labels={"aqi": "AQI", selected_weather: selected_weather.replace("_", " ").title()},
+                        labels={
+                            "aqi": "AQI",
+                            selected_weather: selected_weather.replace("_", " ").title(),
+                        },
                     )
                     for trace in scatter_fig.data:
                         if hasattr(trace, "line"):
@@ -224,7 +243,8 @@ def render_analytics(api_client: APIClient):
                             trace.line.width = 2
 
                     apply_chart_theme(
-                        scatter_fig, height=360,
+                        scatter_fig,
+                        height=360,
                         title=f"AQI vs {selected_weather.replace('_', ' ').title()} — {selected_city}",
                         xaxis_title=selected_weather.replace("_", " ").title(),
                         yaxis_title="AQI",
@@ -240,12 +260,14 @@ def render_analytics(api_client: APIClient):
                 city_stats = api_client.get_statistics(city=city)
                 stats_data = city_stats.get("statistics", {})
                 if "aqi" in stats_data:
-                    compare_data.append({
-                        "City": city.title(),
-                        "Avg AQI": round(stats_data["aqi"]["mean"], 1),
-                        "Max AQI": round(stats_data["aqi"]["max"], 1),
-                        "Avg PM2.5": round(stats_data.get("pm25", {}).get("mean", 0), 1),
-                    })
+                    compare_data.append(
+                        {
+                            "City": city.title(),
+                            "Avg AQI": round(stats_data["aqi"]["mean"], 1),
+                            "Max AQI": round(stats_data["aqi"]["max"], 1),
+                            "Avg PM2.5": round(stats_data.get("pm25", {}).get("mean", 0), 1),
+                        }
+                    )
             except Exception:
                 pass
 
@@ -275,20 +297,28 @@ def render_analytics(api_client: APIClient):
             # Grouped bar chart
             with st.container(border=True):
                 bar_fig = go.Figure()
-                for metric_key, metric_label in [("Avg AQI", "Average AQI"), ("Avg PM2.5", "Average PM2.5")]:
+                for metric_key, metric_label in [
+                    ("Avg AQI", "Average AQI"),
+                    ("Avg PM2.5", "Average PM2.5"),
+                ]:
                     bar_fig.add_trace(
                         go.Bar(
-                            x=compare_df["City"], y=compare_df[metric_key],
+                            x=compare_df["City"],
+                            y=compare_df[metric_key],
                             name=metric_label,
-                            marker_color=[CITY_COLORS.get(c, "#1E88E5") for c in compare_df["City"]],
+                            marker_color=[
+                                CITY_COLORS.get(c, "#1E88E5") for c in compare_df["City"]
+                            ],
                             text=compare_df[metric_key].apply(lambda v: f"{v:.1f}"),
                             textposition="outside",
                         )
                     )
                 apply_chart_theme(
-                    bar_fig, height=380,
+                    bar_fig,
+                    height=380,
                     title="City Comparison — Average AQI & PM2.5",
-                    xaxis_title="City", yaxis_title="Value",
+                    xaxis_title="City",
+                    yaxis_title="Value",
                 )
                 bar_fig.update_layout(barmode="group")
                 st.plotly_chart(bar_fig, use_container_width=True)
@@ -298,13 +328,18 @@ def render_analytics(api_client: APIClient):
 
 
 _POLLUTANT_COLORS = {
-    "pm25": "#1E88E5", "pm10": "#039BE5",
-    "no2": "#E53935", "so2": "#FB8C00",
-    "co": "#6D4C41", "o3": "#00897B",
+    "pm25": "#1E88E5",
+    "pm10": "#039BE5",
+    "no2": "#E53935",
+    "so2": "#FB8C00",
+    "co": "#6D4C41",
+    "o3": "#00897B",
 }
+
 
 def _pollutant_color(name: str) -> str:
     return _POLLUTANT_COLORS.get(name, "#1E88E5")
+
 
 def _hex_to_rgb(hex_color: str) -> str:
     h = hex_color.lstrip("#")

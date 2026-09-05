@@ -70,6 +70,7 @@ CITY_COLORS = {
 
 # ── Helper Functions ──────────────────────────────────────────────────────────
 
+
 def get_aqi_color(aqi_value: int) -> str:
     """Get AQI hex color from value (0-500)."""
     if aqi_value <= 50:
@@ -179,13 +180,13 @@ def render_aqi_badge(aqi_value: int, category: str, size: str = "md") -> str:
 
     return (
         f'<span style="'
-        f'background:{bg};color:{color};border:1.5px solid {color};'
-        f'border-radius:20px;padding:{padding};font-size:{font_size};'
-        f'font-weight:700;letter-spacing:0.3px;display:inline-block;'
+        f"background:{bg};color:{color};border:1.5px solid {color};"
+        f"border-radius:20px;padding:{padding};font-size:{font_size};"
+        f"font-weight:700;letter-spacing:0.3px;display:inline-block;"
         f'line-height:1.4;white-space:nowrap;">'
         f'<span style="font-size:{num_size};font-weight:800;">{aqi_value}</span>'
-        f'&nbsp;·&nbsp;{category}'
-        f'</span>'
+        f"&nbsp;·&nbsp;{category}"
+        f"</span>"
     )
 
 
@@ -218,6 +219,7 @@ def get_plotly_template() -> dict:
 
 
 # ── Global CSS Design System ──────────────────────────────────────────────────
+
 
 def get_dashboard_css() -> str:
     """

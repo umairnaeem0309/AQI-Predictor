@@ -31,7 +31,9 @@ def render_explainability(api_client: APIClient):
 
     # Page hero
     st.title("Model Explainability")
-    st.caption("Feature importance, SHAP analysis, per-prediction explanations, and model benchmarks.")
+    st.caption(
+        "Feature importance, SHAP analysis, per-prediction explanations, and model benchmarks."
+    )
 
     # Tab layout — NO st.status() inside tabs to avoid double-click rerun bug
     tab1, tab2, tab3, tab4 = st.tabs(
@@ -69,17 +71,20 @@ def render_explainability(api_client: APIClient):
                     )
                 with ov2:
                     render_info_card(
-                        "MAE", f"{metrics.get('mae', 0):.2f}",
+                        "MAE",
+                        f"{metrics.get('mae', 0):.2f}",
                         help_text="Mean Absolute Error on the test set",
                     )
                 with ov3:
                     render_info_card(
-                        "R²", f"{metrics.get('r2', 0):.4f}",
+                        "R²",
+                        f"{metrics.get('r2', 0):.4f}",
                         help_text="Coefficient of determination",
                     )
                 with ov4:
                     render_info_card(
-                        "Features", str(feature_data.get("total_features", 0)),
+                        "Features",
+                        str(feature_data.get("total_features", 0)),
                         help_text="Number of input features",
                     )
 
@@ -164,13 +169,17 @@ def render_explainability(api_client: APIClient):
                             textinfo="percent+label",
                             hovertemplate="<b>%{label}</b><br>%{percent}<extra></extra>",
                         )
-                        apply_chart_theme(donut_fig, height=340, title="Feature Category Distribution")
+                        apply_chart_theme(
+                            donut_fig, height=340, title="Feature Category Distribution"
+                        )
                         donut_fig.update_layout(showlegend=False)
                         st.plotly_chart(donut_fig, use_container_width=True)
 
                     with legend_col:
                         st.markdown("<div style='padding-top:60px;'></div>", unsafe_allow_html=True)
-                        sorted_cats = sorted(cat_importance.items(), key=lambda x: x[1], reverse=True)
+                        sorted_cats = sorted(
+                            cat_importance.items(), key=lambda x: x[1], reverse=True
+                        )
                         for cat, imp in sorted_cats:
                             pct = imp / sum(cat_importance.values()) * 100
                             st.markdown(
@@ -304,33 +313,114 @@ def render_explainability(api_client: APIClient):
                 st.markdown("**Pollutant Inputs**")
                 p1, p2 = st.columns(2)
                 with p1:
-                    pm25 = st.number_input("PM2.5 (µg/m³)", value=50.0, min_value=0.0, max_value=500.0, step=1.0, key="shap_pm25")
-                    o3   = st.number_input("O₃ (µg/m³)",   value=40.0, min_value=0.0, max_value=200.0, step=1.0, key="shap_o3")
-                    so2  = st.number_input("SO₂ (µg/m³)",  value=10.0, min_value=0.0, max_value=100.0, step=1.0, key="shap_so2")
+                    pm25 = st.number_input(
+                        "PM2.5 (µg/m³)",
+                        value=50.0,
+                        min_value=0.0,
+                        max_value=500.0,
+                        step=1.0,
+                        key="shap_pm25",
+                    )
+                    o3 = st.number_input(
+                        "O₃ (µg/m³)",
+                        value=40.0,
+                        min_value=0.0,
+                        max_value=200.0,
+                        step=1.0,
+                        key="shap_o3",
+                    )
+                    so2 = st.number_input(
+                        "SO₂ (µg/m³)",
+                        value=10.0,
+                        min_value=0.0,
+                        max_value=100.0,
+                        step=1.0,
+                        key="shap_so2",
+                    )
                 with p2:
-                    pm10 = st.number_input("PM10 (µg/m³)", value=70.0, min_value=0.0, max_value=600.0, step=1.0, key="shap_pm10")
-                    no2  = st.number_input("NO₂ (µg/m³)",  value=25.0, min_value=0.0, max_value=200.0, step=1.0, key="shap_no2")
-                    co   = st.number_input("CO (µg/m³)",   value=1000.0, min_value=0.0, max_value=10000.0, step=10.0, key="shap_co")
+                    pm10 = st.number_input(
+                        "PM10 (µg/m³)",
+                        value=70.0,
+                        min_value=0.0,
+                        max_value=600.0,
+                        step=1.0,
+                        key="shap_pm10",
+                    )
+                    no2 = st.number_input(
+                        "NO₂ (µg/m³)",
+                        value=25.0,
+                        min_value=0.0,
+                        max_value=200.0,
+                        step=1.0,
+                        key="shap_no2",
+                    )
+                    co = st.number_input(
+                        "CO (µg/m³)",
+                        value=1000.0,
+                        min_value=0.0,
+                        max_value=10000.0,
+                        step=10.0,
+                        key="shap_co",
+                    )
 
                 st.markdown("**Weather Inputs**")
                 w1, w2 = st.columns(2)
                 with w1:
-                    temp     = st.number_input("Temp (°C)",    value=35.0, min_value=-10.0, max_value=55.0, step=1.0, key="shap_temp")
-                    wind     = st.number_input("Wind (km/h)",  value=10.0, min_value=0.0, max_value=100.0, step=1.0, key="shap_wind")
+                    temp = st.number_input(
+                        "Temp (°C)",
+                        value=35.0,
+                        min_value=-10.0,
+                        max_value=55.0,
+                        step=1.0,
+                        key="shap_temp",
+                    )
+                    wind = st.number_input(
+                        "Wind (km/h)",
+                        value=10.0,
+                        min_value=0.0,
+                        max_value=100.0,
+                        step=1.0,
+                        key="shap_wind",
+                    )
                 with w2:
-                    humidity = st.number_input("Humidity (%)", value=60.0, min_value=0.0, max_value=100.0, step=1.0, key="shap_humidity")
-                    pressure = st.number_input("Pressure (hPa)", value=1010.0, min_value=900.0, max_value=1100.0, step=1.0, key="shap_pressure")
+                    humidity = st.number_input(
+                        "Humidity (%)",
+                        value=60.0,
+                        min_value=0.0,
+                        max_value=100.0,
+                        step=1.0,
+                        key="shap_humidity",
+                    )
+                    pressure = st.number_input(
+                        "Pressure (hPa)",
+                        value=1010.0,
+                        min_value=900.0,
+                        max_value=1100.0,
+                        step=1.0,
+                        key="shap_pressure",
+                    )
 
-                explain_btn = st.button("Explain Prediction", type="primary", key="shap_btn", use_container_width=True)
+                explain_btn = st.button(
+                    "Explain Prediction", type="primary", key="shap_btn", use_container_width=True
+                )
 
         with result_col:
             if explain_btn:
                 features = {
-                    "pm25": pm25, "pm10": pm10, "o3": o3, "no2": no2,
-                    "so2": so2, "co": co, "temperature": temp,
-                    "humidity": humidity, "wind_speed": wind, "pressure": pressure,
-                    "pm25_aqi": pm25, "pm10_aqi": pm10,
-                    "aqi": pm25, "aqi_derived": pm25,
+                    "pm25": pm25,
+                    "pm10": pm10,
+                    "o3": o3,
+                    "no2": no2,
+                    "so2": so2,
+                    "co": co,
+                    "temperature": temp,
+                    "humidity": humidity,
+                    "wind_speed": wind,
+                    "pressure": pressure,
+                    "pm25_aqi": pm25,
+                    "pm10_aqi": pm10,
+                    "aqi": pm25,
+                    "aqi_derived": pm25,
                 }
 
                 try:
@@ -345,7 +435,7 @@ def render_explainability(api_client: APIClient):
                     st.markdown(
                         f"""
                         <div class="kpi-block" style="border-left:4px solid {aqi_color};margin-bottom:14px;">
-                          <div class="kpi-label">Predicted — {target.replace('target_','').upper()}</div>
+                          <div class="kpi-label">Predicted — {target.replace('target_', '').upper()}</div>
                           <div class="kpi-value" style="color:{aqi_color};">AQI {pred:.1f}</div>
                           <div class="kpi-delta">
                             {'+' if pred > base else ''}{pred - base:.1f} from baseline ({base:.1f})
@@ -379,7 +469,9 @@ def render_explainability(api_client: APIClient):
                             )
                         )
                         wf_fig.add_vline(
-                            x=0, line_dash="dash", line_color="#94A3B8",
+                            x=0,
+                            line_dash="dash",
+                            line_color="#94A3B8",
                             annotation_text="Baseline",
                             annotation_font_size=10,
                             annotation_font_color="#94A3B8",
@@ -408,7 +500,7 @@ def render_explainability(api_client: APIClient):
                                     f'<b>{p["feature"]}</b><br>'
                                     f'<span style="color:#D50000;font-weight:700;">+{p["shap_value"]:.2f}</span>'
                                     f'<span style="color:#94A3B8;font-size:0.75rem;"> · val={p["feature_value"]:.1f}</span>'
-                                    f'</div>',
+                                    f"</div>",
                                     unsafe_allow_html=True,
                                 )
                         with neg_col:
@@ -420,7 +512,7 @@ def render_explainability(api_client: APIClient):
                                     f'<b>{n["feature"]}</b><br>'
                                     f'<span style="color:#00897B;font-weight:700;">{n["shap_value"]:.2f}</span>'
                                     f'<span style="color:#94A3B8;font-size:0.75rem;"> · val={n["feature_value"]:.1f}</span>'
-                                    f'</div>',
+                                    f"</div>",
                                     unsafe_allow_html=True,
                                 )
                     else:
@@ -447,6 +539,7 @@ def render_explainability(api_client: APIClient):
     with tab4:
         try:
             import json as _json
+
             import pandas as _pd
 
             st.subheader("Model Comparison")
@@ -462,24 +555,24 @@ def render_explainability(api_client: APIClient):
                     meta = _json.load(f)
                 best_model = meta.get("model_name", "XGBoost")
                 train_rows = meta.get("train_rows", 0)
-                val_rows   = meta.get("val_rows", 0)
-                test_rows  = meta.get("test_rows", 0)
+                val_rows = meta.get("val_rows", 0)
+                test_rows = meta.get("test_rows", 0)
                 n_features = meta.get("n_features", 0)
-                total      = train_rows + val_rows + test_rows
+                total = train_rows + val_rows + test_rows
 
                 mc = meta.get("model_comparison", {})
                 for key, data in mc.items():
                     name = data.get("name", key)
                     models_data[name] = {
                         "test_metrics": {
-                            "mae":  data.get("test_mae", 0),
+                            "mae": data.get("test_mae", 0),
                             "rmse": data.get("test_rmse", 0),
-                            "r2":   data.get("test_r2", 0),
+                            "r2": data.get("test_r2", 0),
                         },
                         "val_metrics": {
-                            "mae":  data.get("val_mae", 0),
+                            "mae": data.get("val_mae", 0),
                             "rmse": data.get("val_rmse", 0),
-                            "r2":   data.get("val_r2", 0),
+                            "r2": data.get("val_r2", 0),
                         },
                         "train_time": data.get("train_time", 0),
                     }
@@ -489,11 +582,16 @@ def render_explainability(api_client: APIClient):
 
                 with st.container(border=True):
                     ds1, ds2, ds3, ds4, ds5 = st.columns(5)
-                    with ds1: st.metric("Train Rows", f"{train_rows:,}")
-                    with ds2: st.metric("Val Rows", f"{val_rows:,}")
-                    with ds3: st.metric("Test Rows", f"{test_rows:,}")
-                    with ds4: st.metric("Total", f"{total:,}")
-                    with ds5: st.metric("Features", n_features)
+                    with ds1:
+                        st.metric("Train Rows", f"{train_rows:,}")
+                    with ds2:
+                        st.metric("Val Rows", f"{val_rows:,}")
+                    with ds3:
+                        st.metric("Test Rows", f"{test_rows:,}")
+                    with ds4:
+                        st.metric("Total", f"{total:,}")
+                    with ds5:
+                        st.metric("Features", n_features)
 
                 st.caption(f"Source: Hopsworks Feature Store · {len(models_data)} models evaluated")
 
@@ -504,13 +602,15 @@ def render_explainability(api_client: APIClient):
                 for name, data in models_data.items():
                     test = data.get("test_metrics", {})
                     is_best = name == best_model
-                    table_data.append({
-                        "Model": f"{name} *" if is_best else name,
-                        "MAE": round(test.get("mae", 0), 2),
-                        "RMSE": round(test.get("rmse", 0), 2),
-                        "R²": round(test.get("r2", 0), 4),
-                        "Train Time (s)": round(data.get("train_time", 0), 1),
-                    })
+                    table_data.append(
+                        {
+                            "Model": f"{name} *" if is_best else name,
+                            "MAE": round(test.get("mae", 0), 2),
+                            "RMSE": round(test.get("rmse", 0), 2),
+                            "R²": round(test.get("r2", 0), 4),
+                            "Train Time (s)": round(data.get("train_time", 0), 1),
+                        }
+                    )
 
                 best_mae = models_data.get(best_model, {}).get("test_metrics", {}).get("mae", 0)
 
@@ -519,17 +619,22 @@ def render_explainability(api_client: APIClient):
                     hide_index=True,
                     use_container_width=True,
                     column_config={
-                        "MAE": st.column_config.NumberColumn("MAE", format="%.2f", help="Lower is better"),
+                        "MAE": st.column_config.NumberColumn(
+                            "MAE", format="%.2f", help="Lower is better"
+                        ),
                         "R²": st.column_config.ProgressColumn(
-                            "R²", help="Higher is better", min_value=0, max_value=1,
+                            "R²",
+                            help="Higher is better",
+                            min_value=0,
+                            max_value=1,
                         ),
                     },
                 )
 
                 # Bar charts
                 model_names = list(models_data.keys())
-                mae_values  = [models_data[m]["test_metrics"]["mae"]  for m in model_names]
-                r2_values   = [models_data[m]["test_metrics"]["r2"]   for m in model_names]
+                mae_values = [models_data[m]["test_metrics"]["mae"] for m in model_names]
+                r2_values = [models_data[m]["test_metrics"]["r2"] for m in model_names]
 
                 def _model_color(m: str) -> str:
                     return "#00C853" if m == best_model else "#1E88E5"
@@ -538,28 +643,44 @@ def render_explainability(api_client: APIClient):
 
                 with bar1_col:
                     with st.container(border=True):
-                        mae_fig = go.Figure(go.Bar(
-                            x=model_names, y=mae_values,
-                            marker_color=[_model_color(m) for m in model_names],
-                            text=[f"{v:.2f}" for v in mae_values],
-                            textposition="outside",
-                            hovertemplate="<b>%{x}</b><br>MAE: %{y:.2f}<extra></extra>",
-                        ))
-                        apply_chart_theme(mae_fig, height=320, title="MAE (Lower = Better)",
-                                          xaxis_title="Model", yaxis_title="MAE")
+                        mae_fig = go.Figure(
+                            go.Bar(
+                                x=model_names,
+                                y=mae_values,
+                                marker_color=[_model_color(m) for m in model_names],
+                                text=[f"{v:.2f}" for v in mae_values],
+                                textposition="outside",
+                                hovertemplate="<b>%{x}</b><br>MAE: %{y:.2f}<extra></extra>",
+                            )
+                        )
+                        apply_chart_theme(
+                            mae_fig,
+                            height=320,
+                            title="MAE (Lower = Better)",
+                            xaxis_title="Model",
+                            yaxis_title="MAE",
+                        )
                         st.plotly_chart(mae_fig, use_container_width=True)
 
                 with bar2_col:
                     with st.container(border=True):
-                        r2_fig = go.Figure(go.Bar(
-                            x=model_names, y=r2_values,
-                            marker_color=[_model_color(m) for m in model_names],
-                            text=[f"{v:.4f}" for v in r2_values],
-                            textposition="outside",
-                            hovertemplate="<b>%{x}</b><br>R²: %{y:.4f}<extra></extra>",
-                        ))
-                        apply_chart_theme(r2_fig, height=320, title="R² (Higher = Better)",
-                                          xaxis_title="Model", yaxis_title="R²")
+                        r2_fig = go.Figure(
+                            go.Bar(
+                                x=model_names,
+                                y=r2_values,
+                                marker_color=[_model_color(m) for m in model_names],
+                                text=[f"{v:.4f}" for v in r2_values],
+                                textposition="outside",
+                                hovertemplate="<b>%{x}</b><br>R²: %{y:.4f}<extra></extra>",
+                            )
+                        )
+                        apply_chart_theme(
+                            r2_fig,
+                            height=320,
+                            title="R² (Higher = Better)",
+                            xaxis_title="Model",
+                            yaxis_title="R²",
+                        )
                         st.plotly_chart(r2_fig, use_container_width=True)
 
                 # Per-horizon
@@ -574,12 +695,15 @@ def render_explainability(api_client: APIClient):
                         for h in horizons:
                             h_data = ph.get(h, {}).get("test", {})
                             if h_data:
-                                horizon_data.append({
-                                    "Horizon": h, "Model": name,
-                                    "MAE": h_data.get("mae", 0),
-                                    "RMSE": h_data.get("rmse", 0),
-                                    "R²": h_data.get("r2", 0),
-                                })
+                                horizon_data.append(
+                                    {
+                                        "Horizon": h,
+                                        "Model": name,
+                                        "MAE": h_data.get("mae", 0),
+                                        "RMSE": h_data.get("rmse", 0),
+                                        "R²": h_data.get("r2", 0),
+                                    }
+                                )
 
                     if horizon_data:
                         horizon_df = _pd.DataFrame(horizon_data)
@@ -591,12 +715,21 @@ def render_explainability(api_client: APIClient):
                                 for name in model_names:
                                     df_m = horizon_df[horizon_df["Model"] == name]
                                     if not df_m.empty:
-                                        h_mae_fig.add_trace(go.Bar(
-                                            name=name, x=df_m["Horizon"].tolist(),
-                                            y=df_m["MAE"].tolist(), marker_color=_model_color(name),
-                                        ))
-                                apply_chart_theme(h_mae_fig, height=340, title="MAE by Horizon",
-                                                  xaxis_title="Horizon", yaxis_title="MAE")
+                                        h_mae_fig.add_trace(
+                                            go.Bar(
+                                                name=name,
+                                                x=df_m["Horizon"].tolist(),
+                                                y=df_m["MAE"].tolist(),
+                                                marker_color=_model_color(name),
+                                            )
+                                        )
+                                apply_chart_theme(
+                                    h_mae_fig,
+                                    height=340,
+                                    title="MAE by Horizon",
+                                    xaxis_title="Horizon",
+                                    yaxis_title="MAE",
+                                )
                                 h_mae_fig.update_layout(barmode="group")
                                 st.plotly_chart(h_mae_fig, use_container_width=True)
 
@@ -606,12 +739,21 @@ def render_explainability(api_client: APIClient):
                                 for name in model_names:
                                     df_m = horizon_df[horizon_df["Model"] == name]
                                     if not df_m.empty:
-                                        h_r2_fig.add_trace(go.Bar(
-                                            name=name, x=df_m["Horizon"].tolist(),
-                                            y=df_m["R²"].tolist(), marker_color=_model_color(name),
-                                        ))
-                                apply_chart_theme(h_r2_fig, height=340, title="R² by Horizon",
-                                                  xaxis_title="Horizon", yaxis_title="R²")
+                                        h_r2_fig.add_trace(
+                                            go.Bar(
+                                                name=name,
+                                                x=df_m["Horizon"].tolist(),
+                                                y=df_m["R²"].tolist(),
+                                                marker_color=_model_color(name),
+                                            )
+                                        )
+                                apply_chart_theme(
+                                    h_r2_fig,
+                                    height=340,
+                                    title="R² by Horizon",
+                                    xaxis_title="Horizon",
+                                    yaxis_title="R²",
+                                )
                                 h_r2_fig.update_layout(barmode="group")
                                 st.plotly_chart(h_r2_fig, use_container_width=True)
 
