@@ -70,8 +70,8 @@ jobs:
       - name: Commit model update
         if: success() && github.event_name == 'schedule'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "Umair Naeem"
+          git config user.email "umairnaeem0309@gmail.com"
           git add models/production/best_model.pkl
           git add models/production/model_metadata.json
           git add models/metadata/best_metrics.json
