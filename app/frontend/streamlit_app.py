@@ -33,8 +33,6 @@ def init_session_state():
         st.session_state.prediction_data = None
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = None
-    if "active_page" not in st.session_state:
-        st.session_state.active_page = "Dashboard"
 
 
 def _render_sidebar_nav(api_client: APIClient) -> str:
@@ -55,36 +53,12 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
         unsafe_allow_html=True,
     )
 
-    # API / Mock status
-    if api_client.mock_mode:
-        st.sidebar.markdown(
-            '<div class="status-pill status-pill-warn">Mock Mode — Simulated Data</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        if api_client.is_available():
-            st.sidebar.markdown(
-                '<div class="status-pill status-pill-ok">API Connected</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.sidebar.markdown(
-                '<div class="status-pill status-pill-error">API Unavailable</div>',
-                unsafe_allow_html=True,
-            )
-
-    st.sidebar.markdown("<div style='margin:10px 0 4px;'></div>", unsafe_allow_html=True)
-
     # Navigation
     page = st.sidebar.radio(
         "Navigation",
         ["Dashboard", "Analytics", "Explainability", "System"],
-        index=["Dashboard", "Analytics", "Explainability", "System"].index(
-            st.session_state.active_page
-        ),
         label_visibility="collapsed",
     )
-    st.session_state.active_page = page
 
     # City quick-status strip
     pred = st.session_state.get("prediction_data")
@@ -97,15 +71,15 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
         city_rows = ""
         for city in ["Karachi", "Lahore", "Islamabad"]:
             if city == selected:
-                dot_color = color_now
                 cat_label = f"<b>AQI {aqi_now}</b> · {cat_now}"
+                city_style = f"font-weight: 600; color: {color_now};"
             else:
-                dot_color = "#CBD5E1"
                 cat_label = "<span style='color:#94A3B8;'>—</span>"
+                city_style = "color: #94A3B8;"
 
             city_rows += (
                 f'<div class="city-strip-item">'
-                f'<span><span class="city-dot" style="background:{dot_color};"></span>{city}</span>'
+                f'<span style="{city_style}">{city}</span>'
                 f'<span style="font-size:0.72rem;">{cat_label}</span>'
                 f'</div>'
             )
@@ -117,7 +91,7 @@ def _render_sidebar_nav(api_client: APIClient) -> str:
     else:
         city_rows = "".join(
             f'<div class="city-strip-item">'
-            f'<span><span class="city-dot" style="background:{CITY_COLORS[c]};opacity:0.4;"></span>{c}</span>'
+            f'<span style="color:#94A3B8;">{c}</span>'
             f'<span style="font-size:0.7rem;color:#94A3B8;">—</span>'
             f'</div>'
             for c in ["Karachi", "Lahore", "Islamabad"]

@@ -32,7 +32,7 @@ from app.frontend.utils.formatters import format_time_ago, format_timestamp
 
 VALID_CITIES = ["Karachi", "Lahore", "Islamabad"]
 
-_CITY_FLAGS = {"Karachi": "🏙️", "Lahore": "🌳", "Islamabad": "🏔️"}
+_CITY_FLAGS = {"Karachi": "", "Lahore": "", "Islamabad": ""}
 
 
 def render_dashboard(api_client: APIClient):
@@ -95,18 +95,8 @@ def render_dashboard(api_client: APIClient):
     city_flag = _CITY_FLAGS.get(selected_city, "")
     model_ver = prediction.get("model_version", "v1")
 
-    st.markdown(
-        f"""
-        <div class="page-hero">
-          <div class="page-hero-title">{city_flag} {selected_city} — Air Quality Forecast</div>
-          <div class="page-hero-sub" style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-            Current 24h AQI: {badge_html}
-            <span style="opacity:0.7;">Model {model_ver}</span>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title(f"{selected_city}")
+    st.markdown(f"**Current Status:** {badge_html} &nbsp;·&nbsp; Model: `{model_ver}`", unsafe_allow_html=True)
 
     # Confidence intervals (extract early for KPI cards)
     confidence = prediction.get("confidence")

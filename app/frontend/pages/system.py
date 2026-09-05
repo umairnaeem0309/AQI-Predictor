@@ -44,21 +44,8 @@ def render_system(api_client: APIClient):
         _hero_status = ("API Unreachable", "#D50000", "#FFEBEE")
 
     # Page hero
-    hero_label, hero_color, hero_bg = _hero_status
-    st.markdown(
-        f"""
-        <div class="page-hero">
-          <div class="page-hero-title">System Status</div>
-          <div class="page-hero-sub" style="display:flex;align-items:center;gap:12px;margin-top:10px;">
-            <span style="background:{hero_bg};color:{hero_color};border:1.5px solid {hero_color};
-                  border-radius:20px;padding:4px 14px;font-size:0.82rem;font-weight:700;">
-              {hero_label}
-            </span>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title("System Status")
+    st.caption(f"Current State: **{_hero_status[0]}**")
 
     if st.button("Refresh Status", key="refresh_system"):
         st.rerun()

@@ -124,20 +124,18 @@ def render_status_card(
         status: 'ok', 'warning', or 'error'
         icon: Optional emoji icon override
     """
-    dot_cls = _DOT_CLASS.get(status, "dot-ok animated")
     status_colors = {"ok": "#00C853", "warning": "#FF9800", "error": "#D50000"}
     text_color = status_colors.get(status, "#64748B")
 
     st.markdown(
         f"""
-        <div class="health-card">
-          <div class="health-card-body">
-            <div class="health-card-label">{label}</div>
-            <div class="health-card-value" style="display:flex;align-items:center;gap:6px;">
-              <span class="status-dot {dot_cls}"></span>
-              <span style="color:{text_color};">{value}</span>
+        <div style="padding: 6px 0; border-bottom: 1px solid #F1F5F9; margin-bottom: 4px;">
+            <div style="font-size: 0.75rem; color: #64748B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">
+                {label}
             </div>
-          </div>
+            <div style="font-size: 0.95rem; color: {text_color}; font-weight: 500;">
+                {value}
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -157,10 +155,19 @@ def render_info_card(
         value: Display value
         help_text: Optional tooltip text
     """
-    st.metric(
-        label=label,
-        value=str(value) if value is not None else "N/A",
-        help=help_text,
+    display_val = str(value) if value is not None else "N/A"
+    st.markdown(
+        f"""
+        <div style="padding: 6px 0; border-bottom: 1px solid #F1F5F9; margin-bottom: 4px;">
+            <div style="font-size: 0.75rem; color: #64748B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">
+                {label}
+            </div>
+            <div style="font-size: 0.95rem; color: #0F172A; font-weight: 500; word-wrap: break-word;">
+                {display_val}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 

@@ -30,17 +30,8 @@ def render_explainability(api_client: APIClient):
     st.markdown(get_dashboard_css(), unsafe_allow_html=True)
 
     # Page hero
-    st.markdown(
-        """
-        <div class="page-hero">
-          <div class="page-hero-title">Model Explainability</div>
-          <div class="page-hero-sub">
-            Feature importance, SHAP analysis, per-prediction explanations, and model benchmarks.
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title("Model Explainability")
+    st.caption("Feature importance, SHAP analysis, per-prediction explanations, and model benchmarks.")
 
     # Tab layout — NO st.status() inside tabs to avoid double-click rerun bug
     tab1, tab2, tab3, tab4 = st.tabs(
